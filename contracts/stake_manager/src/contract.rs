@@ -1,14 +1,21 @@
 use std::ops::{Add, Mul};
-use cosmwasm_std::{coin, to_json_binary, entry_point, from_json, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdError, StdResult, SubMsg, Uint128, Coin, WasmMsg, CustomQuery, Addr};
+use cosmwasm_std::{coin, to_json_binary, entry_point, from_json, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdError, StdResult, SubMsg, Uint128, WasmMsg, CustomQuery, Addr};
 use cw2::set_contract_version;
 use neutron_sdk::{bindings::{
 	msg::{IbcFee, MsgIbcTransferResponse, NeutronMsg},
 	query::NeutronQuery,
-}, query::min_ibc_fee::query_min_ibc_fee, sudo::msg::{RequestPacket, RequestPacketTimeoutHeight, TransferSudoMsg}, NeutronResult, NeutronError};
+}, query::min_ibc_fee::query_min_ibc_fee, sudo::msg::{RequestPacket, RequestPacketTimeoutHeight}, NeutronResult, NeutronError};
+use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::interchain_txs::helpers::get_port_id;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use cw20_ratom::{msg};
+use cosmos_sdk_proto::cosmos::bank::v1beta1::{
+	MsgSend
+};
+use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
+use cosmos_sdk_proto::prost::Message;
+use neutron_sdk::sudo::msg::SudoMsg;
 use crate::{
 	msg::{ExecuteMsg, InstantiateMsg, MigrateMsg},
 	state::{
@@ -18,8 +25,21 @@ use crate::{
 };
 use crate::state::{INTERCHAIN_ACCOUNTS, POOL_INFOS, STATE, State, UnstakeInfo, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX};
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+struct OpenAckVersion {
+	version: String,
+	controller_connection_id: String,
+	host_connection_id: String,
+	address: String,
+	encoding: String,
+	tx_type: String,
+}
+
 // Default timeout for IbcTransfer is 10000000 blocks
 const DEFAULT_TIMEOUT_HEIGHT: u64 = 10000000;
+
+pub const SUDO_PAYLOAD_REPLY_ID: u64 = 1;
 
 // Default timeout for SubmitTX is two weeks
 pub const DEFAULT_TIMEOUT_SECONDS: u64 = 60 * 60 * 24 * 7 * 2;
@@ -83,11 +103,11 @@ pub fn execute(
 			neutron_address
 		} => execute_stake(deps, env, neutron_address, info),
 		ExecuteMsg::Unstake {
-			amount, interchain_account_id, receiver
-		} => execute_unstake(deps, env, info, amount, interchain_account_id, receiver),
+			amount, interchain_account_id
+		} => execute_unstake(deps, env, info, amount, interchain_account_id),
 		ExecuteMsg::Withdraw {
-			stake_pool
-		} => execute_withdraw(deps, env, info, stake_pool),
+			stake_pool, receiver, interchain_account_id
+		} => execute_withdraw(deps, env, info, stake_pool, receiver, interchain_account_id),
 		ExecuteMsg::NewEra {
 			channel, interchain_account_id
 		} => execute_new_era(deps, env, info.funds, interchain_account_id, channel),
@@ -98,22 +118,36 @@ pub fn execute(
 // Example of different payload types
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub struct Type {
+pub struct IbcSendType {
 	pub message: String,
 }
 
-// a callback handler for payload of Type1
-fn sudo_callback(deps: Deps, payload: Type) -> StdResult<Response> {
+// a callback handler for payload of IbcSendType
+fn sudo_ibc_send_callback(deps: Deps, payload: IbcSendType) -> StdResult<Response> {
 	deps.api
-		.debug(format!("WASMDEBUG: callback: sudo payload: {:?}", payload).as_str());
+		.debug(format!("WASMDEBUG: callback: ibc send sudo payload: {:?}", payload).as_str());
 	Ok(Response::new())
 }
 
-// todo: clean types and payload
+// a callback handler for payload of InterTxType
+fn sudo_inter_tx_callback(deps: Deps, payload: InterTxType) -> StdResult<Response> {
+	deps.api
+		.debug(format!("WASMDEBUG: callback: inter tx sudo payload: {:?}", payload).as_str());
+	Ok(Response::new())
+}
+
 // Enum representing payload to process during handling acknowledgement messages in Sudo handler
 #[derive(Serialize, Deserialize)]
 pub enum SudoPayload {
-	HandlerPayload(Type),
+	HandlerPayloadIbcSend(IbcSendType),
+	HandlerPayloadInterTx(InterTxType),
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct InterTxType {
+	pub message: String,
+	pub port_id: String,
 }
 
 // saves payload to process later to the storage and returns a SubmitTX Cosmos SubMsg with necessary reply id
@@ -199,7 +233,6 @@ fn execute_unstake(
 	info: MessageInfo,
 	amount: Uint128,
 	interchain_account_id: String,
-	receiver: Addr,
 ) -> NeutronResult<Response<NeutronMsg>> {
 	if amount == Uint128::zero() {
 		return Err(NeutronError::Std(StdError::generic_err(format!(
@@ -233,7 +266,6 @@ fn execute_unstake(
 	let unstake_info = UnstakeInfo {
 		era: state.era,
 		pool: delegator,
-		receiver,
 		amount: token_amount,
 	};
 
@@ -262,10 +294,12 @@ fn execute_unstake(
 }
 
 fn execute_withdraw(
-	deps: DepsMut<NeutronQuery>,
-	_: Env,
+	mut deps: DepsMut<NeutronQuery>,
+	env: Env,
 	info: MessageInfo,
 	stake_pool: String,
+	receiver: Addr,
+	interchain_account_id: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
 	let mut total_withdraw_amount = Uint128::zero();
 	let mut unstakes = UNSTAKES_INDEX_FOR_USER.load(deps.storage, &info.sender)?;
@@ -310,13 +344,57 @@ fn execute_withdraw(
 		.join(",");
 
 	// todo: interchain tx send atom
+	let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
+	let (delegator, connection_id) = get_ica(deps.as_ref(), &env, &interchain_account_id)?;
+	let ica_send = MsgSend {
+		from_address: delegator,
+		to_address: receiver.to_string(),
+		amount: Vec::from([Coin {
+			denom: state.atom_ibc_denom,
+			amount: total_withdraw_amount.to_string(),
+		}]),
+	};
+	let mut buf = Vec::new();
+	buf.reserve(ica_send.encoded_len());
+
+	if let Err(e) = ica_send.encode(&mut buf) {
+		return Err(NeutronError::Std(StdError::generic_err(format!(
+			"Encode error: {}",
+			e
+		))));
+	}
+
+	let any_msg = ProtobufAny {
+		type_url: "/cosmos.bank.v1beta1.MsgSend".to_string(),
+		value: Binary::from(buf),
+	};
+
+	let cosmos_msg = NeutronMsg::submit_tx(
+		connection_id,
+		interchain_account_id.clone(),
+		vec![any_msg],
+		"".to_string(),
+		DEFAULT_TIMEOUT_SECONDS,
+		fee,
+	);
+
+	// We use a submessage here because we need the process message reply to save
+	// the outgoing IBC packet identifier for later.
+	let submsg = msg_with_sudo_callback(
+		deps.branch(),
+		cosmos_msg,
+		SudoPayload::HandlerPayloadInterTx(InterTxType {
+			port_id: get_port_id(env.contract.address.as_str(), &interchain_account_id),
+			message: "message".to_string(),
+		}),
+	)?;
 
 	Ok(Response::new()
 		.add_attribute("action", "withdraw")
 		.add_attribute("from", info.sender)
 		.add_attribute("pool", stake_pool)
 		.add_attribute("unstake_index_list", unstake_index_list_str)
-		.add_attribute("amount", total_withdraw_amount)
+		.add_attribute("amount", total_withdraw_amount).add_submessages(vec![submsg])
 	)
 }
 
@@ -332,7 +410,7 @@ fn execute_stake_lsm(
 fn execute_new_era(
 	mut deps: DepsMut<NeutronQuery>,
 	env: Env,
-	funds: Vec<Coin>,
+	funds: Vec<cosmwasm_std::Coin>,
 	interchain_account_id: String,
 	channel: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
@@ -380,27 +458,48 @@ fn execute_new_era(
 	let submsg = msg_with_sudo_callback(
 		deps.branch(),
 		msg,
-		SudoPayload::HandlerPayload(Type {
+		SudoPayload::HandlerPayloadIbcSend(IbcSendType {
 			message: "message".to_string(),
 		}),
 	)?;
 
 	deps.as_ref().api.debug(format!("WASMDEBUG: execute_send: sent submsg: {:?}", submsg).as_str());
 
+	// todo: event
+
 	Ok(Response::default().add_submessages(vec![submsg]))
 }
 
 #[entry_point]
-pub fn sudo(deps: DepsMut, _env: Env, msg: TransferSudoMsg) -> StdResult<Response> {
+pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> StdResult<Response> {
+	deps.api
+		.debug(format!("WASMDEBUG: sudo: received sudo msg: {:?}", msg).as_str());
+
 	match msg {
 		// For handling successful (non-error) acknowledgements
-		TransferSudoMsg::Response { request, data } => sudo_response(deps, request, data),
+		SudoMsg::Response { request, data } => sudo_response(deps, request, data),
 
 		// For handling error acknowledgements
-		TransferSudoMsg::Error { request, details } => sudo_error(deps, request, details),
+		SudoMsg::Error { request, details } => sudo_error(deps, request, details),
 
 		// For handling error timeouts
-		TransferSudoMsg::Timeout { request } => sudo_timeout(deps, request),
+		SudoMsg::Timeout { request } => sudo_timeout(deps, request),
+
+		// For handling successful registering of ICA
+		SudoMsg::OpenAck {
+			port_id,
+			channel_id,
+			counterparty_channel_id,
+			counterparty_version,
+		} => sudo_open_ack(
+			deps,
+			env,
+			port_id,
+			channel_id,
+			counterparty_channel_id,
+			counterparty_version,
+		),
+		_ => Ok(Response::default()),
 	}
 }
 
@@ -442,10 +541,40 @@ fn sudo_response(deps: DepsMut, req: RequestPacket, data: Binary) -> StdResult<R
 		.ok_or_else(|| StdError::generic_err("channel_id not found"))?;
 
 	match read_sudo_payload(deps.storage, channel_id, seq_id)? {
-		SudoPayload::HandlerPayload(t) => sudo_callback(deps.as_ref(), t),
+		SudoPayload::HandlerPayloadIbcSend(t) => sudo_ibc_send_callback(deps.as_ref(), t),
+		SudoPayload::HandlerPayloadInterTx(t) => sudo_inter_tx_callback(deps.as_ref(), t),
 	}
 	// at this place we can safely remove the data under (channel_id, seq_id) key
 	// but it costs an extra gas, so its on you how to use the storage
+}
+
+// handler
+fn sudo_open_ack(
+	deps: DepsMut,
+	_env: Env,
+	port_id: String,
+	_channel_id: String,
+	_counterparty_channel_id: String,
+	counterparty_version: String,
+) -> StdResult<Response> {
+	// The version variable contains a JSON value with multiple fields,
+	// including the generated account address.
+	let parsed_version: Result<OpenAckVersion, _> =
+		serde_json_wasm::from_str(counterparty_version.as_str());
+
+	// Update the storage record associated with the interchain account.
+	if let Ok(parsed_version) = parsed_version {
+		INTERCHAIN_ACCOUNTS.save(
+			deps.storage,
+			port_id,
+			&Some((
+				parsed_version.address,
+				parsed_version.controller_connection_id,
+			)),
+		)?;
+		return Ok(Response::default());
+	}
+	Err(StdError::generic_err("Can't parse counterparty_version"))
 }
 
 #[entry_point]

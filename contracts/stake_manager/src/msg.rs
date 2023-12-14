@@ -23,10 +23,11 @@ pub enum ExecuteMsg {
 	Unstake {
 		amount: Uint128,
 		interchain_account_id: String,
-		receiver: Addr,
 	},
 	Withdraw {
 		stake_pool: String,
+		receiver: Addr,
+		interchain_account_id: String,
 	},
 	NewEra {
 		channel: String,
@@ -34,7 +35,7 @@ pub enum ExecuteMsg {
 	},
 	StakeLSM {
 		// todo!
-	}
+	},
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]

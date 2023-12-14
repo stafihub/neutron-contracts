@@ -33,7 +33,6 @@ pub const STATE: Item<State> = Item::new("state");
 pub struct UnstakeInfo {
 	pub era: Uint128,
 	pub pool: String,
-	pub receiver: Addr,
 	pub amount: Uint128,
 }
 
