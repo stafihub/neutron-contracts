@@ -1,5 +1,6 @@
 use cosmwasm_std::{from_json, Binary, StdResult, Storage, to_json_vec, Coin, Addr, Uint128};
 use cw_storage_plus::{Item, Map};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::contract::SudoPayload;
@@ -21,9 +22,32 @@ pub struct State {
 	pub cw20: Addr,
 	pub era: Uint128,
 	pub rate: Uint128,
+	pub unstake_times_limit: Uint128,
+	pub next_unstake_index: Uint128,
 }
 
 pub const STATE: Item<State> = Item::new("state");
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct UnstakeInfo {
+	pub era: Uint128,
+	pub pool: String,
+	pub receiver: Addr,
+	pub amount: Uint128,
+}
+
+pub const UNSTAKES_OF_USER: Map<&Addr, Vec<UnstakeInfo>> = Map::new("unstakes");
+
+
+// todo: If multiple pool is supported, it can be changed to pool.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct PoolInfo {
+	pub unbond: Uint128,
+	pub active: Uint128,
+}
+
+pub const POOL_INFOS: Item<PoolInfo> = Item::new("pool_info");
+
 
 pub const INTERCHAIN_ACCOUNTS: Map<String, Option<(String, String)>> =
 	Map::new("interchain_accounts");

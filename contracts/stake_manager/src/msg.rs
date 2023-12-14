@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr, Coin};
+use cosmwasm_std::{Addr, Coin, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -9,6 +9,8 @@ pub struct InstantiateMsg {
 	pub interchain_account_id: String,
 	pub cw20_address: Addr,
 	pub atom_ibc_denom: String,
+	pub unstake_times_limit: Uint128,
+	pub next_unstake_index: Uint128,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
@@ -18,7 +20,9 @@ pub enum ExecuteMsg {
 		neutron_address: String,
 	},
 	Unstake {
-		amount: u128,
+		amount: Uint128,
+		interchain_account_id: String,
+		receiver: Addr,
 	},
 	Withdraw {},
 	NewEra {

@@ -1,18 +1,14 @@
-use std::ops::Mul;
-use cosmwasm_std::{coin, to_json_binary, entry_point, from_json, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdError, StdResult, SubMsg, Uint128, Coin, WasmMsg, CustomQuery};
+use std::ops::{Add, Mul};
+use cosmwasm_std::{coin, to_json_binary, entry_point, from_json, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdError, StdResult, SubMsg, Uint128, Coin, WasmMsg, CustomQuery, Addr};
 use cw2::set_contract_version;
-use neutron_sdk::{
-	bindings::{
-		msg::{IbcFee, MsgIbcTransferResponse, NeutronMsg},
-		query::NeutronQuery,
-	},
-	query::min_ibc_fee::query_min_ibc_fee,
-	sudo::msg::{RequestPacket, RequestPacketTimeoutHeight, TransferSudoMsg},
-	NeutronResult,
-};
+use neutron_sdk::{bindings::{
+	msg::{IbcFee, MsgIbcTransferResponse, NeutronMsg},
+	query::NeutronQuery,
+}, query::min_ibc_fee::query_min_ibc_fee, sudo::msg::{RequestPacket, RequestPacketTimeoutHeight, TransferSudoMsg}, NeutronResult, NeutronError};
 use neutron_sdk::interchain_txs::helpers::get_port_id;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use cw20_ratom::msg;
 use crate::{
 	msg::{ExecuteMsg, InstantiateMsg, MigrateMsg},
 	state::{
@@ -20,7 +16,7 @@ use crate::{
 		IBC_SUDO_ID_RANGE_END, IBC_SUDO_ID_RANGE_START,
 	},
 };
-use crate::state::{INTERCHAIN_ACCOUNTS, STATE, State};
+use crate::state::{INTERCHAIN_ACCOUNTS, POOL_INFOS, STATE, State, UnstakeInfo, UNSTAKES_OF_USER};
 
 // Default timeout for IbcTransfer is 10000000 blocks
 const DEFAULT_TIMEOUT_HEIGHT: u64 = 10000000;
@@ -55,6 +51,8 @@ pub fn instantiate(
 			atom_ibc_denom: msg.atom_ibc_denom,
 			era: Uint128::zero(),
 			rate: Uint128::one(),
+			unstake_times_limit: msg.unstake_times_limit,
+			next_unstake_index: Uint128::zero(),
 		}),
 	)?;
 
@@ -84,8 +82,8 @@ pub fn execute(
 			neutron_address
 		} => execute_stake(deps, env, neutron_address, info),
 		ExecuteMsg::Unstake {
-			amount
-		} => execute_unstake(deps, env, info, amount),
+			amount, interchain_account_id, receiver
+		} => execute_unstake(deps, env, info, amount, interchain_account_id, receiver),
 		ExecuteMsg::Withdraw {} => execute_withdraw(deps, env, info),
 		ExecuteMsg::NewEra {
 			channel, interchain_account_id
@@ -180,27 +178,92 @@ fn execute_stake(
 				.unwrap_or(Uint128::zero())
 		);
 	}
-	// todo: Exchange rate conversion
+	// todo: Exchange rate conversion in new era function
 	amount = amount.mul(state.rate.u128());
 
 	let msg = WasmMsg::Execute {
 		contract_addr: state.cw20.to_string(),
-		msg: to_json_binary(&cw20::Cw20ExecuteMsg::Mint { recipient: neutron_address.to_string(), amount: Uint128::from(amount) })?,
+		msg: to_json_binary(&msg::ExecuteMsg::Mint { recipient: neutron_address.to_string(), amount: Uint128::from(amount) })?,
 		funds: vec![],
 	};
 
+	// todo: add event
 	Ok(Response::new()
 		.add_message(CosmosMsg::Wasm(msg))
 		.add_attribute("mint", "call_contract_b"))
 }
 
+// todo: Don't consider the service charge for the time being.
+// todo: Before this step, ask the user to authorize burn from
 fn execute_unstake(
-	_: DepsMut<NeutronQuery>,
-	_: Env,
-	_: MessageInfo,
-	_amount: u128,
+	deps: DepsMut<NeutronQuery>,
+	env: Env,
+	info: MessageInfo,
+	amount: Uint128,
+	interchain_account_id: String,
+	receiver: Addr,
 ) -> NeutronResult<Response<NeutronMsg>> {
-	Ok(Response::new())
+	if amount == Uint128::zero() {
+		return Err(NeutronError::Std(StdError::generic_err(format!(
+			"Encode error: {}", "LSD token amount is zero"
+		))));
+	}
+
+	let mut state = STATE.load(deps.storage)?;
+
+	// todo: Abstract as a method
+	let unstake_count = UNSTAKES_OF_USER.load(deps.storage, &info.sender)?.len() as u128;
+	let unstake_limit = state.unstake_times_limit.u128();
+	if unstake_count >= unstake_limit {
+		return Err(NeutronError::Std(StdError::generic_err(format!(
+			"Encode error: {}", "Unstake times limit reached"
+		))));
+	}
+
+	// Calculate the number of tokens(atom)
+	let token_amount = amount.mul(state.rate);
+
+	let (delegator, _) = get_ica(deps.as_ref(), &env, &interchain_account_id)?;
+
+	// update pool info
+	let mut pool_info = POOL_INFOS.load(deps.storage)?;
+	pool_info.unbond += token_amount;
+	pool_info.active -= token_amount;
+	POOL_INFOS.save(deps.storage, &(pool_info))?;
+
+	let will_use_unstake_index = state.next_unstake_index;
+	state.next_unstake_index = state.next_unstake_index.add(Uint128::one());
+	STATE.save(deps.storage, &state)?;
+
+	// update unstake info
+	let unstake_info = UnstakeInfo {
+		era: state.era,
+		pool: delegator,
+		receiver,
+		amount: token_amount,
+	};
+
+	UNSTAKES_OF_USER.update(deps.storage, &info.sender, |unstake_list| -> StdResult<_> {
+		let mut list = unstake_list.unwrap_or_default();
+		list.push(unstake_info.clone());
+		Ok(list)
+	})?;
+
+	// burn
+	let msg = WasmMsg::Execute {
+		contract_addr: state.cw20.to_string(),
+		msg: to_json_binary(&msg::ExecuteMsg::BurnFrom { owner: info.sender.to_string(), amount: Default::default() })?,
+		funds: vec![],
+	};
+
+	// send event
+	Ok(Response::new()
+		.add_message(CosmosMsg::Wasm(msg))
+		.add_attribute("action", "unstake")
+		.add_attribute("from", info.sender)
+		.add_attribute("token_amount", token_amount.to_string())
+		.add_attribute("lsd_token_amount", amount.to_string())
+		.add_attribute("unstake_index", will_use_unstake_index.to_string()))
 }
 
 fn execute_withdraw(
