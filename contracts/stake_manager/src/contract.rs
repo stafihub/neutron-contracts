@@ -8,7 +8,7 @@ use neutron_sdk::{bindings::{
 use neutron_sdk::interchain_txs::helpers::get_port_id;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use cw20_ratom::{ContractError, msg};
+use cw20_ratom::{msg};
 use crate::{
 	msg::{ExecuteMsg, InstantiateMsg, MigrateMsg},
 	state::{
@@ -85,7 +85,9 @@ pub fn execute(
 		ExecuteMsg::Unstake {
 			amount, interchain_account_id, receiver
 		} => execute_unstake(deps, env, info, amount, interchain_account_id, receiver),
-		ExecuteMsg::Withdraw {} => execute_withdraw(deps, env, info),
+		ExecuteMsg::Withdraw {
+			stake_pool
+		} => execute_withdraw(deps, env, info, stake_pool),
 		ExecuteMsg::NewEra {
 			channel, interchain_account_id
 		} => execute_new_era(deps, env, info.funds, interchain_account_id, channel),
@@ -263,9 +265,59 @@ fn execute_withdraw(
 	deps: DepsMut<NeutronQuery>,
 	_: Env,
 	info: MessageInfo,
+	stake_pool: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
+	let mut total_withdraw_amount = Uint128::zero();
+	let mut unstakes = UNSTAKES_INDEX_FOR_USER.load(deps.storage, &info.sender)?;
 
-	Ok(Response::new())
+	let mut emit_unstake_index_list = vec![];
+	let mut indices_to_remove = Vec::new();
+
+	let state = STATE.load(deps.storage)?;
+
+	for (i, unstake_index) in unstakes.iter().enumerate() {
+		let unstake_info = UNSTAKES_OF_INDEX.load(deps.storage, unstake_index.u128())?;
+		if unstake_info.era + state.unbonding_period > state.era || unstake_info.pool != stake_pool {
+			continue;
+		}
+
+		// Remove the unstake index element of info.sender from UNSTAKES_INDEX_FOR_USER
+		total_withdraw_amount += unstake_info.amount;
+		emit_unstake_index_list.push(*unstake_index);
+		indices_to_remove.push(i);
+	}
+
+	// Reverse sort the indices to remove to avoid shifting issues during removal
+	indices_to_remove.sort_unstable_by(|a, b| b.cmp(a));
+
+	// Remove the elements
+	for index in indices_to_remove {
+		unstakes.remove(index);
+	}
+
+	UNSTAKES_INDEX_FOR_USER.save(deps.storage, &info.sender, &unstakes)?;
+
+	if total_withdraw_amount.is_zero() {
+		return Err(NeutronError::Std(StdError::generic_err(format!(
+			"Encode error: {}", "Zero withdraw amount"
+		))));
+	}
+
+	let unstake_index_list_str = emit_unstake_index_list
+		.iter()
+		.map(|index| index.u128().to_string())
+		.collect::<Vec<String>>()
+		.join(",");
+
+	// todo: interchain tx send atom
+
+	Ok(Response::new()
+		.add_attribute("action", "withdraw")
+		.add_attribute("from", info.sender)
+		.add_attribute("pool", stake_pool)
+		.add_attribute("unstake_index_list", unstake_index_list_str)
+		.add_attribute("amount", total_withdraw_amount)
+	)
 }
 
 fn execute_stake_lsm(

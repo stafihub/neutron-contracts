@@ -25,7 +25,9 @@ pub enum ExecuteMsg {
 		interchain_account_id: String,
 		receiver: Addr,
 	},
-	Withdraw {},
+	Withdraw {
+		stake_pool: String,
+	},
 	NewEra {
 		channel: String,
 		interchain_account_id: String,
