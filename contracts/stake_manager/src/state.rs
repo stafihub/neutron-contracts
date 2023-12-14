@@ -24,6 +24,7 @@ pub struct State {
 	pub rate: Uint128,
 	pub unstake_times_limit: Uint128,
 	pub next_unstake_index: Uint128,
+	pub unbonding_period: Uint128,
 }
 
 pub const STATE: Item<State> = Item::new("state");
@@ -36,7 +37,8 @@ pub struct UnstakeInfo {
 	pub amount: Uint128,
 }
 
-pub const UNSTAKES_OF_USER: Map<&Addr, Vec<UnstakeInfo>> = Map::new("unstakes");
+pub const UNSTAKES_OF_INDEX: Map<u128, UnstakeInfo> = Map::new("unstakes_of_index");
+pub const UNSTAKES_INDEX_FOR_USER: Map<&Addr, Vec<Uint128>> = Map::new("unstakes_index_for_user");
 
 
 // todo: If multiple pool is supported, it can be changed to pool.

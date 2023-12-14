@@ -11,6 +11,7 @@ pub struct InstantiateMsg {
 	pub atom_ibc_denom: String,
 	pub unstake_times_limit: Uint128,
 	pub next_unstake_index: Uint128,
+	pub unbonding_period: Uint128,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
@@ -29,6 +30,9 @@ pub enum ExecuteMsg {
 		channel: String,
 		interchain_account_id: String,
 	},
+	StakeLSM {
+		// todo!
+	}
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]

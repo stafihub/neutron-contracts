@@ -8,7 +8,7 @@ use neutron_sdk::{bindings::{
 use neutron_sdk::interchain_txs::helpers::get_port_id;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use cw20_ratom::msg;
+use cw20_ratom::{ContractError, msg};
 use crate::{
 	msg::{ExecuteMsg, InstantiateMsg, MigrateMsg},
 	state::{
@@ -16,7 +16,7 @@ use crate::{
 		IBC_SUDO_ID_RANGE_END, IBC_SUDO_ID_RANGE_START,
 	},
 };
-use crate::state::{INTERCHAIN_ACCOUNTS, POOL_INFOS, STATE, State, UnstakeInfo, UNSTAKES_OF_USER};
+use crate::state::{INTERCHAIN_ACCOUNTS, POOL_INFOS, STATE, State, UnstakeInfo, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX};
 
 // Default timeout for IbcTransfer is 10000000 blocks
 const DEFAULT_TIMEOUT_HEIGHT: u64 = 10000000;
@@ -53,6 +53,7 @@ pub fn instantiate(
 			rate: Uint128::one(),
 			unstake_times_limit: msg.unstake_times_limit,
 			next_unstake_index: Uint128::zero(),
+			unbonding_period: msg.unbonding_period,
 		}),
 	)?;
 
@@ -88,6 +89,7 @@ pub fn execute(
 		ExecuteMsg::NewEra {
 			channel, interchain_account_id
 		} => execute_new_era(deps, env, info.funds, interchain_account_id, channel),
+		ExecuteMsg::StakeLSM {} => execute_stake_lsm(deps, env, info),
 	}
 }
 
@@ -96,12 +98,6 @@ pub fn execute(
 #[serde(rename_all = "snake_case")]
 pub struct Type {
 	pub message: String,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub struct Type2 {
-	pub data: String,
 }
 
 // a callback handler for payload of Type1
@@ -212,7 +208,7 @@ fn execute_unstake(
 	let mut state = STATE.load(deps.storage)?;
 
 	// todo: Abstract as a method
-	let unstake_count = UNSTAKES_OF_USER.load(deps.storage, &info.sender)?.len() as u128;
+	let unstake_count = UNSTAKES_INDEX_FOR_USER.load(deps.storage, &info.sender)?.len() as u128;
 	let unstake_limit = state.unstake_times_limit.u128();
 	if unstake_count >= unstake_limit {
 		return Err(NeutronError::Std(StdError::generic_err(format!(
@@ -231,10 +227,6 @@ fn execute_unstake(
 	pool_info.active -= token_amount;
 	POOL_INFOS.save(deps.storage, &(pool_info))?;
 
-	let will_use_unstake_index = state.next_unstake_index;
-	state.next_unstake_index = state.next_unstake_index.add(Uint128::one());
-	STATE.save(deps.storage, &state)?;
-
 	// update unstake info
 	let unstake_info = UnstakeInfo {
 		era: state.era,
@@ -243,11 +235,12 @@ fn execute_unstake(
 		amount: token_amount,
 	};
 
-	UNSTAKES_OF_USER.update(deps.storage, &info.sender, |unstake_list| -> StdResult<_> {
-		let mut list = unstake_list.unwrap_or_default();
-		list.push(unstake_info.clone());
-		Ok(list)
-	})?;
+	let will_use_unstake_index = state.next_unstake_index;
+
+	UNSTAKES_OF_INDEX.save(deps.storage, will_use_unstake_index.u128(), &unstake_info)?;
+
+	state.next_unstake_index = state.next_unstake_index.add(Uint128::one());
+	STATE.save(deps.storage, &state)?;
 
 	// burn
 	let msg = WasmMsg::Execute {
@@ -267,13 +260,22 @@ fn execute_unstake(
 }
 
 fn execute_withdraw(
+	deps: DepsMut<NeutronQuery>,
+	_: Env,
+	info: MessageInfo,
+) -> NeutronResult<Response<NeutronMsg>> {
+
+	Ok(Response::new())
+}
+
+fn execute_stake_lsm(
 	_: DepsMut<NeutronQuery>,
 	_: Env,
 	_: MessageInfo,
 ) -> NeutronResult<Response<NeutronMsg>> {
+	// todo!
 	Ok(Response::new())
 }
-
 
 fn execute_new_era(
 	mut deps: DepsMut<NeutronQuery>,
