@@ -15,6 +15,7 @@ use cosmos_sdk_proto::cosmos::bank::v1beta1::{
 };
 use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
 use cosmos_sdk_proto::prost::Message;
+use neutron_sdk::interchain_queries::v045::new_register_distribution_fee_pool_query_msg;
 use neutron_sdk::sudo::msg::SudoMsg;
 use crate::{
 	msg::{ExecuteMsg, InstantiateMsg, MigrateMsg},
@@ -57,7 +58,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 #[entry_point]
 pub fn instantiate(
 	deps: DepsMut,
-	env: Env,
+	_: Env,
 	info: MessageInfo,
 	msg: InstantiateMsg,
 ) -> NeutronResult<Response<NeutronMsg>> {
@@ -77,15 +78,7 @@ pub fn instantiate(
 		}),
 	)?;
 
-	let register = NeutronMsg::register_interchain_account(
-		msg.connection_id,
-		msg.interchain_account_id.clone(),
-	);
-	let key = get_port_id(env.contract.address.as_str(), &msg.interchain_account_id);
-	// we are saving empty data here because we handle response of registering ICA in sudo_open_ack method
-	INTERCHAIN_ACCOUNTS.save(deps.storage, key, &None)?;
-
-	Ok(Response::new().add_message(register))
+	Ok(Response::new())
 }
 
 #[entry_point]
@@ -99,6 +92,10 @@ pub fn execute(
 		// NOTE: this is an example contract that shows how to make IBC transfers!
 		// Please add necessary authorization or other protection mechanisms
 		// if you intend to send funds over IBC
+		ExecuteMsg::RegisterICA {
+			connection_id, interchain_account_id
+		} => execute_register_ica(deps, env, info, connection_id, interchain_account_id),
+		ExecuteMsg::RegisterICQ { connection_id, update_period } => execute_register_icq(deps, env, info, connection_id, update_period),
 		ExecuteMsg::Stake {
 			neutron_address
 		} => execute_stake(deps, env, neutron_address, info),
@@ -190,6 +187,36 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> StdResult<Response> {
 			msg.id
 		))),
 	}
+}
+
+fn execute_register_ica(
+	deps: DepsMut<NeutronQuery>,
+	env: Env,
+	_: MessageInfo,
+	connection_id: String,
+	interchain_account_id: String,
+) -> NeutronResult<Response<NeutronMsg>> {
+	let register = NeutronMsg::register_interchain_account(
+		connection_id.clone(),
+		interchain_account_id.clone(),
+	);
+	let key = get_port_id(env.contract.address.as_str(), &interchain_account_id);
+	// we are saving empty data here because we handle response of registering ICA in sudo_open_ack method
+	INTERCHAIN_ACCOUNTS.save(deps.storage, key, &None)?;
+
+	Ok(Response::default().add_message(register))
+}
+
+fn execute_register_icq(
+	_: DepsMut<NeutronQuery>,
+	_: Env,
+	_: MessageInfo,
+	connection_id: String,
+	update_period: u64,
+) -> NeutronResult<Response<NeutronMsg>> {
+	let msg = new_register_distribution_fee_pool_query_msg(connection_id, update_period)?;
+
+	Ok(Response::default().add_message(msg))
 }
 
 fn execute_stake(
@@ -422,6 +449,7 @@ fn execute_new_era(
 	// --------------------------------------------------------------------------------------------------
 
 	// todo: Funds is obtained from the internal status of the contract
+	// icq query ica rewards
 
 	let state = STATE.load(deps.storage)?;
 
