@@ -22,6 +22,11 @@ pub enum ExecuteMsg {
         connection_id: String,
         interchain_account_id: String,
     },
+    ConfigPool{
+        interchain_account_id: String,
+        validator_addrs: Vec<String>,
+        withdraw_addr: String,
+    },
     RegisterBalanceQuery {
         connection_id: String,
         update_period: u64,

@@ -37,6 +37,7 @@ use cw20_ratom::{msg};
 use cosmos_sdk_proto::cosmos::bank::v1beta1::{MsgSend};
 use neutron_sdk::interchain_queries::{v045::{new_register_delegator_delegations_query_msg}};
 use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
+use cosmos_sdk_proto::cosmos::distribution::v1beta1::MsgSetWithdrawAddress;
 use cosmos_sdk_proto::cosmos::staking::v1beta1::{MsgDelegate, MsgUndelegate};
 use cosmos_sdk_proto::prost::Message;
 use neutron_sdk::interchain_queries::v045::new_register_balance_query_msg;
@@ -86,6 +87,8 @@ pub const SUDO_PAYLOAD_REPLY_ID: u64 = 1;
 // Default timeout for SubmitTX is two weeks
 pub const DEFAULT_TIMEOUT_SECONDS: u64 = 60 * 60 * 24 * 7 * 2;
 
+pub const DEFAULT_UPDATE_PERIOD: u64 = 6;
+
 // config by instantiate
 // const UATOM_IBC_DENOM: &str =
 // 	"ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2";
@@ -117,18 +120,6 @@ pub fn instantiate(
 		}),
 	)?;
 
-	// todo: move to new entry point
-	// ERA.save(
-	// 	deps.storage,
-	// 	&(Era {
-	// 		era: msg.era,
-	// 		pre_era: msg.era - 1,
-	// 		rate: msg.rate,
-	// 		pre_rate: msg.rate,
-	// 		era_update_status: true,
-	// 	}),
-	// )?;
-
 	Ok(Response::new())
 }
 
@@ -143,10 +134,13 @@ pub fn execute(
 ) -> NeutronResult<Response<NeutronMsg>> {
 	match msg {
 		// NOTE: this is an example contract that shows how to make IBC transfers!
-		// Please add necessary authorization or other protection mechanisms
+		// todo: Please add necessary authorization or other protection mechanisms
 		// if you intend to send funds over IBC
 		ExecuteMsg::RegisterPool { connection_id, interchain_account_id } =>
 			execute_register_pool(deps, env, info, connection_id, interchain_account_id),
+		ExecuteMsg::ConfigPool {
+			interchain_account_id, validator_addrs, withdraw_addr
+		} => execute_config_pool(deps, env, info, interchain_account_id, validator_addrs, withdraw_addr),
 		ExecuteMsg::RegisterBalanceQuery {
 			connection_id,
 			addr,
@@ -261,18 +255,66 @@ fn execute_register_pool(
 	Ok(Response::default().add_message(register))
 }
 
-// todo: add execute to config the validator addrs and withdraw address on reply
+// add execute to config the validator addrs and withdraw address on reply
 fn execute_config_pool(
-	deps: DepsMut<NeutronQuery>,
+	mut deps: DepsMut<NeutronQuery>,
 	env: Env,
 	_: MessageInfo,
-	connection_id: String,
 	interchain_account_id: String,
+	validator_addrs: Vec<String>,
+	withdraw_addr: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
+	let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
 	let (delegator, connection_id) = get_ica(deps.as_ref(), &env, &interchain_account_id)?;
 
+	let msg = new_register_delegator_delegations_query_msg(
+		connection_id.clone(),
+		delegator.clone(),
+		validator_addrs,
+		DEFAULT_UPDATE_PERIOD,
+	)?;
 
-	Ok(Response::default())
+	let set_withdraw_msg = MsgSetWithdrawAddress {
+		delegator_address: delegator,
+		withdraw_address: withdraw_addr,
+	};
+	let mut buf = Vec::new();
+	buf.reserve(set_withdraw_msg.encoded_len());
+
+	if let Err(e) = set_withdraw_msg.encode(&mut buf) {
+		return Err(
+			NeutronError::Std(StdError::generic_err(format!("Encode error: {}", e)))
+		);
+	}
+
+	let any_msg = ProtobufAny {
+		type_url: "/cosmos.distribution.v1beta1.Msg/SetWithdrawAddress".to_string(),
+		value: Binary::from(buf),
+	};
+
+	let cosmos_msg = NeutronMsg::submit_tx(
+		connection_id.clone(),
+		interchain_account_id.clone(),
+		vec![any_msg],
+		"".to_string(),
+		DEFAULT_TIMEOUT_SECONDS,
+		fee.clone(),
+	);
+
+	// We use a submessage here because we need the process message reply to save
+	// the outgoing IBC packet identifier for later.
+	let submsg_setwithdraw = msg_with_sudo_callback(
+		deps.branch(),
+		cosmos_msg,
+		SudoPayload::HandlerPayloadInterTx(InterTxType {
+			port_id: get_port_id(env.contract.address.to_string(), interchain_account_id),
+			// Here you can store some information about the transaction to help you parse
+			// the acknowledgement later.
+			message: "set_delegator_withdraw_addr".to_string(),
+		}),
+	)?;
+
+	Ok(Response::new().add_message(msg).add_submessages(vec![submsg_setwithdraw]))
 }
 
 pub fn register_delegations_query(
@@ -569,7 +611,7 @@ fn execute_era_update(
 		// check era state
 		if era_info.era_update_status != EraUpdated {
 			deps.as_ref().api.debug(format!("WASMDEBUG: execute_era_update skip pool: {:?}", pool_addr).as_str());
-	        continue;
+			continue;
 		}
 
 		let mut amount = 0;
@@ -748,7 +790,7 @@ fn execute_era_bond(
 }
 
 fn execute_bond_active(
-	mut deps: DepsMut<NeutronQuery>,
+	deps: DepsMut<NeutronQuery>,
 	_: Env,
 	pool_addr: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
@@ -757,7 +799,7 @@ fn execute_bond_active(
 	// check era state
 	if era_info.era_update_status != BondReported {
 		deps.as_ref().api.debug(format!("WASMDEBUG: execute_era_bond skip pool: {:?}", pool_addr).as_str());
-		return Ok(Response::default())
+		return Ok(Response::default());
 	}
 	// todo: calculate the rate
 	// todo: calculate protocol fee
