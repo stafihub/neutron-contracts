@@ -13,6 +13,7 @@ pub const REPLY_QUEUE_ID: Map<u64, Vec<u8>> = Map::new("reply_queue_id");
 
 const REPLY_ID: Item<u64> = Item::new("reply_id");
 
+// todo: Organize the use of Uint128 and u128
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct State {
@@ -20,18 +21,38 @@ pub struct State {
 	pub owner: Addr,
 	pub atom_ibc_denom: String,
 	pub cw20: Addr,
-	pub era: Uint128,
-	pub rate: Uint128,
+	pub cosmos_validator: String,
 	pub unstake_times_limit: Uint128,
 	pub next_unstake_index: Uint128,
-	pub unbonding_period: Uint128,
+	pub unbonding_period: u128,
 }
 
 pub const STATE: Item<State> = Item::new("state");
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct WaitStakeInfo {
+	pub wait_stake: i128,
+	pub need_withdraw: i128,
+}
+
+pub const WAIT_STAKE_INFO: Item<WaitStakeInfo> = Item::new("wait_stake_info");
+
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct Era {
+	pub era: u128,
+	pub pre_era: u128,
+	pub rate: Uint128,
+	pub pre_rate: Uint128,
+	pub era_update_status: bool,
+}
+
+pub const ERA: Item<crate::state::Era> = Item::new("era");
+
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct UnstakeInfo {
-	pub era: Uint128,
+	pub era: u128,
 	pub pool: String,
 	pub amount: Uint128,
 }
