@@ -50,7 +50,12 @@ pub struct PoolInfo {
 
 pub const POOLS: Map<String, PoolInfo> = Map::new("pools");
 
-pub const POOL_ARRAY: Item<Vec<String>> = Item::new("pool_array");
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub enum PoolBondState {
+    EraUpdated = 0,
+    BondReported = 1,
+    ActiveReported = 2,
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Era {
@@ -58,7 +63,7 @@ pub struct Era {
     pub pre_era: u128,
     pub rate: Uint128,
     pub pre_rate: Uint128,
-    pub era_update_status: u16,
+    pub era_update_status: PoolBondState,
 }
 // key: pool_addr
 pub const POOL_ERA_INFO: Map<String, Era> = Map::new("pool_era_info");

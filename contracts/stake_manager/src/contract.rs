@@ -1,4 +1,4 @@
-use std::ops::{Add, Mul};
+use std::ops::{Add, Div, Mul};
 use cosmwasm_std::{
 	coin,
 	to_json_binary,
@@ -65,6 +65,7 @@ use crate::state::{
 	POOL_ERA_INFO,
 	POOL_ICA_MAP,
 };
+use crate::state::PoolBondState::{BondReported, EraUpdated};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -323,8 +324,7 @@ fn execute_stake(
 		);
 	}
 
-	// todo: calu rate
-	amount = amount.mul(era_info.rate.u128());
+	amount = amount.mul(era_info.rate.u128()).div(1_000_000);
 
 	let msg = WasmMsg::Execute {
 		contract_addr: state.cw20.to_string(),
@@ -565,7 +565,12 @@ fn execute_era_update(
 	let mut msgs = vec![];
 	for pool_addr in pool_array {
 		let pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
-		// todo: check era state
+		let era_info = POOL_ERA_INFO.load(deps.storage, pool_addr.clone())?;
+		// check era state
+		if era_info.era_update_status != EraUpdated {
+			deps.as_ref().api.debug(format!("WASMDEBUG: execute_era_update skip pool: {:?}", pool_addr).as_str());
+	        continue;
+		}
 
 		let mut amount = 0;
 		if !funds.is_empty() {
@@ -629,7 +634,12 @@ fn execute_era_bond(
 	let mut msgs = vec![];
 	for pool_addr in pool_array {
 		let pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
-		// todo: check era state
+		let era_info = POOL_ERA_INFO.load(deps.storage, pool_addr.clone())?;
+		// check era state
+		if era_info.era_update_status != BondReported {
+			deps.as_ref().api.debug(format!("WASMDEBUG: execute_era_bond skip pool: {:?}", pool_addr).as_str());
+			continue;
+		}
 
 		let interchain_account_id = POOL_ICA_MAP.load(deps.storage, pool_addr.clone())?;
 		if pool_info.unbond - pool_info.active > Int256::from(0) {
@@ -743,16 +753,19 @@ fn execute_bond_active(
 	pool_addr: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
 	let pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
-	// todo: check era state
+	let era_info = POOL_ERA_INFO.load(deps.storage, pool_addr.clone())?;
+	// check era state
+	if era_info.era_update_status != BondReported {
+		deps.as_ref().api.debug(format!("WASMDEBUG: execute_era_bond skip pool: {:?}", pool_addr).as_str());
+		return Ok(Response::default())
+	}
 	// todo: calculate the rate
 	// todo: calculate protocol fee
 	Ok(Response::default())
 }
 
-// todo: add ibc tx result reply
 // todo: update the rate in sudo replay
 // todo: update era state
-// todo: ica rewards
 #[entry_point]
 pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> StdResult<Response> {
 	deps.api.debug(format!("WASMDEBUG: sudo: received sudo msg: {:?}", msg).as_str());
