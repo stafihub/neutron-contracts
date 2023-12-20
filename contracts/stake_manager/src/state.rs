@@ -1,4 +1,14 @@
-use cosmwasm_std::{from_json, Binary, StdResult, Storage, to_json_vec, Coin, Addr, Uint128};
+use cosmwasm_std::{
+	from_json,
+	Binary,
+	StdResult,
+	Storage,
+	to_json_vec,
+	Coin,
+	Addr,
+	Uint128,
+	Int256,
+};
 use cw_storage_plus::{Item, Map};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -19,9 +29,7 @@ const REPLY_ID: Item<u64> = Item::new("reply_id");
 pub struct State {
 	pub minimal_stake: Coin,
 	pub owner: Addr,
-	pub atom_ibc_denom: String,
 	pub cw20: Addr,
-	pub cosmos_validator: String,
 	pub unstake_times_limit: Uint128,
 	pub next_unstake_index: Uint128,
 	pub unbonding_period: u128,
@@ -30,13 +38,21 @@ pub struct State {
 pub const STATE: Item<State> = Item::new("state");
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct WaitStakeInfo {
-	pub wait_stake: i128,
-	pub need_withdraw: i128,
+pub struct PoolInfo {
+	pub wait_stake: Int256,
+	pub need_withdraw: Int256,
+	pub unbond: Uint128,
+	pub active: Uint128,
+	pub withdraw_addr: String,
+	pub pool_addr: String,
+	pub ibc_denom: String,
+	pub connection_id: String,
+	pub validator_addrs: Vec<String>,
 }
 
-pub const WAIT_STAKE_INFO: Item<WaitStakeInfo> = Item::new("wait_stake_info");
+pub const POOLS: Map<String, PoolInfo> = Map::new("pools");
 
+pub const POOL_ARRAY: Item<Vec<String>> = Item::new("pool_array");
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Era {
@@ -47,8 +63,7 @@ pub struct Era {
 	pub era_update_status: bool,
 }
 
-pub const ERA: Item<crate::state::Era> = Item::new("era");
-
+pub const POOL_ERA_INFO: Map<String, Era> = Map::new("pool_era_info");
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct UnstakeInfo {
@@ -60,19 +75,12 @@ pub struct UnstakeInfo {
 pub const UNSTAKES_OF_INDEX: Map<u128, UnstakeInfo> = Map::new("unstakes_of_index");
 pub const UNSTAKES_INDEX_FOR_USER: Map<&Addr, Vec<Uint128>> = Map::new("unstakes_index_for_user");
 
+pub const POOL_DENOM_MPA: Map<String, String> = Map::new("pool_denom_mpa");
 
-// todo: If multiple pool is supported, it can be changed to pool.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct PoolInfo {
-	pub unbond: Uint128,
-	pub active: Uint128,
-}
-
-pub const POOL_INFOS: Item<PoolInfo> = Item::new("pool_info");
-
-
-pub const INTERCHAIN_ACCOUNTS: Map<String, Option<(String, String)>> =
-	Map::new("interchain_accounts");
+pub const INTERCHAIN_ACCOUNTS: Map<String, Option<(String, String)>> = Map::new(
+	"interchain_accounts"
+);
+pub const POOL_ICA_MAP: Map<String, String> = Map::new("pool_ica_map");
 
 /// get_next_id gives us an id for a reply msg
 /// dynamic reply id helps us to pass sudo payload to sudo handler via reply handler
@@ -83,7 +91,7 @@ pub const INTERCHAIN_ACCOUNTS: Map<String, Option<(String, String)>> =
 pub fn get_next_id(store: &mut dyn Storage) -> StdResult<u64> {
 	let mut id = REPLY_ID.may_load(store)?.unwrap_or(IBC_SUDO_ID_RANGE_START);
 	if id > IBC_SUDO_ID_RANGE_END {
-		id = IBC_SUDO_ID_RANGE_START
+		id = IBC_SUDO_ID_RANGE_START;
 	}
 	REPLY_ID.save(store, &(id + 1))?;
 	Ok(id)

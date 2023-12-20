@@ -1,31 +1,40 @@
 use std::ops::{Add, Mul};
-use cosmwasm_std::{coin, to_json_binary, entry_point, from_json, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdError, StdResult, SubMsg, Uint128, WasmMsg, CustomQuery, Addr};
+use cosmwasm_std::{coin, to_json_binary, entry_point, from_json, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdError, StdResult, SubMsg, Uint128, WasmMsg, CustomQuery, Addr, Int256};
 use cw2::set_contract_version;
-use neutron_sdk::{bindings::{
-	msg::{IbcFee, MsgIbcTransferResponse, NeutronMsg},
-	query::NeutronQuery,
-}, query::min_ibc_fee::query_min_ibc_fee, sudo::msg::{RequestPacket, RequestPacketTimeoutHeight}, NeutronResult, NeutronError};
+use neutron_sdk::{
+	bindings::{msg::{IbcFee, MsgIbcTransferResponse, NeutronMsg}, query::NeutronQuery},
+	query::min_ibc_fee::query_min_ibc_fee,
+	sudo::msg::{RequestPacket, RequestPacketTimeoutHeight},
+	NeutronResult,
+	NeutronError,
+};
 use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::interchain_txs::helpers::get_port_id;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use cw20_ratom::{msg};
-use cosmos_sdk_proto::cosmos::bank::v1beta1::{
-	MsgSend
+use cosmos_sdk_proto::cosmos::bank::v1beta1::{MsgSend};
+use neutron_sdk::interchain_queries::{
+	v045::{
+		new_register_delegator_delegations_query_msg,
+	},
 };
 use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
 use cosmos_sdk_proto::cosmos::staking::v1beta1::{MsgDelegate, MsgUndelegate};
 use cosmos_sdk_proto::prost::Message;
-use neutron_sdk::interchain_queries::v045::new_register_distribution_fee_pool_query_msg;
 use neutron_sdk::sudo::msg::SudoMsg;
 use crate::{
 	msg::{ExecuteMsg, InstantiateMsg, MigrateMsg},
 	state::{
-		read_reply_payload, read_sudo_payload, save_reply_payload, save_sudo_payload,
-		IBC_SUDO_ID_RANGE_END, IBC_SUDO_ID_RANGE_START,
+		read_reply_payload,
+		read_sudo_payload,
+		save_reply_payload,
+		save_sudo_payload,
+		IBC_SUDO_ID_RANGE_END,
+		IBC_SUDO_ID_RANGE_START,
 	},
 };
-use crate::state::{ERA, Era, INTERCHAIN_ACCOUNTS, POOL_INFOS, STATE, State, UnstakeInfo, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX, WAIT_STAKE_INFO};
+use crate::state::{INTERCHAIN_ACCOUNTS, STATE, State, UnstakeInfo, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX, POOLS, POOL_DENOM_MPA, POOL_ERA_INFO, POOL_ICA_MAP, POOL_ARRAY};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -66,32 +75,34 @@ pub fn instantiate(
 	set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
 	STATE.save(
-		deps.storage, &(State {
+		deps.storage,
+		&(State {
 			owner: info.sender,
 			minimal_stake: msg.minimal_stake,
 			cw20: msg.cw20_address,
-			atom_ibc_denom: msg.atom_ibc_denom,
-			cosmos_validator: msg.cosmos_validator,
 			unstake_times_limit: msg.unstake_times_limit,
 			next_unstake_index: Uint128::zero(),
 			unbonding_period: msg.unbonding_period,
 		}),
 	)?;
 
-	ERA.save(
-		deps.storage, &(Era {
-			era: msg.era,
-			pre_era: msg.era - 1,
-			rate: msg.rate,
-			pre_rate: msg.rate,
-			era_update_status: true,
-		}),
-	)?;
+	// todo: move to new entry point
+	// ERA.save(
+	// 	deps.storage,
+	// 	&(Era {
+	// 		era: msg.era,
+	// 		pre_era: msg.era - 1,
+	// 		rate: msg.rate,
+	// 		pre_rate: msg.rate,
+	// 		era_update_status: true,
+	// 	}),
+	// )?;
 
 	Ok(Response::new())
 }
 
 // todo: add response event
+// todo: add execute add pool
 #[entry_point]
 pub fn execute(
 	deps: DepsMut<NeutronQuery>,
@@ -103,22 +114,22 @@ pub fn execute(
 		// NOTE: this is an example contract that shows how to make IBC transfers!
 		// Please add necessary authorization or other protection mechanisms
 		// if you intend to send funds over IBC
-		ExecuteMsg::RegisterICA {
-			connection_id, interchain_account_id
-		} => execute_register_ica(deps, env, info, connection_id, interchain_account_id),
-		ExecuteMsg::RegisterICQ { connection_id, update_period } => execute_register_icq(deps, env, info, connection_id, update_period),
-		ExecuteMsg::Stake {
-			neutron_address
-		} => execute_stake(deps, env, neutron_address, info),
-		ExecuteMsg::Unstake {
-			amount, interchain_account_id
-		} => execute_unstake(deps, env, info, amount, interchain_account_id),
-		ExecuteMsg::Withdraw {
-			stake_pool, receiver, interchain_account_id
-		} => execute_withdraw(deps, env, info, stake_pool, receiver, interchain_account_id),
-		ExecuteMsg::NewEra {
-			channel, interchain_account_id
-		} => execute_new_era(deps, env, info.funds, interchain_account_id, channel),
+		ExecuteMsg::RegisterICA { connection_id, interchain_account_id } =>
+			execute_register_ica(deps, env, info, connection_id, interchain_account_id),
+		ExecuteMsg::RegisterDelegatorDelegationsQuery {
+			connection_id,
+			delegator,
+			validators,
+			update_period,
+		} => register_delegations_query(connection_id, delegator, validators, update_period),
+		ExecuteMsg::Stake { neutron_address, pool_addr } => execute_stake(deps, env, neutron_address, pool_addr, info),
+		ExecuteMsg::Unstake { amount, interchain_account_id, pool_addr } =>
+			execute_unstake(deps, env, info, amount, interchain_account_id, pool_addr),
+		ExecuteMsg::Withdraw { pool_addr, receiver, interchain_account_id } =>
+			execute_withdraw(deps, env, info, pool_addr, receiver, interchain_account_id),
+		ExecuteMsg::NewEra { channel: _ } =>
+		// todo: Different rtoken are executed separately.
+			execute_new_era(deps, env, info.funds),
 		ExecuteMsg::StakeLSM {} => execute_stake_lsm(deps, env, info),
 	}
 }
@@ -132,15 +143,13 @@ pub struct IbcSendType {
 
 // a callback handler for payload of IbcSendType
 fn sudo_ibc_send_callback(deps: Deps, payload: IbcSendType) -> StdResult<Response> {
-	deps.api
-		.debug(format!("WASMDEBUG: callback: ibc send sudo payload: {:?}", payload).as_str());
+	deps.api.debug(format!("WASMDEBUG: callback: ibc send sudo payload: {:?}", payload).as_str());
 	Ok(Response::new())
 }
 
 // a callback handler for payload of InterTxType
 fn sudo_inter_tx_callback(deps: Deps, payload: InterTxType) -> StdResult<Response> {
-	deps.api
-		.debug(format!("WASMDEBUG: callback: inter tx sudo payload: {:?}", payload).as_str());
+	deps.api.debug(format!("WASMDEBUG: callback: inter tx sudo payload: {:?}", payload).as_str());
 	Ok(Response::new())
 }
 
@@ -178,10 +187,8 @@ fn prepare_sudo_payload(mut deps: DepsMut, _env: Env, msg: Reply) -> StdResult<R
 		&msg.result
 			.into_result()
 			.map_err(StdError::generic_err)?
-			.data
-			.ok_or_else(|| StdError::generic_err("no result"))?,
-	)
-		.map_err(|e| StdError::generic_err(format!("failed to parse response: {:?}", e)))?;
+			.data.ok_or_else(|| StdError::generic_err("no result"))?
+	).map_err(|e| StdError::generic_err(format!("failed to parse response: {:?}", e)))?;
 	let seq_id = resp.sequence_id;
 	let channel_id = resp.channel;
 	save_sudo_payload(deps.branch().storage, channel_id, seq_id, payload)?;
@@ -193,10 +200,7 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> StdResult<Response> {
 	match msg.id {
 		// It's convenient to use range of ID's to handle multiple reply messages
 		IBC_SUDO_ID_RANGE_START..=IBC_SUDO_ID_RANGE_END => prepare_sudo_payload(deps, env, msg),
-		_ => Err(StdError::generic_err(format!(
-			"unsupported reply message id {}",
-			msg.id
-		))),
+		_ => Err(StdError::generic_err(format!("unsupported reply message id {}", msg.id))),
 	}
 }
 
@@ -218,48 +222,59 @@ fn execute_register_ica(
 	Ok(Response::default().add_message(register))
 }
 
-fn execute_register_icq(
-	_: DepsMut<NeutronQuery>,
-	_: Env,
-	_: MessageInfo,
+pub fn register_delegations_query(
 	connection_id: String,
+	delegator: String,
+	validators: Vec<String>,
 	update_period: u64,
 ) -> NeutronResult<Response<NeutronMsg>> {
-	let msg = new_register_distribution_fee_pool_query_msg(connection_id, update_period)?;
+	let msg = new_register_delegator_delegations_query_msg(
+		connection_id,
+		delegator,
+		validators,
+		update_period,
+	)?;
 
-	Ok(Response::default().add_message(msg))
+	Ok(Response::new().add_message(msg))
 }
 
 fn execute_stake(
 	deps: DepsMut<NeutronQuery>,
 	_: Env,
 	neutron_address: String,
+	pool_addr: String,
 	info: MessageInfo,
 ) -> NeutronResult<Response<NeutronMsg>> {
 	let state = STATE.load(deps.storage)?;
-	let era_info = ERA.load(deps.storage)?;
+	let era_info = POOL_ERA_INFO.load(deps.storage, pool_addr.clone())?;
+	let pool_denom = POOL_DENOM_MPA.load(deps.storage, pool_addr.clone())?;
 
 	let mut amount = 0;
 	if !info.funds.is_empty() {
 		amount = u128::from(
 			info.funds
 				.iter()
-				.find(|c| c.denom == state.atom_ibc_denom)
+				.find(|c| c.denom == pool_denom)
 				.map(|c| c.amount)
 				.unwrap_or(Uint128::zero())
 		);
 	}
+
+	// todo: calu rate
 	amount = amount.mul(era_info.rate.u128());
 
 	let msg = WasmMsg::Execute {
 		contract_addr: state.cw20.to_string(),
-		msg: to_json_binary(&msg::ExecuteMsg::Mint { recipient: neutron_address.to_string(), amount: Uint128::from(amount) })?,
+		msg: to_json_binary(
+			&(msg::ExecuteMsg::Mint {
+				recipient: neutron_address.to_string(),
+				amount: Uint128::from(amount),
+			})
+		)?,
 		funds: vec![],
 	};
 
-	Ok(Response::new()
-		.add_message(CosmosMsg::Wasm(msg))
-		.add_attribute("mint", "call_contract_b"))
+	Ok(Response::new().add_message(CosmosMsg::Wasm(msg)).add_attribute("mint", "call_contract_b"))
 }
 
 // todo: Don't consider the service charge for the time being.
@@ -270,22 +285,27 @@ fn execute_unstake(
 	info: MessageInfo,
 	amount: Uint128,
 	interchain_account_id: String,
+	pool_addr: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
 	if amount == Uint128::zero() {
-		return Err(NeutronError::Std(StdError::generic_err(format!(
-			"Encode error: {}", "LSD token amount is zero"
-		))));
+		return Err(
+			NeutronError::Std(
+				StdError::generic_err(format!("Encode error: {}", "LSD token amount is zero"))
+			)
+		);
 	}
 
 	let mut state = STATE.load(deps.storage)?;
-	let era_info = ERA.load(deps.storage)?;
+	let era_info = POOL_ERA_INFO.load(deps.storage, pool_addr.clone())?;
 
 	let unstake_count = UNSTAKES_INDEX_FOR_USER.load(deps.storage, &info.sender)?.len() as u128;
 	let unstake_limit = state.unstake_times_limit.u128();
 	if unstake_count >= unstake_limit {
-		return Err(NeutronError::Std(StdError::generic_err(format!(
-			"Encode error: {}", "Unstake times limit reached"
-		))));
+		return Err(
+			NeutronError::Std(
+				StdError::generic_err(format!("Encode error: {}", "Unstake times limit reached"))
+			)
+		);
 	}
 
 	// Calculate the number of tokens(atom)
@@ -294,10 +314,10 @@ fn execute_unstake(
 	let (delegator, _) = get_ica(deps.as_ref(), &env, &interchain_account_id)?;
 
 	// update pool info
-	let mut pool_info = POOL_INFOS.load(deps.storage)?;
-	pool_info.unbond += token_amount;
-	pool_info.active -= token_amount;
-	POOL_INFOS.save(deps.storage, &(pool_info))?;
+	let mut pools = POOLS.load(deps.storage, pool_addr.clone())?;
+	pools.unbond += token_amount;
+	pools.active -= token_amount;
+	POOLS.save(deps.storage, pool_addr, &pools)?;
 
 	// update unstake info
 	let unstake_info = UnstakeInfo {
@@ -316,18 +336,25 @@ fn execute_unstake(
 	// burn
 	let msg = WasmMsg::Execute {
 		contract_addr: state.cw20.to_string(),
-		msg: to_json_binary(&msg::ExecuteMsg::BurnFrom { owner: info.sender.to_string(), amount: Default::default() })?,
+		msg: to_json_binary(
+			&(msg::ExecuteMsg::BurnFrom {
+				owner: info.sender.to_string(),
+				amount: Default::default(),
+			})
+		)?,
 		funds: vec![],
 	};
 
 	// send event
-	Ok(Response::new()
-		.add_message(CosmosMsg::Wasm(msg))
-		.add_attribute("action", "unstake")
-		.add_attribute("from", info.sender)
-		.add_attribute("token_amount", token_amount.to_string())
-		.add_attribute("lsd_token_amount", amount.to_string())
-		.add_attribute("unstake_index", will_use_unstake_index.to_string()))
+	Ok(
+		Response::new()
+			.add_message(CosmosMsg::Wasm(msg))
+			.add_attribute("action", "unstake")
+			.add_attribute("from", info.sender)
+			.add_attribute("token_amount", token_amount.to_string())
+			.add_attribute("lsd_token_amount", amount.to_string())
+			.add_attribute("unstake_index", will_use_unstake_index.to_string())
+	)
 }
 
 fn execute_withdraw(
@@ -345,11 +372,15 @@ fn execute_withdraw(
 	let mut indices_to_remove = Vec::new();
 
 	let state = STATE.load(deps.storage)?;
-	let era_info = ERA.load(deps.storage)?;
+	let era_info = POOL_ERA_INFO.load(deps.storage, stake_pool.clone())?;
+	let pool_info = POOLS.load(deps.storage, stake_pool.clone())?;
 
 	for (i, unstake_index) in unstakes.iter().enumerate() {
 		let unstake_info = UNSTAKES_OF_INDEX.load(deps.storage, unstake_index.u128())?;
-		if unstake_info.era + state.unbonding_period > era_info.era || unstake_info.pool != stake_pool {
+		if
+		unstake_info.era + state.unbonding_period > era_info.era ||
+			unstake_info.pool != stake_pool
+		{
 			continue;
 		}
 
@@ -370,9 +401,11 @@ fn execute_withdraw(
 	UNSTAKES_INDEX_FOR_USER.save(deps.storage, &info.sender, &unstakes)?;
 
 	if total_withdraw_amount.is_zero() {
-		return Err(NeutronError::Std(StdError::generic_err(format!(
-			"Encode error: {}", "Zero withdraw amount"
-		))));
+		return Err(
+			NeutronError::Std(
+				StdError::generic_err(format!("Encode error: {}", "Zero withdraw amount"))
+			)
+		);
 	}
 
 	let unstake_index_list_str = emit_unstake_index_list
@@ -387,19 +420,18 @@ fn execute_withdraw(
 	let ica_send = MsgSend {
 		from_address: delegator,
 		to_address: receiver.to_string(),
-		amount: Vec::from([Coin {
-			denom: state.atom_ibc_denom,
-			amount: total_withdraw_amount.to_string(),
-		}]),
+		amount: Vec::from([
+			Coin {
+				denom: pool_info.ibc_denom,
+				amount: total_withdraw_amount.to_string(),
+			},
+		]),
 	};
 	let mut buf = Vec::new();
 	buf.reserve(ica_send.encoded_len());
 
 	if let Err(e) = ica_send.encode(&mut buf) {
-		return Err(NeutronError::Std(StdError::generic_err(format!(
-			"Encode error: {}",
-			e
-		))));
+		return Err(NeutronError::Std(StdError::generic_err(format!("Encode error: {}", e))));
 	}
 
 	let any_msg = ProtobufAny {
@@ -427,12 +459,14 @@ fn execute_withdraw(
 		}),
 	)?;
 
-	Ok(Response::new()
-		.add_attribute("action", "withdraw")
-		.add_attribute("from", info.sender)
-		.add_attribute("pool", stake_pool)
-		.add_attribute("unstake_index_list", unstake_index_list_str)
-		.add_attribute("amount", total_withdraw_amount).add_submessages(vec![submsg])
+	Ok(
+		Response::new()
+			.add_attribute("action", "withdraw")
+			.add_attribute("from", info.sender)
+			.add_attribute("pool", stake_pool.clone())
+			.add_attribute("unstake_index_list", unstake_index_list_str)
+			.add_attribute("amount", total_withdraw_amount)
+			.add_submessages(vec![submsg])
 	)
 }
 
@@ -449,173 +483,174 @@ fn execute_new_era(
 	mut deps: DepsMut<NeutronQuery>,
 	env: Env,
 	funds: Vec<cosmwasm_std::Coin>,
-	interchain_account_id: String,
-	channel: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
 	// --------------------------------------------------------------------------------------------------
 	// contract must pay for relaying of acknowledgements
 	// See more info here: https://docs.neutron.org/neutron/feerefunder/overview
 	let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
-	let (delegator, connection_id) = get_ica(deps.as_ref(), &env, &interchain_account_id)?;
-	// --------------------------------------------------------------------------------------------------
-
-	// Funds is obtained from the internal status of the contract
-
-	let state = STATE.load(deps.storage)?;
-	let wait_stake_info = WAIT_STAKE_INFO.load(deps.storage)?;
-
-	let mut amount = 0;
-	if !funds.is_empty() {
-		amount = u128::from(
-			funds
-				.iter()
-				.find(|c| c.denom == state.atom_ibc_denom)
-				.map(|c| c.amount)
-				.unwrap_or(Uint128::zero())
-		);
-	}
-
-	let tx_coin = coin(amount, state.atom_ibc_denom.clone());
-
-	let msg = NeutronMsg::IbcTransfer {
-		source_port: "transfer".to_string(),
-		source_channel: channel.clone(),
-		sender: env.contract.address.to_string(),
-		receiver: delegator.clone(),
-		token: tx_coin,
-		timeout_height: RequestPacketTimeoutHeight {
-			revision_number: Some(2),
-			revision_height: Some(DEFAULT_TIMEOUT_HEIGHT),
-		},
-		timeout_timestamp: DEFAULT_TIMEOUT_SECONDS,
-		memo: "".to_string(),
-		fee: fee.clone(),
-	};
-
-	deps.as_ref().api.debug(format!("WASMDEBUG: IbcTransfer msg: {:?}", msg).as_str());
-
-	let submsg = msg_with_sudo_callback(
-		deps.branch(),
-		msg,
-		SudoPayload::HandlerPayloadIbcSend(IbcSendType {
-			message: "message".to_string(),
-		}),
-	)?;
+	// todo: 从 map 中获取 interchain_account_id
+	let pool_array = POOL_ARRAY.load(deps.storage)?;
 	let mut msgs = vec![];
-	deps.as_ref().api.debug(format!("WASMDEBUG: execute_send: sent submsg: {:?}", submsg).as_str());
-	msgs.push(submsg);
-	if wait_stake_info.wait_stake < 0 {
-		// add submessage to unstake
-		let delegate_msg = MsgUndelegate {
-			delegator_address: delegator,
-			validator_address: state.cosmos_validator,
-			amount: Some(Coin {
-				denom: state.atom_ibc_denom.clone(),
-				amount: amount.to_string(),
-			}),
-		};
-		let mut buf = Vec::new();
-		buf.reserve(delegate_msg.encoded_len());
+	for pool_addr in pool_array {
+		let interchain_account_id = POOL_ICA_MAP.load(deps.storage, pool_addr.clone())?;
+		let (delegator, connection_id) = get_ica(deps.as_ref(), &env, &interchain_account_id)?;
+		// --------------------------------------------------------------------------------------------------
 
-		if let Err(e) = delegate_msg.encode(&mut buf) {
-			return Err(NeutronError::Std(StdError::generic_err(format!(
-				"Encode error: {}",
-				e
-			))));
+		// Funds is obtained from the internal status of the contract
+
+		let pool_info = POOLS.load(deps.storage, delegator.clone())?;
+
+		let mut amount = 0;
+		if !funds.is_empty() {
+			amount = u128::from(
+				funds
+					.iter()
+					.find(|c| c.denom == pool_info.ibc_denom.clone())
+					.map(|c| c.amount)
+					.unwrap_or(Uint128::zero())
+			);
 		}
 
-		let any_msg = ProtobufAny {
-			type_url: "/cosmos.staking.v1beta1.MsgUndelegate".to_string(),
-			value: Binary::from(buf),
+		let tx_coin = coin(amount, pool_info.ibc_denom.clone());
+
+		let msg = NeutronMsg::IbcTransfer {
+			source_port: "transfer".to_string(),
+			source_channel: connection_id.clone(),
+			sender: env.contract.address.to_string(),
+			receiver: delegator.clone(),
+			token: tx_coin,
+			timeout_height: RequestPacketTimeoutHeight {
+				revision_number: Some(2),
+				revision_height: Some(DEFAULT_TIMEOUT_HEIGHT),
+			},
+			timeout_timestamp: DEFAULT_TIMEOUT_SECONDS,
+			memo: "".to_string(),
+			fee: fee.clone(),
 		};
 
-		let cosmos_msg = NeutronMsg::submit_tx(
-			connection_id,
-			interchain_account_id.clone(),
-			vec![any_msg],
-			"".to_string(),
-			DEFAULT_TIMEOUT_SECONDS,
-			fee,
-		);
+		// todo: We need to split these steps and wait until transfer arrives before performing the following steps.
+		// todo: Split delegation equally
 
-		// We use a submessage here because we need the process message reply to save
-		// the outgoing IBC packet identifier for later.
-		let submsg_unstake = msg_with_sudo_callback(
+		deps.as_ref().api.debug(format!("WASMDEBUG: IbcTransfer msg: {:?}", msg).as_str());
+
+		let submsg = msg_with_sudo_callback(
 			deps.branch(),
-			cosmos_msg,
-			SudoPayload::HandlerPayloadInterTx(InterTxType {
-				port_id: get_port_id(env.contract.address.to_string(), interchain_account_id),
-				// Here you can store some information about the transaction to help you parse
-				// the acknowledgement later.
-				message: "interchain_undelegate".to_string(),
+			msg,
+			SudoPayload::HandlerPayloadIbcSend(IbcSendType {
+				message: "message".to_string(),
 			}),
 		)?;
+		deps.as_ref().api.debug(format!("WASMDEBUG: execute_send: sent submsg: {:?}", submsg).as_str());
+		msgs.push(submsg);
+		if pool_info.wait_stake < Int256::from(0) {
+			// add submessage to unstake
+			let delegate_msg = MsgUndelegate {
+				delegator_address: delegator.clone(),
+				validator_address: pool_info.validator_addrs[0].clone(),
+				amount: Some(Coin {
+					denom: pool_info.ibc_denom.clone(),
+					amount: amount.to_string(),
+				}),
+			};
+			let mut buf = Vec::new();
+			buf.reserve(delegate_msg.encoded_len());
 
-		msgs.push(submsg_unstake);
-	} else if wait_stake_info.wait_stake - wait_stake_info.need_withdraw > 0 {
-		// add submessage to stake
-		let delegate_msg = MsgDelegate {
-			delegator_address: delegator,
-			validator_address: state.cosmos_validator,
-			amount: Some(Coin {
-				denom: state.atom_ibc_denom.clone(),
-				amount: amount.to_string(),
-			}),
-		};
+			if let Err(e) = delegate_msg.encode(&mut buf) {
+				return Err(
+					NeutronError::Std(StdError::generic_err(format!("Encode error: {}", e)))
+				);
+			}
 
-		// Serialize the Delegate message.
-		let mut buf = Vec::new();
-		buf.reserve(delegate_msg.encoded_len());
+			let any_msg = ProtobufAny {
+				type_url: "/cosmos.staking.v1beta1.MsgUndelegate".to_string(),
+				value: Binary::from(buf),
+			};
 
-		if let Err(e) = delegate_msg.encode(&mut buf) {
-			return Err(NeutronError::Std(StdError::generic_err(format!(
-				"Encode error: {}",
-				e
-			))));
+			let cosmos_msg = NeutronMsg::submit_tx(
+				connection_id.clone(),
+				interchain_account_id.clone(),
+				vec![any_msg],
+				"".to_string(),
+				DEFAULT_TIMEOUT_SECONDS,
+				fee.clone(),
+			);
+
+			// We use a submessage here because we need the process message reply to save
+			// the outgoing IBC packet identifier for later.
+			let submsg_unstake = msg_with_sudo_callback(
+				deps.branch(),
+				cosmos_msg,
+				SudoPayload::HandlerPayloadInterTx(InterTxType {
+					port_id: get_port_id(env.contract.address.to_string(), interchain_account_id),
+					// Here you can store some information about the transaction to help you parse
+					// the acknowledgement later.
+					message: "interchain_undelegate".to_string(),
+				}),
+			)?;
+
+			msgs.push(submsg_unstake);
+		} else if pool_info.wait_stake - pool_info.need_withdraw > Int256::from(0) {
+			// add submessage to stake
+			let delegate_msg = MsgDelegate {
+				delegator_address: pool_addr.clone(),
+				validator_address: pool_info.validator_addrs[0].clone(),
+				amount: Some(Coin {
+					denom: pool_info.ibc_denom.clone(),
+					amount: amount.to_string(),
+				}),
+			};
+
+			// Serialize the Delegate message.
+			let mut buf = Vec::new();
+			buf.reserve(delegate_msg.encoded_len());
+
+			if let Err(e) = delegate_msg.encode(&mut buf) {
+				return Err(
+					NeutronError::Std(StdError::generic_err(format!("Encode error: {}", e)))
+				);
+			}
+
+			// Put the serialized Delegate message to a types.Any protobuf message.
+			let any_msg = ProtobufAny {
+				type_url: "/cosmos.staking.v1beta1.MsgDelegate".to_string(),
+				value: Binary::from(buf),
+			};
+
+			// Form the neutron SubmitTx message containing the binary Delegate message.
+			let cosmos_msg = NeutronMsg::submit_tx(
+				connection_id.clone(),
+				interchain_account_id.clone(),
+				vec![any_msg],
+				"".to_string(),
+				DEFAULT_TIMEOUT_SECONDS,
+				fee.clone(),
+			);
+
+			// We use a submessage here because we need the process message reply to save
+			// the outgoing IBC packet identifier for later.
+			let submsg_stake = msg_with_sudo_callback(
+				deps.branch(),
+				cosmos_msg,
+				SudoPayload::HandlerPayloadInterTx(InterTxType {
+					port_id: get_port_id(env.contract.address.to_string(), interchain_account_id),
+					// Here you can store some information about the transaction to help you parse
+					// the acknowledgement later.
+					message: "interchain_delegate".to_string(),
+				}),
+			)?;
+			msgs.push(submsg_stake);
 		}
-
-		// Put the serialized Delegate message to a types.Any protobuf message.
-		let any_msg = ProtobufAny {
-			type_url: "/cosmos.staking.v1beta1.MsgDelegate".to_string(),
-			value: Binary::from(buf),
-		};
-
-		// Form the neutron SubmitTx message containing the binary Delegate message.
-		let cosmos_msg = NeutronMsg::submit_tx(
-			connection_id,
-			interchain_account_id.clone(),
-			vec![any_msg],
-			"".to_string(),
-			DEFAULT_TIMEOUT_SECONDS,
-			fee,
-		);
-
-		// We use a submessage here because we need the process message reply to save
-		// the outgoing IBC packet identifier for later.
-		let submsg_stake = msg_with_sudo_callback(
-			deps.branch(),
-			cosmos_msg,
-			SudoPayload::HandlerPayloadInterTx(InterTxType {
-				port_id: get_port_id(env.contract.address.to_string(), interchain_account_id),
-				// Here you can store some information about the transaction to help you parse
-				// the acknowledgement later.
-				message: "interchain_delegate".to_string(),
-			}),
-		)?;
-		msgs.push(submsg_stake);
 	}
 
 	Ok(Response::default().add_submessages(msgs))
 }
-
 
 // todo: add ibc tx result reply
 // todo: update the rate in sudo replay
 // todo: ica rewards
 #[entry_point]
 pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> StdResult<Response> {
-	deps.api
-		.debug(format!("WASMDEBUG: sudo: received sudo msg: {:?}", msg).as_str());
+	deps.api.debug(format!("WASMDEBUG: sudo: received sudo msg: {:?}", msg).as_str());
 
 	match msg {
 		// For handling successful (non-error) acknowledgements
@@ -628,59 +663,39 @@ pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> StdResult<Response> {
 		SudoMsg::Timeout { request } => sudo_timeout(deps, request),
 
 		// For handling successful registering of ICA
-		SudoMsg::OpenAck {
-			port_id,
-			channel_id,
-			counterparty_channel_id,
-			counterparty_version,
-		} => sudo_open_ack(
-			deps,
-			env,
-			port_id,
-			channel_id,
-			counterparty_channel_id,
-			counterparty_version,
-		),
+		SudoMsg::OpenAck { port_id, channel_id, counterparty_channel_id, counterparty_version } =>
+			sudo_open_ack(
+				deps,
+				env,
+				port_id,
+				channel_id,
+				counterparty_channel_id,
+				counterparty_version,
+			),
 		_ => Ok(Response::default()),
 	}
 }
 
 fn sudo_error(deps: DepsMut, req: RequestPacket, data: String) -> StdResult<Response> {
 	deps.api.debug(
-		format!(
-			"WASMDEBUG: sudo_error: sudo error received: {:?} {}",
-			req, data
-		)
-			.as_str(),
+		format!("WASMDEBUG: sudo_error: sudo error received: {:?} {}", req, data).as_str()
 	);
 	Ok(Response::new())
 }
 
 fn sudo_timeout(deps: DepsMut, req: RequestPacket) -> StdResult<Response> {
 	deps.api.debug(
-		format!(
-			"WASMDEBUG: sudo_timeout: sudo timeout ack received: {:?}",
-			req
-		)
-			.as_str(),
+		format!("WASMDEBUG: sudo_timeout: sudo timeout ack received: {:?}", req).as_str()
 	);
 	Ok(Response::new())
 }
 
 fn sudo_response(deps: DepsMut, req: RequestPacket, data: Binary) -> StdResult<Response> {
-	deps.api.debug(
-		format!(
-			"WASMDEBUG: sudo_response: sudo received: {:?} {}",
-			req, data
-		)
-			.as_str(),
-	);
-	let seq_id = req
-		.sequence
-		.ok_or_else(|| StdError::generic_err("sequence not found"))?;
-	let channel_id = req
-		.source_channel
-		.ok_or_else(|| StdError::generic_err("channel_id not found"))?;
+	deps.api.debug(format!("WASMDEBUG: sudo_response: sudo received: {:?} {}", req, data).as_str());
+	let seq_id = req.sequence.ok_or_else(|| StdError::generic_err("sequence not found"))?;
+	let channel_id = req.source_channel.ok_or_else(||
+		StdError::generic_err("channel_id not found")
+	)?;
 
 	match read_sudo_payload(deps.storage, channel_id, seq_id)? {
 		SudoPayload::HandlerPayloadIbcSend(t) => sudo_ibc_send_callback(deps.as_ref(), t),
@@ -701,19 +716,18 @@ fn sudo_open_ack(
 ) -> StdResult<Response> {
 	// The version variable contains a JSON value with multiple fields,
 	// including the generated account address.
-	let parsed_version: Result<OpenAckVersion, _> =
-		serde_json_wasm::from_str(counterparty_version.as_str());
+	let parsed_version: Result<OpenAckVersion, _> = serde_json_wasm::from_str(
+		counterparty_version.as_str()
+	);
 
 	// Update the storage record associated with the interchain account.
 	if let Ok(parsed_version) = parsed_version {
 		INTERCHAIN_ACCOUNTS.save(
 			deps.storage,
 			port_id,
-			&Some((
-				parsed_version.address,
-				parsed_version.controller_connection_id,
-			)),
+			&Some((parsed_version.address.clone(), parsed_version.controller_connection_id.clone())),
 		)?;
+		POOL_ICA_MAP.save(deps.storage, parsed_version.address, &parsed_version.controller_connection_id)?;
 		return Ok(Response::default());
 	}
 	Err(StdError::generic_err("Can't parse counterparty_version"))
@@ -728,13 +742,11 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response
 fn min_ntrn_ibc_fee(fee: IbcFee) -> IbcFee {
 	IbcFee {
 		recv_fee: fee.recv_fee,
-		ack_fee: fee
-			.ack_fee
+		ack_fee: fee.ack_fee
 			.into_iter()
 			.filter(|a| a.denom == FEE_DENOM)
 			.collect(),
-		timeout_fee: fee
-			.timeout_fee
+		timeout_fee: fee.timeout_fee
 			.into_iter()
 			.filter(|a| a.denom == FEE_DENOM)
 			.collect(),
