@@ -1,5 +1,26 @@
 use std::ops::{Add, Mul};
-use cosmwasm_std::{coin, to_json_binary, entry_point, from_json, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdError, StdResult, SubMsg, Uint128, WasmMsg, CustomQuery, Addr, Int256};
+use cosmwasm_std::{
+	coin,
+	to_json_binary,
+	entry_point,
+	from_json,
+	Binary,
+	CosmosMsg,
+	Deps,
+	DepsMut,
+	Env,
+	MessageInfo,
+	Reply,
+	Response,
+	StdError,
+	StdResult,
+	SubMsg,
+	Uint128,
+	WasmMsg,
+	CustomQuery,
+	Addr,
+	Int256,
+};
 use cw2::set_contract_version;
 use neutron_sdk::{
 	bindings::{msg::{IbcFee, MsgIbcTransferResponse, NeutronMsg}, query::NeutronQuery},
@@ -14,14 +35,11 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use cw20_ratom::{msg};
 use cosmos_sdk_proto::cosmos::bank::v1beta1::{MsgSend};
-use neutron_sdk::interchain_queries::{
-	v045::{
-		new_register_delegator_delegations_query_msg,
-	},
-};
+use neutron_sdk::interchain_queries::{v045::{new_register_delegator_delegations_query_msg}};
 use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
 use cosmos_sdk_proto::cosmos::staking::v1beta1::{MsgDelegate, MsgUndelegate};
 use cosmos_sdk_proto::prost::Message;
+use neutron_sdk::interchain_queries::v045::new_register_balance_query_msg;
 use neutron_sdk::sudo::msg::SudoMsg;
 use crate::{
 	msg::{ExecuteMsg, InstantiateMsg, MigrateMsg},
@@ -32,9 +50,21 @@ use crate::{
 		save_sudo_payload,
 		IBC_SUDO_ID_RANGE_END,
 		IBC_SUDO_ID_RANGE_START,
+		CONNECTION_POOL_MAP,
 	},
 };
-use crate::state::{INTERCHAIN_ACCOUNTS, STATE, State, UnstakeInfo, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX, POOLS, POOL_DENOM_MPA, POOL_ERA_INFO, POOL_ICA_MAP, POOL_ARRAY};
+use crate::state::{
+	INTERCHAIN_ACCOUNTS,
+	STATE,
+	State,
+	UnstakeInfo,
+	UNSTAKES_INDEX_FOR_USER,
+	UNSTAKES_OF_INDEX,
+	POOLS,
+	POOL_DENOM_MPA,
+	POOL_ERA_INFO,
+	POOL_ICA_MAP,
+};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -114,22 +144,29 @@ pub fn execute(
 		// NOTE: this is an example contract that shows how to make IBC transfers!
 		// Please add necessary authorization or other protection mechanisms
 		// if you intend to send funds over IBC
-		ExecuteMsg::RegisterICA { connection_id, interchain_account_id } =>
-			execute_register_ica(deps, env, info, connection_id, interchain_account_id),
+		ExecuteMsg::RegisterPool { connection_id, interchain_account_id } =>
+			execute_register_pool(deps, env, info, connection_id, interchain_account_id),
+		ExecuteMsg::RegisterBalanceQuery {
+			connection_id,
+			addr,
+			denom,
+			update_period,
+		} => register_balance_query(connection_id, addr, denom, update_period),
 		ExecuteMsg::RegisterDelegatorDelegationsQuery {
 			connection_id,
 			delegator,
 			validators,
 			update_period,
 		} => register_delegations_query(connection_id, delegator, validators, update_period),
-		ExecuteMsg::Stake { neutron_address, pool_addr } => execute_stake(deps, env, neutron_address, pool_addr, info),
+		ExecuteMsg::Stake { neutron_address, pool_addr } =>
+			execute_stake(deps, env, neutron_address, pool_addr, info),
 		ExecuteMsg::Unstake { amount, interchain_account_id, pool_addr } =>
 			execute_unstake(deps, env, info, amount, interchain_account_id, pool_addr),
 		ExecuteMsg::Withdraw { pool_addr, receiver, interchain_account_id } =>
 			execute_withdraw(deps, env, info, pool_addr, receiver, interchain_account_id),
-		ExecuteMsg::NewEra { channel: _ } =>
-		// todo: Different rtoken are executed separately.
-			execute_new_era(deps, env, info.funds),
+		ExecuteMsg::EraUpdate { connection_id, channel } =>
+		// Different rtoken are executed separately.
+			execute_era_update(deps, env, info.funds, connection_id, channel),
 		ExecuteMsg::StakeLSM {} => execute_stake_lsm(deps, env, info),
 	}
 }
@@ -204,7 +241,8 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> StdResult<Response> {
 	}
 }
 
-fn execute_register_ica(
+// todo: refactor to add pool
+fn execute_register_pool(
 	deps: DepsMut<NeutronQuery>,
 	env: Env,
 	_: MessageInfo,
@@ -222,6 +260,20 @@ fn execute_register_ica(
 	Ok(Response::default().add_message(register))
 }
 
+// todo: add execute to config the validator addrs and withdraw address on reply
+fn execute_config_pool(
+	deps: DepsMut<NeutronQuery>,
+	env: Env,
+	_: MessageInfo,
+	connection_id: String,
+	interchain_account_id: String,
+) -> NeutronResult<Response<NeutronMsg>> {
+	let (delegator, connection_id) = get_ica(deps.as_ref(), &env, &interchain_account_id)?;
+
+
+	Ok(Response::default())
+}
+
 pub fn register_delegations_query(
 	connection_id: String,
 	delegator: String,
@@ -234,6 +286,17 @@ pub fn register_delegations_query(
 		validators,
 		update_period,
 	)?;
+
+	Ok(Response::new().add_message(msg))
+}
+
+pub fn register_balance_query(
+	connection_id: String,
+	addr: String,
+	denom: String,
+	update_period: u64,
+) -> NeutronResult<Response<NeutronMsg>> {
+	let msg = new_register_balance_query_msg(connection_id, addr, denom, update_period)?;
 
 	Ok(Response::new().add_message(msg))
 }
@@ -277,7 +340,6 @@ fn execute_stake(
 	Ok(Response::new().add_message(CosmosMsg::Wasm(msg)).add_attribute("mint", "call_contract_b"))
 }
 
-// todo: Don't consider the service charge for the time being.
 // Before this step, need the user to authorize burn from
 fn execute_unstake(
 	deps: DepsMut<NeutronQuery>,
@@ -315,8 +377,8 @@ fn execute_unstake(
 
 	// update pool info
 	let mut pools = POOLS.load(deps.storage, pool_addr.clone())?;
-	pools.unbond += token_amount;
-	pools.active -= token_amount;
+	pools.unbond += Int256::from(token_amount);
+	pools.active -= Int256::from(token_amount);
 	POOLS.save(deps.storage, pool_addr, &pools)?;
 
 	// update unstake info
@@ -361,7 +423,7 @@ fn execute_withdraw(
 	mut deps: DepsMut<NeutronQuery>,
 	env: Env,
 	info: MessageInfo,
-	stake_pool: String,
+	pool_addr: String,
 	receiver: Addr,
 	interchain_account_id: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
@@ -372,14 +434,14 @@ fn execute_withdraw(
 	let mut indices_to_remove = Vec::new();
 
 	let state = STATE.load(deps.storage)?;
-	let era_info = POOL_ERA_INFO.load(deps.storage, stake_pool.clone())?;
-	let pool_info = POOLS.load(deps.storage, stake_pool.clone())?;
+	let era_info = POOL_ERA_INFO.load(deps.storage, pool_addr.clone())?;
+	let pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
 
 	for (i, unstake_index) in unstakes.iter().enumerate() {
 		let unstake_info = UNSTAKES_OF_INDEX.load(deps.storage, unstake_index.u128())?;
 		if
 		unstake_info.era + state.unbonding_period > era_info.era ||
-			unstake_info.pool != stake_pool
+			unstake_info.pool != pool_addr
 		{
 			continue;
 		}
@@ -434,7 +496,7 @@ fn execute_withdraw(
 		return Err(NeutronError::Std(StdError::generic_err(format!("Encode error: {}", e))));
 	}
 
-	let any_msg = ProtobufAny {
+	let send_msg = ProtobufAny {
 		type_url: "/cosmos.bank.v1beta1.MsgSend".to_string(),
 		value: Binary::from(buf),
 	};
@@ -442,7 +504,7 @@ fn execute_withdraw(
 	let cosmos_msg = NeutronMsg::submit_tx(
 		connection_id,
 		interchain_account_id.clone(),
-		vec![any_msg],
+		vec![send_msg],
 		"".to_string(),
 		DEFAULT_TIMEOUT_SECONDS,
 		fee,
@@ -463,7 +525,7 @@ fn execute_withdraw(
 		Response::new()
 			.add_attribute("action", "withdraw")
 			.add_attribute("from", info.sender)
-			.add_attribute("pool", stake_pool.clone())
+			.add_attribute("pool", pool_addr.clone())
 			.add_attribute("unstake_index_list", unstake_index_list_str)
 			.add_attribute("amount", total_withdraw_amount)
 			.add_submessages(vec![submsg])
@@ -479,26 +541,31 @@ fn execute_stake_lsm(
 	Ok(Response::new())
 }
 
-fn execute_new_era(
+fn execute_redelegate(
+	_: DepsMut<NeutronQuery>,
+	_: Env,
+	_: MessageInfo,
+) -> NeutronResult<Response<NeutronMsg>> {
+	// todo!
+	Ok(Response::new())
+}
+
+fn execute_era_update(
 	mut deps: DepsMut<NeutronQuery>,
 	env: Env,
 	funds: Vec<cosmwasm_std::Coin>,
+	connection_id: String,
+	channel: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
 	// --------------------------------------------------------------------------------------------------
 	// contract must pay for relaying of acknowledgements
 	// See more info here: https://docs.neutron.org/neutron/feerefunder/overview
 	let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
-	// todo: 从 map 中获取 interchain_account_id
-	let pool_array = POOL_ARRAY.load(deps.storage)?;
+	let pool_array = CONNECTION_POOL_MAP.load(deps.storage, connection_id.clone())?;
 	let mut msgs = vec![];
 	for pool_addr in pool_array {
-		let interchain_account_id = POOL_ICA_MAP.load(deps.storage, pool_addr.clone())?;
-		let (delegator, connection_id) = get_ica(deps.as_ref(), &env, &interchain_account_id)?;
-		// --------------------------------------------------------------------------------------------------
-
-		// Funds is obtained from the internal status of the contract
-
-		let pool_info = POOLS.load(deps.storage, delegator.clone())?;
+		let pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
+		// todo: check era state
 
 		let mut amount = 0;
 		if !funds.is_empty() {
@@ -515,9 +582,9 @@ fn execute_new_era(
 
 		let msg = NeutronMsg::IbcTransfer {
 			source_port: "transfer".to_string(),
-			source_channel: connection_id.clone(),
+			source_channel: channel.clone(),
 			sender: env.contract.address.to_string(),
-			receiver: delegator.clone(),
+			receiver: pool_addr.clone(),
 			token: tx_coin,
 			timeout_height: RequestPacketTimeoutHeight {
 				revision_number: Some(2),
@@ -528,9 +595,6 @@ fn execute_new_era(
 			fee: fee.clone(),
 		};
 
-		// todo: We need to split these steps and wait until transfer arrives before performing the following steps.
-		// todo: Split delegation equally
-
 		deps.as_ref().api.debug(format!("WASMDEBUG: IbcTransfer msg: {:?}", msg).as_str());
 
 		let submsg = msg_with_sudo_callback(
@@ -540,16 +604,43 @@ fn execute_new_era(
 				message: "message".to_string(),
 			}),
 		)?;
-		deps.as_ref().api.debug(format!("WASMDEBUG: execute_send: sent submsg: {:?}", submsg).as_str());
+		deps.as_ref().api.debug(
+			format!("WASMDEBUG: execute_send: sent submsg: {:?}", submsg).as_str()
+		);
 		msgs.push(submsg);
-		if pool_info.wait_stake < Int256::from(0) {
+
+		// todo: check withdraw address balance and send it to the pool
+	}
+
+	Ok(Response::default().add_submessages(msgs))
+}
+
+// todo? What if some of the operations failed when pledged to multiple verifiers?
+fn execute_era_bond(
+	mut deps: DepsMut<NeutronQuery>,
+	env: Env,
+	connection_id: String,
+) -> NeutronResult<Response<NeutronMsg>> {
+	// --------------------------------------------------------------------------------------------------
+	// contract must pay for relaying of acknowledgements
+	// See more info here: https://docs.neutron.org/neutron/feerefunder/overview
+	let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
+	let pool_array = CONNECTION_POOL_MAP.load(deps.storage, connection_id.clone())?;
+	let mut msgs = vec![];
+	for pool_addr in pool_array {
+		let pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
+		// todo: check era state
+
+		let interchain_account_id = POOL_ICA_MAP.load(deps.storage, pool_addr.clone())?;
+		if pool_info.unbond - pool_info.active > Int256::from(0) {
+			let unbond_amount = pool_info.unbond - pool_info.active;
 			// add submessage to unstake
 			let delegate_msg = MsgUndelegate {
-				delegator_address: delegator.clone(),
+				delegator_address: pool_addr.clone(),
 				validator_address: pool_info.validator_addrs[0].clone(),
 				amount: Some(Coin {
 					denom: pool_info.ibc_denom.clone(),
-					amount: amount.to_string(),
+					amount: unbond_amount.to_string(),
 				}),
 			};
 			let mut buf = Vec::new();
@@ -589,14 +680,15 @@ fn execute_new_era(
 			)?;
 
 			msgs.push(submsg_unstake);
-		} else if pool_info.wait_stake - pool_info.need_withdraw > Int256::from(0) {
+		} else if pool_info.active - pool_info.need_withdraw > Int256::from(0) {
+			let stake_amount = pool_info.active - pool_info.need_withdraw;
 			// add submessage to stake
 			let delegate_msg = MsgDelegate {
 				delegator_address: pool_addr.clone(),
 				validator_address: pool_info.validator_addrs[0].clone(),
 				amount: Some(Coin {
 					denom: pool_info.ibc_denom.clone(),
-					amount: amount.to_string(),
+					amount: stake_amount.to_string(),
 				}),
 			};
 
@@ -645,8 +737,21 @@ fn execute_new_era(
 	Ok(Response::default().add_submessages(msgs))
 }
 
+fn execute_bond_active(
+	mut deps: DepsMut<NeutronQuery>,
+	_: Env,
+	pool_addr: String,
+) -> NeutronResult<Response<NeutronMsg>> {
+	let pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
+	// todo: check era state
+	// todo: calculate the rate
+	// todo: calculate protocol fee
+	Ok(Response::default())
+}
+
 // todo: add ibc tx result reply
 // todo: update the rate in sudo replay
+// todo: update era state
 // todo: ica rewards
 #[entry_point]
 pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> StdResult<Response> {
@@ -727,7 +832,11 @@ fn sudo_open_ack(
 			port_id,
 			&Some((parsed_version.address.clone(), parsed_version.controller_connection_id.clone())),
 		)?;
-		POOL_ICA_MAP.save(deps.storage, parsed_version.address, &parsed_version.controller_connection_id)?;
+		POOL_ICA_MAP.save(
+			deps.storage,
+			parsed_version.address,
+			&parsed_version.controller_connection_id,
+		)?;
 		return Ok(Response::default());
 	}
 	Err(StdError::generic_err("Can't parse counterparty_version"))

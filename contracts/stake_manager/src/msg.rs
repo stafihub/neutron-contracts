@@ -18,9 +18,15 @@ pub struct InstantiateMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
-    RegisterICA {
+    RegisterPool {
         connection_id: String,
         interchain_account_id: String,
+    },
+    RegisterBalanceQuery {
+        connection_id: String,
+        update_period: u64,
+        addr: String,
+        denom: String,
     },
     RegisterDelegatorDelegationsQuery {
         delegator: String,
@@ -42,7 +48,8 @@ pub enum ExecuteMsg {
         receiver: Addr,
         interchain_account_id: String,
     },
-    NewEra {
+    EraUpdate {
+        connection_id: String,
         channel: String,
     },
     StakeLSM {
