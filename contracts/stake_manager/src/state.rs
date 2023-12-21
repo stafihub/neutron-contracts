@@ -28,7 +28,6 @@ const REPLY_ID: Item<u64> = Item::new("reply_id");
 pub struct State {
     pub minimal_stake: Coin,
     pub owner: Addr,
-    pub cw20: Addr,
     pub unstake_times_limit: Uint128,
     pub next_unstake_index: Uint128,
     pub unbonding_period: u128,
@@ -41,6 +40,7 @@ pub struct PoolInfo {
     pub need_withdraw: Int256,
     pub unbond: Int256,
     pub active: Int256,
+    pub cw20: Addr,
     pub withdraw_addr: String,
     pub pool_addr: String,
     pub ibc_denom: String,
@@ -93,6 +93,21 @@ pub const POOL_ICA_MAP: Map<String, String> = Map::new("pool_ica_map");
 
 // key: connection_id value:pool_addr list
 pub const CONNECTION_POOL_MAP: Map<String, Vec<String>> = Map::new("connection_pools");
+
+// key: ica address value: query id
+pub const ADDR_QUERY_ID: Map<String, u64> = Map::new("addr_query_id");
+
+pub const LATEST_QUERY_ID: Item<u64> = Item::new("latest_query_id");
+
+pub const KV_QUERY_ID_TO_CALLBACKS: Map<u64, QueryKind> = Map::new("kv_query_id_to_callbacks");
+
+// contains query kinds that we expect to handle in `sudo_kv_query_result`
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+pub enum QueryKind {
+    // Balance query
+    Balance,
+    // You can add your handlers to understand what query to deserialize by query_id in sudo callback
+}
 
 /// get_next_id gives us an id for a reply msg
 /// dynamic reply id helps us to pass sudo payload to sudo handler via reply handler
