@@ -124,7 +124,6 @@ pub fn instantiate(
 }
 
 // todo: add response event
-// todo: add execute add pool
 #[entry_point]
 pub fn execute(
 	deps: DepsMut<NeutronQuery>,
@@ -236,7 +235,6 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> StdResult<Response> {
 	}
 }
 
-// todo: refactor to add pool
 fn execute_register_pool(
 	deps: DepsMut<NeutronQuery>,
 	env: Env,
@@ -266,13 +264,17 @@ fn execute_config_pool(
 ) -> NeutronResult<Response<NeutronMsg>> {
 	let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
 	let (delegator, connection_id) = get_ica(deps.as_ref(), &env, &interchain_account_id)?;
+	let pool_info = POOLS.load(deps.storage, delegator.clone())?;
 
-	let msg = new_register_delegator_delegations_query_msg(
+	let register_delegation_query_msg = new_register_delegator_delegations_query_msg(
 		connection_id.clone(),
 		delegator.clone(),
 		validator_addrs,
 		DEFAULT_UPDATE_PERIOD,
 	)?;
+
+	let register_balance_pool_msg = new_register_balance_query_msg(connection_id.clone(), delegator.clone(), pool_info.remove_denom, DEFAULT_UPDATE_PERIOD)?;
+	let register_balance_withdraw_msg = new_register_balance_query_msg(connection_id.clone(), delegator.clone(), withdraw_addr.clone(), DEFAULT_UPDATE_PERIOD)?;
 
 	let set_withdraw_msg = MsgSetWithdrawAddress {
 		delegator_address: delegator,
@@ -303,7 +305,7 @@ fn execute_config_pool(
 
 	// We use a submessage here because we need the process message reply to save
 	// the outgoing IBC packet identifier for later.
-	let submsg_setwithdraw = msg_with_sudo_callback(
+	let submsg_set_withdraw = msg_with_sudo_callback(
 		deps.branch(),
 		cosmos_msg,
 		SudoPayload::HandlerPayloadInterTx(InterTxType {
@@ -314,7 +316,11 @@ fn execute_config_pool(
 		}),
 	)?;
 
-	Ok(Response::new().add_message(msg).add_submessages(vec![submsg_setwithdraw]))
+	Ok(Response::new()
+		.add_message(register_delegation_query_msg)
+		.add_message(register_balance_pool_msg)
+		.add_message(register_balance_withdraw_msg)
+		.add_submessages(vec![submsg_set_withdraw]))
 }
 
 pub fn register_delegations_query(

@@ -44,6 +44,7 @@ pub struct PoolInfo {
     pub withdraw_addr: String,
     pub pool_addr: String,
     pub ibc_denom: String,
+    pub remove_denom: String,
     pub connection_id: String,
     pub validator_addrs: Vec<String>,
 }
