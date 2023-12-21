@@ -23,10 +23,7 @@ use cosmwasm_std::{
 };
 use cw2::set_contract_version;
 use neutron_sdk::{
-    bindings::{
-        msg::{ IbcFee, MsgIbcTransferResponse, NeutronMsg, MsgRegisterInterchainQueryResponse },
-        query::{ NeutronQuery },
-    },
+    bindings::{ msg::{ IbcFee, MsgIbcTransferResponse, NeutronMsg }, query::{ NeutronQuery } },
     query::min_ibc_fee::query_min_ibc_fee,
     sudo::msg::{ RequestPacket, RequestPacketTimeoutHeight },
     NeutronResult,
@@ -36,7 +33,6 @@ use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::interchain_txs::helpers::get_port_id;
 use schemars::JsonSchema;
 use serde::{ Deserialize, Serialize };
-use cw20_ratom::{ msg };
 use cosmos_sdk_proto::cosmos::{ bank::v1beta1::{ MsgSend } };
 use neutron_sdk::interchain_queries::{ v045::{ new_register_delegator_delegations_query_msg } };
 use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
@@ -125,8 +121,7 @@ pub enum SudoPayload {
     HandlerPayloadInterTx(InterTxType),
 }
 
-// too
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
     _: Env,
@@ -149,14 +144,14 @@ pub fn instantiate(
     Ok(Response::new())
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
     deps.api.debug("WASMDEBUG: migrate");
     Ok(Response::default())
 }
 
 // todo: add response event
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut<NeutronQuery>,
     env: Env,
@@ -231,8 +226,9 @@ fn execute_config_pool(
     let pool_info = POOLS.load(deps.storage, delegator.clone())?;
 
     let latest_query_id = LATEST_QUERY_ID.load(deps.storage)?;
-    let pool_query_id = latest_query_id + 1;
-    let withdraw_query_id = latest_query_id + 2;
+    let pool_delegation_query_id = latest_query_id + 1;
+    let pool_query_id = latest_query_id + 2;
+    let withdraw_query_id = latest_query_id + 3;
 
     let register_delegation_query_msg = new_register_delegator_delegations_query_msg(
         connection_id.clone(),
@@ -240,6 +236,12 @@ fn execute_config_pool(
         validator_addrs,
         DEFAULT_UPDATE_PERIOD
     )?;
+
+    // wrap into submessage to save {query_id, query_type} on reply that'll later be used to handle sudo kv callback
+    let register_delegation_query_submsg = SubMsg::reply_on_success(
+        register_delegation_query_msg,
+        pool_delegation_query_id
+    );
 
     let register_balance_pool_msg = new_register_balance_query_msg(
         connection_id.clone(),
@@ -310,15 +312,14 @@ fn execute_config_pool(
     )?;
 
     Ok(
-        Response::new()
-            .add_message(register_delegation_query_msg)
-            .add_submessages(
-                vec![
-                    register_balance_pool_submsg,
-                    register_balance_withdraw_submsg,
-                    submsg_set_withdraw
-                ]
-            )
+        Response::new().add_submessages(
+            vec![
+                register_delegation_query_submsg,
+                register_balance_pool_submsg,
+                register_balance_withdraw_submsg,
+                submsg_set_withdraw
+            ]
+        )
     )
 }
 
@@ -376,7 +377,7 @@ fn execute_stake(
     let msg = WasmMsg::Execute {
         contract_addr: pool_info.cw20.to_string(),
         msg: to_json_binary(
-            &(msg::ExecuteMsg::Mint {
+            &(cw20_ratom::msg::ExecuteMsg::Mint {
                 recipient: neutron_address.to_string(),
                 amount: Uint128::from(amount),
             })
@@ -447,7 +448,7 @@ fn execute_unstake(
     let msg = WasmMsg::Execute {
         contract_addr: pool_info.cw20.to_string(),
         msg: to_json_binary(
-            &(msg::ExecuteMsg::BurnFrom {
+            &(cw20_ratom::msg::ExecuteMsg::BurnFrom {
                 owner: info.sender.to_string(),
                 amount: Default::default(),
             })
