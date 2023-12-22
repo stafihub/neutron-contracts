@@ -19,7 +19,7 @@ use cosmwasm_std::{
     WasmMsg,
     CustomQuery,
     Addr,
-    Int256,
+    Int256, to_binary,
 };
 use cw2::set_contract_version;
 use neutron_sdk::{
@@ -27,7 +27,7 @@ use neutron_sdk::{
     query::min_ibc_fee::query_min_ibc_fee,
     sudo::msg::{ RequestPacket, RequestPacketTimeoutHeight },
     NeutronResult,
-    NeutronError,
+    NeutronError, interchain_queries::{get_registered_query, v045::{queries::BalanceResponse, types::Balances}, check_query_type, types::QueryType, query_kv_result},
 };
 use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::interchain_txs::helpers::get_port_id;
@@ -42,7 +42,7 @@ use cosmos_sdk_proto::prost::Message;
 use neutron_sdk::interchain_queries::v045::new_register_balance_query_msg;
 use neutron_sdk::sudo::msg::SudoMsg;
 use crate::{
-    msg::{ ExecuteMsg, InstantiateMsg, MigrateMsg },
+    msg::{ ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg },
     state::{
         read_reply_payload,
         read_sudo_payload,
@@ -148,6 +148,37 @@ pub fn instantiate(
 pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
     deps.api.debug("WASMDEBUG: migrate");
     Ok(Response::default())
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn query(deps: Deps<NeutronQuery>, env: Env, msg: QueryMsg) -> NeutronResult<Binary> {
+    match msg {
+        QueryMsg::GetRegisteredQuery { query_id } => {
+            Ok(to_json_binary(&get_registered_query(deps, query_id)?)?)
+        },
+        QueryMsg::Balance { query_id } => Ok(to_json_binary(&query_balance(deps, env, query_id)?)?),
+    }
+}
+
+pub fn query_balance(
+    deps: Deps<NeutronQuery>,
+    _env: Env,
+    registered_query_id: u64,
+) -> NeutronResult<BalanceResponse> {
+    // get info about the query
+    let registered_query = get_registered_query(deps, registered_query_id)?;
+    // check that query type is KV
+    check_query_type(registered_query.registered_query.query_type, QueryType::KV)?;
+    // reconstruct a nice Balances structure from raw KV-storage values
+    let balances: Balances = query_kv_result(deps, registered_query_id)?;
+
+    Ok(BalanceResponse {
+        // last_submitted_height tells us when the query result was updated last time (block height)
+        last_submitted_local_height: registered_query
+            .registered_query
+            .last_submitted_result_local_height,
+        balances,
+    })
 }
 
 // todo: add response event
@@ -815,8 +846,11 @@ fn execute_bond_active(
         );
         return Ok(Response::default());
     }
+
     // todo: calculate the rate
+
     // todo: calculate protocol fee
+
     Ok(Response::default())
 }
 

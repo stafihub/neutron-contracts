@@ -15,6 +15,13 @@ pub struct InstantiateMsg {
     pub unbonding_period: u128,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum QueryMsg {
+    GetRegisteredQuery { query_id: u64 },
+    Balance { query_id: u64 },
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
