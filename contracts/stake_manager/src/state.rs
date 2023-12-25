@@ -7,7 +7,6 @@ use cosmwasm_std::{
     Coin,
     Addr,
     Uint128,
-    Int256,
 };
 use cw_storage_plus::{ Item, Map };
 use schemars::JsonSchema;
@@ -37,16 +36,19 @@ pub const STATE: Item<State> = Item::new("state");
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct PoolInfo {
-    pub need_withdraw: Int256,
-    pub unbond: Int256,
-    pub active: Int256,
+    pub need_withdraw: Uint128,
+    pub unbond: Uint128,
+    pub active: Uint128,
     pub cw20: Addr,
     pub withdraw_addr: String,
     pub pool_addr: String,
     pub ibc_denom: String,
-    pub remove_denom: String,
+    pub remote_denom: String,
     pub connection_id: String,
     pub validator_addrs: Vec<String>,
+    pub era: u128,
+    pub rate: Uint128,
+    pub era_update_status: PoolBondState,
 }
 
 pub const POOLS: Map<String, PoolInfo> = Map::new("pools");
@@ -57,17 +59,6 @@ pub enum PoolBondState {
     BondReported = 1,
     ActiveReported = 2,
 }
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct Era {
-    pub era: u128,
-    pub pre_era: u128,
-    pub rate: Uint128,
-    pub pre_rate: Uint128,
-    pub era_update_status: PoolBondState,
-}
-// key: pool_addr
-pub const POOL_ERA_INFO: Map<String, Era> = Map::new("pool_era_info");
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct UnstakeInfo {

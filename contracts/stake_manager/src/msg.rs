@@ -18,8 +18,12 @@ pub struct InstantiateMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
-    GetRegisteredQuery { query_id: u64 },
-    Balance { query_id: u64 },
+    GetRegisteredQuery {
+        query_id: u64,
+    },
+    Balance {
+        query_id: u64,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
@@ -29,7 +33,7 @@ pub enum ExecuteMsg {
         connection_id: String,
         interchain_account_id: String,
     },
-    ConfigPool{
+    ConfigPool {
         interchain_account_id: String,
         validator_addrs: Vec<String>,
         withdraw_addr: String,
@@ -60,9 +64,19 @@ pub enum ExecuteMsg {
         receiver: Addr,
         interchain_account_id: String,
     },
+    PoolRmValidator {
+        pool_addr: String,
+        validator_addrs: Vec<String>,
+    },
     EraUpdate {
-        connection_id: String,
         channel: String,
+        pool_addr: String,
+    },
+    EraBond {
+        pool_addr: String,
+    },
+    EraBondActive {
+        pool_addr: String,
     },
     StakeLSM {
         // todo!
