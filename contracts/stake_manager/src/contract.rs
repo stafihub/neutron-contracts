@@ -24,7 +24,7 @@ use cosmwasm_std::{
 };
 use cw2::set_contract_version;
 use neutron_sdk::{
-    bindings::{ msg::{ IbcFee, MsgIbcTransferResponse, NeutronMsg }, query::{ NeutronQuery } },
+    bindings::{ msg::{ IbcFee, MsgIbcTransferResponse, NeutronMsg }, query::{ NeutronQuery, QueryInterchainAccountAddressResponse } },
     query::min_ibc_fee::query_min_ibc_fee,
     sudo::msg::{ RequestPacket, RequestPacketTimeoutHeight },
     NeutronResult,
@@ -62,7 +62,7 @@ use crate::{
         QueryKind,
         LATEST_QUERY_ID,
         ADDR_QUERY_ID,
-        PoolBondState,
+        PoolBondState, ACKNOWLEDGEMENT_RESULTS, read_errors_from_queue,
     },
 };
 use crate::state::{
@@ -171,6 +171,13 @@ pub fn query(deps: Deps<NeutronQuery>, env: Env, msg: QueryMsg) -> NeutronResult
             Ok(to_json_binary(&get_registered_query(deps, query_id)?)?)
         }
         QueryMsg::Balance { query_id } => Ok(to_json_binary(&query_balance(deps, env, query_id)?)?),
+        QueryMsg::InterchainAccountAddress { interchain_account_id, connection_id } =>
+            query_interchain_address(deps, env, interchain_account_id, connection_id),
+        QueryMsg::InterchainAccountAddressFromContract { interchain_account_id } =>
+            query_interchain_address_contract(deps, env, interchain_account_id),
+        QueryMsg::AcknowledgementResult { interchain_account_id, sequence_id } =>
+            query_acknowledgement_result(deps, env, interchain_account_id, sequence_id),
+        QueryMsg::ErrorsQueue {} => query_errors_queue(deps),
     }
 }
 
@@ -191,6 +198,49 @@ pub fn query_balance(
         last_submitted_local_height: registered_query.registered_query.last_submitted_result_local_height,
         balances,
     })
+}
+
+// returns ICA address from Neutron ICA SDK module
+pub fn query_interchain_address(
+    deps: Deps<NeutronQuery>,
+    env: Env,
+    interchain_account_id: String,
+    connection_id: String,
+) -> NeutronResult<Binary> {
+    let query = NeutronQuery::InterchainAccountAddress {
+        owner_address: env.contract.address.to_string(),
+        interchain_account_id,
+        connection_id,
+    };
+
+    let res: QueryInterchainAccountAddressResponse = deps.querier.query(&query.into())?;
+    Ok(to_json_binary(&res)?)
+}
+
+// returns ICA address from the contract storage. The address was saved in sudo_open_ack method
+pub fn query_interchain_address_contract(
+    deps: Deps<NeutronQuery>,
+    env: Env,
+    interchain_account_id: String,
+) -> NeutronResult<Binary> {
+    Ok(to_json_binary(&get_ica(deps, &env, &interchain_account_id)?)?)
+}
+
+// returns the result
+pub fn query_acknowledgement_result(
+    deps: Deps<NeutronQuery>,
+    env: Env,
+    interchain_account_id: String,
+    sequence_id: u64,
+) -> NeutronResult<Binary> {
+    let port_id = get_port_id(env.contract.address.as_str(), &interchain_account_id);
+    let res = ACKNOWLEDGEMENT_RESULTS.may_load(deps.storage, (port_id, sequence_id))?;
+    Ok(to_json_binary(&res)?)
+}
+
+pub fn query_errors_queue(deps: Deps<NeutronQuery>) -> NeutronResult<Binary> {
+    let res = read_errors_from_queue(deps.storage)?;
+    Ok(to_json_binary(&res)?)
 }
 
 // todo: add response event

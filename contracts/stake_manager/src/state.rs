@@ -6,7 +6,7 @@ use cosmwasm_std::{
     to_json_vec,
     Coin,
     Addr,
-    Uint128,
+    Uint128, Order,
 };
 use cw_storage_plus::{ Item, Map };
 use schemars::JsonSchema;
@@ -98,6 +98,31 @@ pub enum QueryKind {
     // Balance query
     Balance,
     // You can add your handlers to understand what query to deserialize by query_id in sudo callback
+}
+
+
+/// Serves for storing acknowledgement calls for interchain transactions
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum AcknowledgementResult {
+    /// Success - Got success acknowledgement in sudo with array of message item types in it
+    Success(Vec<String>),
+    /// Error - Got error acknowledgement in sudo with payload message in it and error details
+    Error((String, String)),
+    /// Timeout - Got timeout acknowledgement in sudo with payload message in it
+    Timeout(String),
+}
+
+// interchain transaction responses - ack/err/timeout state to query later
+pub const ACKNOWLEDGEMENT_RESULTS: Map<(String, u64), AcknowledgementResult> =
+    Map::new("acknowledgement_results");
+
+pub const ERRORS_QUEUE: Map<u32, String> = Map::new("errors_queue");
+
+pub fn read_errors_from_queue(store: &dyn Storage) -> StdResult<Vec<(Vec<u8>, String)>> {
+    ERRORS_QUEUE
+        .range_raw(store, None, None, Order::Ascending)
+        .collect()
 }
 
 /// get_next_id gives us an id for a reply msg
