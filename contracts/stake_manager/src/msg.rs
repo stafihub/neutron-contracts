@@ -1,19 +1,9 @@
-use cosmwasm_std::{ Addr, Coin, Uint128 };
+use cosmwasm_std::{ Addr, Uint128 };
 use schemars::JsonSchema;
 use serde::{ Deserialize, Serialize };
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-pub struct InstantiateMsg {
-    pub minimal_stake: Coin,
-    pub cw20_address: Addr,
-    pub atom_ibc_denom: String,
-    pub era: u128,
-    pub rate: Uint128,
-    pub cosmos_validator: String,
-    pub unstake_times_limit: Uint128,
-    pub next_unstake_index: Uint128,
-    pub unbonding_period: u128,
-}
+pub struct InstantiateMsg {}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -53,6 +43,11 @@ pub enum ExecuteMsg {
         interchain_account_id: String,
         validator_addrs: Vec<String>,
         withdraw_addr: String,
+        rtoken: Addr,
+        minimal_stake: Uint128,
+        unstake_times_limit: Uint128,
+        next_unstake_index: Uint128,
+        unbonding_period: u128,
     },
     RegisterBalanceQuery {
         connection_id: String,

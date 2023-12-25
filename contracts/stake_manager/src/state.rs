@@ -4,9 +4,9 @@ use cosmwasm_std::{
     StdResult,
     Storage,
     to_json_vec,
-    Coin,
     Addr,
-    Uint128, Order,
+    Uint128,
+    Order,
 };
 use cw_storage_plus::{ Item, Map };
 use schemars::JsonSchema;
@@ -25,11 +25,7 @@ const REPLY_ID: Item<u64> = Item::new("reply_id");
 // todo: Organize the use of Uint128 and u128
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct State {
-    pub minimal_stake: Coin,
     pub owner: Addr,
-    pub unstake_times_limit: Uint128,
-    pub next_unstake_index: Uint128,
-    pub unbonding_period: u128,
 }
 
 pub const STATE: Item<State> = Item::new("state");
@@ -39,7 +35,7 @@ pub struct PoolInfo {
     pub need_withdraw: Uint128,
     pub unbond: Uint128,
     pub active: Uint128,
-    pub cw20: Addr,
+    pub rtoken: Addr,
     pub withdraw_addr: String,
     pub pool_addr: String,
     pub ibc_denom: String,
@@ -48,6 +44,10 @@ pub struct PoolInfo {
     pub validator_addrs: Vec<String>,
     pub era: u128,
     pub rate: Uint128,
+    pub minimal_stake: Uint128,
+    pub unstake_times_limit: Uint128,
+    pub next_unstake_index: Uint128,
+    pub unbonding_period: u128,
     pub era_update_status: PoolBondState,
 }
 
@@ -100,7 +100,6 @@ pub enum QueryKind {
     // You can add your handlers to understand what query to deserialize by query_id in sudo callback
 }
 
-
 /// Serves for storing acknowledgement calls for interchain transactions
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
@@ -114,15 +113,14 @@ pub enum AcknowledgementResult {
 }
 
 // interchain transaction responses - ack/err/timeout state to query later
-pub const ACKNOWLEDGEMENT_RESULTS: Map<(String, u64), AcknowledgementResult> =
-    Map::new("acknowledgement_results");
+pub const ACKNOWLEDGEMENT_RESULTS: Map<(String, u64), AcknowledgementResult> = Map::new(
+    "acknowledgement_results"
+);
 
 pub const ERRORS_QUEUE: Map<u32, String> = Map::new("errors_queue");
 
 pub fn read_errors_from_queue(store: &dyn Storage) -> StdResult<Vec<(Vec<u8>, String)>> {
-    ERRORS_QUEUE
-        .range_raw(store, None, None, Order::Ascending)
-        .collect()
+    ERRORS_QUEUE.range_raw(store, None, None, Order::Ascending).collect()
 }
 
 /// get_next_id gives us an id for a reply msg

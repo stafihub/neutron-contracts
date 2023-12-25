@@ -24,7 +24,10 @@ use cosmwasm_std::{
 };
 use cw2::set_contract_version;
 use neutron_sdk::{
-    bindings::{ msg::{ IbcFee, MsgIbcTransferResponse, NeutronMsg }, query::{ NeutronQuery, QueryInterchainAccountAddressResponse } },
+    bindings::{
+        msg::{ IbcFee, MsgIbcTransferResponse, NeutronMsg },
+        query::{ NeutronQuery, QueryInterchainAccountAddressResponse },
+    },
     query::min_ibc_fee::query_min_ibc_fee,
     sudo::msg::{ RequestPacket, RequestPacketTimeoutHeight },
     NeutronResult,
@@ -62,7 +65,9 @@ use crate::{
         QueryKind,
         LATEST_QUERY_ID,
         ADDR_QUERY_ID,
-        PoolBondState, ACKNOWLEDGEMENT_RESULTS, read_errors_from_queue,
+        PoolBondState,
+        ACKNOWLEDGEMENT_RESULTS,
+        read_errors_from_queue,
     },
 };
 use crate::state::{
@@ -140,7 +145,7 @@ pub fn instantiate(
     deps: DepsMut,
     _: Env,
     info: MessageInfo,
-    msg: InstantiateMsg
+    _: InstantiateMsg
 ) -> NeutronResult<Response<NeutronMsg>> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
@@ -148,10 +153,6 @@ pub fn instantiate(
         deps.storage,
         &(State {
             owner: info.sender,
-            minimal_stake: msg.minimal_stake,
-            unstake_times_limit: msg.unstake_times_limit,
-            next_unstake_index: Uint128::zero(),
-            unbonding_period: msg.unbonding_period,
         })
     )?;
 
@@ -205,7 +206,7 @@ pub fn query_interchain_address(
     deps: Deps<NeutronQuery>,
     env: Env,
     interchain_account_id: String,
-    connection_id: String,
+    connection_id: String
 ) -> NeutronResult<Binary> {
     let query = NeutronQuery::InterchainAccountAddress {
         owner_address: env.contract.address.to_string(),
@@ -221,7 +222,7 @@ pub fn query_interchain_address(
 pub fn query_interchain_address_contract(
     deps: Deps<NeutronQuery>,
     env: Env,
-    interchain_account_id: String,
+    interchain_account_id: String
 ) -> NeutronResult<Binary> {
     Ok(to_json_binary(&get_ica(deps, &env, &interchain_account_id)?)?)
 }
@@ -231,7 +232,7 @@ pub fn query_acknowledgement_result(
     deps: Deps<NeutronQuery>,
     env: Env,
     interchain_account_id: String,
-    sequence_id: u64,
+    sequence_id: u64
 ) -> NeutronResult<Binary> {
     let port_id = get_port_id(env.contract.address.as_str(), &interchain_account_id);
     let res = ACKNOWLEDGEMENT_RESULTS.may_load(deps.storage, (port_id, sequence_id))?;
@@ -257,14 +258,28 @@ pub fn execute(
         // if you intend to send funds over IBC
         ExecuteMsg::RegisterPool { connection_id, interchain_account_id } =>
             execute_register_pool(deps, env, info, connection_id, interchain_account_id),
-        ExecuteMsg::ConfigPool { interchain_account_id, validator_addrs, withdraw_addr } =>
+        ExecuteMsg::ConfigPool {
+            interchain_account_id,
+            validator_addrs,
+            withdraw_addr,
+            rtoken,
+            minimal_stake,
+            unstake_times_limit,
+            next_unstake_index,
+            unbonding_period,
+        } =>
             execute_config_pool(
                 deps,
                 env,
                 info,
                 interchain_account_id,
                 validator_addrs,
-                withdraw_addr
+                withdraw_addr,
+                rtoken,
+                minimal_stake,
+                unstake_times_limit,
+                next_unstake_index,
+                unbonding_period
             ),
         ExecuteMsg::RegisterBalanceQuery { connection_id, addr, denom, update_period } =>
             register_balance_query(connection_id, addr, denom, update_period),
@@ -316,11 +331,16 @@ fn execute_config_pool(
     _: MessageInfo,
     interchain_account_id: String,
     validator_addrs: Vec<String>,
-    withdraw_addr: String
+    withdraw_addr: String,
+    rtoken: Addr,
+    minimal_stake: Uint128,
+    unstake_times_limit: Uint128,
+    next_unstake_index: Uint128,
+    unbonding_period: u128
 ) -> NeutronResult<Response<NeutronMsg>> {
     let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
     let (delegator, connection_id) = get_ica(deps.as_ref(), &env, &interchain_account_id)?;
-    let pool_info = POOLS.load(deps.storage, delegator.clone())?;
+    let mut pool_info = POOLS.load(deps.storage, delegator.clone())?;
 
     let latest_query_id = LATEST_QUERY_ID.load(deps.storage)?;
     let pool_delegation_query_id = latest_query_id + 1;
@@ -343,7 +363,7 @@ fn execute_config_pool(
     let register_balance_pool_msg = new_register_balance_query_msg(
         connection_id.clone(),
         delegator.clone(),
-        pool_info.remote_denom,
+        pool_info.remote_denom.clone(),
         DEFAULT_UPDATE_PERIOD
     )?;
 
@@ -408,6 +428,14 @@ fn execute_config_pool(
         })
     )?;
 
+    pool_info.minimal_stake = minimal_stake;
+    pool_info.rtoken = rtoken;
+    pool_info.next_unstake_index = next_unstake_index;
+    pool_info.unbonding_period = unbonding_period;
+    pool_info.unstake_times_limit = unstake_times_limit;
+
+    POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
+
     Ok(
         Response::new().add_submessages(
             vec![
@@ -471,7 +499,7 @@ fn execute_stake(
     amount = amount.mul(pool_info.rate.u128()).div(1_000_000);
 
     let msg = WasmMsg::Execute {
-        contract_addr: pool_info.cw20.to_string(),
+        contract_addr: pool_info.rtoken.to_string(),
         msg: to_json_binary(
             &(cw20_ratom::msg::ExecuteMsg::Mint {
                 recipient: neutron_address.to_string(),
@@ -501,11 +529,10 @@ fn execute_unstake(
         );
     }
 
-    let mut state = STATE.load(deps.storage)?;
-    let pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
+    let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
 
     let unstake_count = UNSTAKES_INDEX_FOR_USER.load(deps.storage, &info.sender)?.len() as u128;
-    let unstake_limit = state.unstake_times_limit.u128();
+    let unstake_limit = pool_info.unstake_times_limit.u128();
     if unstake_count >= unstake_limit {
         return Err(
             NeutronError::Std(
@@ -524,7 +551,7 @@ fn execute_unstake(
     pools.unbond = pools.unbond.add(token_amount);
     // todo: Numerical check
     pools.active = pools.active.sub(token_amount);
-    POOLS.save(deps.storage, pool_addr, &pools)?;
+    POOLS.save(deps.storage, pool_addr.clone(), &pools)?;
 
     // update unstake info
     let unstake_info = UnstakeInfo {
@@ -533,16 +560,16 @@ fn execute_unstake(
         amount: token_amount,
     };
 
-    let will_use_unstake_index = state.next_unstake_index;
+    let will_use_unstake_index = pool_info.next_unstake_index;
 
     UNSTAKES_OF_INDEX.save(deps.storage, will_use_unstake_index.u128(), &unstake_info)?;
 
-    state.next_unstake_index = state.next_unstake_index.add(Uint128::one());
-    STATE.save(deps.storage, &state)?;
+    pool_info.next_unstake_index = pool_info.next_unstake_index.add(Uint128::one());
+    POOLS.save(deps.storage, pool_addr.clone(),&pool_info)?;
 
     // burn
     let msg = WasmMsg::Execute {
-        contract_addr: pool_info.cw20.to_string(),
+        contract_addr: pool_info.rtoken.to_string(),
         msg: to_json_binary(
             &(cw20_ratom::msg::ExecuteMsg::BurnFrom {
                 owner: info.sender.to_string(),
@@ -578,13 +605,12 @@ fn execute_withdraw(
     let mut emit_unstake_index_list = vec![];
     let mut indices_to_remove = Vec::new();
 
-    let state = STATE.load(deps.storage)?;
     let pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
 
     for (i, unstake_index) in unstakes.iter().enumerate() {
         let unstake_info = UNSTAKES_OF_INDEX.load(deps.storage, unstake_index.u128())?;
         if
-            unstake_info.era + state.unbonding_period > pool_info.era ||
+            unstake_info.era + pool_info.unbonding_period > pool_info.era ||
             unstake_info.pool != pool_addr
         {
             continue;
@@ -761,6 +787,7 @@ fn execute_rm_pool_validators(
     }
 
     // todo: update state in sudo reply
+    // todo: update delegation_query
     Ok(Response::default().add_submessages(msgs))
 }
 
@@ -1093,7 +1120,7 @@ fn execute_bond_active(
     let token_info_msg = cw20_ratom::msg::QueryMsg::TokenInfo {};
     let token_info: cw20::TokenInfoResponse = deps.querier.query(
         &QueryRequest::Wasm(WasmQuery::Smart {
-            contract_addr: pool_info.cw20.to_string(),
+            contract_addr: pool_info.rtoken.to_string(),
             msg: to_json_binary(&token_info_msg)?,
         })
     )?;
