@@ -63,12 +63,13 @@ use crate::{
         IBC_SUDO_ID_RANGE_START,
         KV_QUERY_ID_TO_CALLBACKS,
         QueryKind,
-        LATEST_QUERY_ID,
+        LATEST_BALANCES_QUERY_ID,
         ADDR_QUERY_ID,
         PoolBondState,
         ACKNOWLEDGEMENT_RESULTS,
         read_errors_from_queue,
         PoolInfo,
+        QUERY_BALANCES_REPLY_ID_RANGE_START, QUERY_BALANCES_REPLY_ID_END, QUERY_DELEGATIONS_REPLY_ID_RANGE_START, QUERY_DELEGATIONS_REPLY_ID_END, LATEST_DELEGATIONS_QUERY_ID,
     },
 };
 use crate::state::{
@@ -157,6 +158,9 @@ pub fn instantiate(
         })
     )?;
 
+    LATEST_BALANCES_QUERY_ID.save(deps.storage, &QUERY_BALANCES_REPLY_ID_RANGE_START)?;
+    LATEST_DELEGATIONS_QUERY_ID.save(deps.storage, &QUERY_DELEGATIONS_REPLY_ID_RANGE_START)?;
+
     Ok(Response::new())
 }
 
@@ -173,7 +177,8 @@ pub fn query(deps: Deps<NeutronQuery>, env: Env, msg: QueryMsg) -> NeutronResult
             Ok(to_json_binary(&get_registered_query(deps, query_id)?)?)
         }
         QueryMsg::Balance { query_id } => Ok(to_json_binary(&query_balance(deps, env, query_id)?)?),
-        QueryMsg::PoolInfo { pool_addr } => Ok(to_json_binary(&query_pool_info(deps, env, pool_addr)?)?),
+        QueryMsg::PoolInfo { pool_addr } =>
+            Ok(to_json_binary(&query_pool_info(deps, env, pool_addr)?)?),
         QueryMsg::InterchainAccountAddress { interchain_account_id, connection_id } =>
             query_interchain_address(deps, env, interchain_account_id, connection_id),
         QueryMsg::InterchainAccountAddressFromContract { interchain_account_id } =>
@@ -278,9 +283,16 @@ pub fn execute(
             ),
         ExecuteMsg::ConfigPool {
             interchain_account_id,
-            validator_addrs,
-            withdraw_addr,
+            need_withdraw,
+            unbond,
+            active,
             rtoken,
+            withdraw_addr,
+            ibc_denom,
+            remote_denom,
+            validator_addrs,
+            era,
+            rate,
             minimal_stake,
             unstake_times_limit,
             next_unstake_index,
@@ -291,9 +303,16 @@ pub fn execute(
                 env,
                 info,
                 interchain_account_id,
-                validator_addrs,
-                withdraw_addr,
+                need_withdraw,
+                unbond,
+                active,
                 rtoken,
+                withdraw_addr,
+                ibc_denom,
+                remote_denom,
+                validator_addrs,
+                era,
+                rate,
                 minimal_stake,
                 unstake_times_limit,
                 next_unstake_index,
@@ -332,12 +351,19 @@ fn execute_register_pool(
     interchain_account_id: String,
     register_fee: Vec<cosmwasm_std::Coin>
 ) -> NeutronResult<Response<NeutronMsg>> {
+    deps.as_ref().api.debug(format!("WASMDEBUG: register_fee {:?}", register_fee).as_str());
     let register = NeutronMsg::register_interchain_account(
         connection_id.clone(),
         interchain_account_id.clone(),
         Some(register_fee)
     );
+
+    deps.as_ref().api.debug(format!("WASMDEBUG: register msg is {:?}", register).as_str());
+
     let key = get_port_id(env.contract.address.as_str(), &interchain_account_id);
+
+    deps.as_ref().api.debug(format!("WASMDEBUG: register key is {:?}", key).as_str());
+
     // we are saving empty data here because we handle response of registering ICA in sudo_open_ack method
     INTERCHAIN_ACCOUNTS.save(deps.storage, key, &None)?;
 
@@ -350,9 +376,16 @@ fn execute_config_pool(
     env: Env,
     _: MessageInfo,
     interchain_account_id: String,
-    validator_addrs: Vec<String>,
-    withdraw_addr: String,
+    need_withdraw: Uint128,
+    unbond: Uint128,
+    active: Uint128,
     rtoken: Addr,
+    withdraw_addr: String,
+    ibc_denom: String,
+    remote_denom: String,
+    validator_addrs: Vec<String>,
+    era: u128,
+    rate: Uint128,
     minimal_stake: Uint128,
     unstake_times_limit: Uint128,
     next_unstake_index: Uint128,
@@ -360,12 +393,51 @@ fn execute_config_pool(
 ) -> NeutronResult<Response<NeutronMsg>> {
     let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
     let (delegator, connection_id) = get_ica(deps.as_ref(), &env, &interchain_account_id)?;
-    let mut pool_info = POOLS.load(deps.storage, delegator.clone())?;
 
-    let latest_query_id = LATEST_QUERY_ID.load(deps.storage)?;
+    deps.as_ref().api.debug(
+        format!(
+            "WASMDEBUG: execute_config_pool get_ica delegator: {:?},connection_id: {:?}",
+            delegator,
+            connection_id
+        ).as_str()
+    );
+
+    let mut pool_info = POOLS.load(deps.as_ref().storage, delegator.clone())?;
+
+    deps.as_ref().api.debug(
+        format!("WASMDEBUG: execute_config_pool POOLS.load: {:?}", pool_info).as_str()
+    );
+
+    pool_info.need_withdraw = need_withdraw;
+    pool_info.unbond = unbond;
+    pool_info.active = active;
+    pool_info.ibc_denom = ibc_denom;
+    pool_info.remote_denom = remote_denom;
+    pool_info.era = era;
+    pool_info.rate = rate;
+    pool_info.minimal_stake = minimal_stake;
+    pool_info.rtoken = rtoken;
+    pool_info.next_unstake_index = next_unstake_index;
+    pool_info.unbonding_period = unbonding_period;
+    pool_info.unstake_times_limit = unstake_times_limit;
+
+    POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
+
+    let latest_query_id = LATEST_BALANCES_QUERY_ID.load(deps.as_ref().storage)?;
+
+    deps.as_ref().api.debug(
+        format!(
+            "WASMDEBUG: execute_config_pool pool update: {:?},latest_query_id is {:?}",
+            pool_info,
+            latest_query_id
+        ).as_str()
+    );
+
     let pool_delegation_query_id = latest_query_id + 1;
     let pool_query_id = latest_query_id + 2;
     let withdraw_query_id = latest_query_id + 3;
+
+    LATEST_BALANCES_QUERY_ID.save(deps.storage, &(withdraw_query_id.clone() + 1))?;
 
     let register_delegation_query_msg = new_register_delegator_delegations_query_msg(
         connection_id.clone(),
@@ -411,8 +483,8 @@ fn execute_config_pool(
     ADDR_QUERY_ID.save(deps.storage, withdraw_addr.clone(), &withdraw_query_id)?;
 
     let set_withdraw_msg = MsgSetWithdrawAddress {
-        delegator_address: delegator,
-        withdraw_address: withdraw_addr,
+        delegator_address: delegator.clone(),
+        withdraw_address: withdraw_addr.clone(),
     };
     let mut buf = Vec::new();
     buf.reserve(set_withdraw_msg.encoded_len());
@@ -444,17 +516,9 @@ fn execute_config_pool(
             port_id: get_port_id(env.contract.address.to_string(), interchain_account_id),
             // Here you can store some information about the transaction to help you parse
             // the acknowledgement later.
-            message: "set_delegator_withdraw_addr".to_string(),
+            message: format!("set_withdraw_{}_{}.to_string()", delegator, withdraw_addr),
         })
     )?;
-
-    pool_info.minimal_stake = minimal_stake;
-    pool_info.rtoken = rtoken;
-    pool_info.next_unstake_index = next_unstake_index;
-    pool_info.unbonding_period = unbonding_period;
-    pool_info.unstake_times_limit = unstake_times_limit;
-
-    POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
 
     Ok(
         Response::new().add_submessages(
@@ -1158,6 +1222,8 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> StdResult<Response> {
     match msg.id {
         // It's convenient to use range of ID's to handle multiple reply messages
         IBC_SUDO_ID_RANGE_START..=IBC_SUDO_ID_RANGE_END => prepare_sudo_payload(deps, env, msg),
+        QUERY_BALANCES_REPLY_ID_RANGE_START..=QUERY_BALANCES_REPLY_ID_END => sudo_kv_query_balances_result(deps, env, msg.id),
+        QUERY_DELEGATIONS_REPLY_ID_RANGE_START..=QUERY_DELEGATIONS_REPLY_ID_END => sudo_kv_query_delegations_result(deps, env, msg.id),
         _ => Err(StdError::generic_err(format!("unsupported reply message id {}", msg.id))),
     }
 }
@@ -1189,19 +1255,27 @@ pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> StdResult<Response> {
                 counterparty_version
             ),
 
-        SudoMsg::KVQueryResult { query_id } => sudo_kv_query_result(deps, env, query_id),
+        SudoMsg::KVQueryResult { query_id } => sudo_kv_query_balances_result(deps, env, query_id),
         _ => Ok(Response::default()),
     }
 }
 
-/// sudo_kv_query_result is the contract's callback for KV query results. Note that only the query
-/// id is provided, so you need to read the query result from the state.
-pub fn sudo_kv_query_result(deps: DepsMut, _env: Env, query_id: u64) -> StdResult<Response> {
+pub fn sudo_kv_query_balances_result(deps: DepsMut, _env: Env, query_id: u64) -> StdResult<Response> {
     deps.api.debug(
         format!("WASMDEBUG: sudo_kv_query_result received; query_id: {:?}", query_id).as_str()
     );
 
-    KV_QUERY_ID_TO_CALLBACKS.save(deps.storage, query_id, &QueryKind::Balance)?;
+    KV_QUERY_ID_TO_CALLBACKS.save(deps.storage, query_id, &QueryKind::Balances)?;
+
+    Ok(Response::default())
+}
+
+pub fn sudo_kv_query_delegations_result(deps: DepsMut, _env: Env, query_id: u64) -> StdResult<Response> {
+    deps.api.debug(
+        format!("WASMDEBUG: sudo_kv_query_result received; query_id: {:?}", query_id).as_str()
+    );
+
+    KV_QUERY_ID_TO_CALLBACKS.save(deps.storage, query_id, &QueryKind::Delegations)?;
 
     Ok(Response::default())
 }
@@ -1299,9 +1373,29 @@ fn sudo_open_ack(
         )?;
         POOL_ICA_MAP.save(
             deps.storage,
-            parsed_version.address,
+            parsed_version.address.clone(),
             &parsed_version.controller_connection_id
         )?;
+        let pool_info = PoolInfo {
+            need_withdraw: Uint128::zero(),
+            unbond: Uint128::zero(),
+            active: Uint128::zero(),
+            rtoken: Addr::unchecked(""),
+            withdraw_addr: "".to_string(),
+            pool_addr: parsed_version.address.clone(),
+            ibc_denom: "".to_string(),
+            remote_denom: "".to_string(),
+            connection_id: "".to_string(),
+            validator_addrs: vec![],
+            era: 0,
+            rate: Uint128::zero(),
+            minimal_stake: Uint128::zero(),
+            unstake_times_limit: Uint128::zero(),
+            next_unstake_index: Uint128::zero(),
+            unbonding_period: 0,
+            era_update_status: PoolBondState::ActiveReported,
+        };
+        POOLS.save(deps.storage, parsed_version.address.clone(), &pool_info)?;
         return Ok(Response::default());
     }
     Err(StdError::generic_err("Can't parse counterparty_version"))

@@ -1,13 +1,4 @@
-use cosmwasm_std::{
-    from_json,
-    Binary,
-    StdResult,
-    Storage,
-    to_json_vec,
-    Addr,
-    Uint128,
-    Order,
-};
+use cosmwasm_std::{ from_json, Binary, StdResult, Storage, to_json_vec, Addr, Uint128, Order };
 use cw_storage_plus::{ Item, Map };
 use schemars::JsonSchema;
 use serde::{ Deserialize, Serialize };
@@ -18,11 +9,20 @@ pub const IBC_SUDO_ID_RANGE_START: u64 = 1_000_000_000;
 pub const IBC_SUDO_ID_RANGE_SIZE: u64 = 1_000;
 pub const IBC_SUDO_ID_RANGE_END: u64 = IBC_SUDO_ID_RANGE_START + IBC_SUDO_ID_RANGE_SIZE;
 
+pub const QUERY_BALANCES_REPLY_ID_RANGE_START: u64 = 1000;
+pub const QUERY_BALANCES_REPLY_ID_RANGE_SIZE: u64 = 500;
+pub const QUERY_BALANCES_REPLY_ID_END: u64 =
+    QUERY_BALANCES_REPLY_ID_RANGE_START + QUERY_BALANCES_REPLY_ID_RANGE_SIZE;
+
+pub const QUERY_DELEGATIONS_REPLY_ID_RANGE_START: u64 = 2000;
+pub const QUERY_DELEGATIONS_REPLY_ID_RANGE_SIZE: u64 = 500;
+pub const QUERY_DELEGATIONS_REPLY_ID_END: u64 =
+    QUERY_DELEGATIONS_REPLY_ID_RANGE_START + QUERY_DELEGATIONS_REPLY_ID_RANGE_SIZE;
+
 pub const REPLY_QUEUE_ID: Map<u64, Vec<u8>> = Map::new("reply_queue_id");
 
 const REPLY_ID: Item<u64> = Item::new("reply_id");
 
-// todo: Organize the use of Uint128 and u128
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct State {
     pub owner: Addr,
@@ -88,7 +88,9 @@ pub const CONNECTION_POOL_MAP: Map<String, Vec<String>> = Map::new("connection_p
 // key: ica address value: query id
 pub const ADDR_QUERY_ID: Map<String, u64> = Map::new("addr_query_id");
 
-pub const LATEST_QUERY_ID: Item<u64> = Item::new("latest_query_id");
+pub const LATEST_BALANCES_QUERY_ID: Item<u64> = Item::new("latest_balances_query_id");
+
+pub const LATEST_DELEGATIONS_QUERY_ID: Item<u64> = Item::new("latest_delegations_query_id");
 
 pub const KV_QUERY_ID_TO_CALLBACKS: Map<u64, QueryKind> = Map::new("kv_query_id_to_callbacks");
 
@@ -96,7 +98,8 @@ pub const KV_QUERY_ID_TO_CALLBACKS: Map<u64, QueryKind> = Map::new("kv_query_id_
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub enum QueryKind {
     // Balance query
-    Balance,
+    Balances,
+    Delegations,
     // You can add your handlers to understand what query to deserialize by query_id in sudo callback
 }
 

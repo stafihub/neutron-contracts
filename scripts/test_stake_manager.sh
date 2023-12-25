@@ -6,11 +6,15 @@ IFS=$'\n\t'
 
 CONTRACT_PATH="artifacts/stake_manager.wasm"
 CHAIN_ID_1="test-1"
+#NEUTRON_DIR="${NEUTRON_DIR:-/var/lib/docker/volumes/neutron-testing-data/_data}"
+#HOME_1="${NEUTRON_DIR}/test-1/"
 NEUTRON_DIR="${NEUTRON_DIR:-/Users/wang/OrbStack/docker/volumes}"
 HOME_1="${NEUTRON_DIR}/neutron-testing-data/test-1/"
 ADDRESS_1="neutron1m9l358xunhhwds0568za49mzhvuxx9ux8xafx2"
 ADMIN="neutron1m9l358xunhhwds0568za49mzhvuxx9ux8xafx2"
 NEUTRON_NODE="tcp://127.0.0.1:26657"
+# VALIDATOR="cosmosvaloper18hl5c9xn5dze2g50uaw0l2mr02ew57zk0auktn"
+# rtoken_address="neutron1kt4604x3kn48dulhvjzyxekn9xg3xnv8a5f48syr0vtrf3j3nyss50n028"
 
 wait_tx() {
     local txhash
@@ -43,7 +47,7 @@ contract_address=$(neutrond tx wasm instantiate "$code_id" '{}' \
     wait_tx | jq -r '.logs[0].events[] | select(.type == "instantiate").attributes[] | select(.key == "_contract_address").value')
 echo "Contract address: $contract_address"
 
-tx_result="$(neutrond tx bank send demowallet1 "$contract_address" 100000untrn \
+tx_result="$(neutrond tx bank send demowallet1 "$contract_address" 1000000untrn \
     --chain-id "$CHAIN_ID_1" --home "$HOME_1" --node "$NEUTRON_NODE" \
     --keyring-backend=test -y --gas-prices 0.0025untrn \
     --broadcast-mode=sync --output json | wait_tx)"
@@ -53,3 +57,98 @@ if [[ "$code" -ne 0 ]]; then
     echo "Failed to send money to contract: $(echo "$tx_result" | jq '.raw_log')" && exit 1
 fi
 echo "Sent money to contract to pay fees"
+
+msg='{"register_pool":{
+  "connection_id": "connection-0",
+  "interchain_account_id": "test1",
+  "register_fee":[
+    {
+        "denom":"untrn",
+        "amount": "300000"
+    }
+  ]
+}}'
+
+#msg='{"register_pool":{
+#  "connection_id": "connection-0",
+#  "interchain_account_id": "test1",
+#  "register_fee":[]
+#}}'
+
+tx_result="$(neutrond tx wasm execute "$contract_address" "$msg" \
+    --amount 300000untrn \
+    --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
+    --broadcast-mode=sync --gas-prices 0.0055untrn --gas 2000000 \
+    --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"
+
+code="$(echo "$tx_result" | jq '.code')"
+if [[ "$code" -ne 0 ]]; then
+    echo "Failed to register interchain account: $(echo "$tx_result" | jq '.raw_log')" && exit 1
+fi
+
+echo "Waiting 10 seconds for interchain account (sometimes it takes a lot of time)…"
+# shellcheck disable=SC2034
+for i in $(seq 10); do
+    sleep 1
+    echo -n .
+done
+echo " done"
+
+query='{"interchain_account_address_from_contract":{"interchain_account_id":"test1"}}'
+query_b64_urlenc="$(echo -n "$query" | base64 | tr -d '\n' | jq -sRr '@uri')"
+url="http://127.0.0.1:1317/wasm/contract/$contract_address/smart/$query_b64_urlenc?encoding=base64"
+ica_address=$(curl -s "$url" | jq -r '.result.smart' | base64 -d | jq -r '.[0]')
+echo "ICA address: $ica_address"
+
+#query='{"pool_info":{"pool_addr":"cosmos16r4hwuzppch5kq8epw6045z2e2zrgt03ff8dnz6e2qtu2k5975dqx2yvae"}}'
+#query_b64_urlenc="$(echo -n "$query" | base64 | tr -d '\n' | jq -sRr '@uri')"
+#url="http://127.0.0.1:1317/wasm/contract/$contract_address/smart/$query_b64_urlenc?encoding=base64"
+#ica_address=$(curl -s "$url" | jq -r '.result.smart' | base64 -d | jq -r '.[0]')
+#echo "pool_info is: $ica_address"
+
+msg='{
+  "config_pool": {
+    "interchain_account_id": "test1",
+    "need_withdraw": "0",
+    "unbond": "0",
+    "active": "0",
+    "rtoken": "neutron1t2tcfr92kgh6j3vg7e70csrgwpwqtdcg2m0umvya6922xype5trqdn6ahj",
+    "withdraw_addr": "cosmos10h9stc5v6ntgeygf5xf945njqq5h32r53uquvw",
+    "ibc_denom": "ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2",
+    "remote_denom": "uatom",
+    "validator_addrs": ["cosmosvaloper18hl5c9xn5dze2g50uaw0l2mr02ew57zk0auktn"],
+    "era": "1",
+    "rate": "1",
+    "minimal_stake": "1000",
+    "unstake_times_limit": "10",
+    "next_unstake_index": "1",
+    "unbonding_period": "2"
+  }
+}'
+
+
+tx_result="$(neutrond tx wasm execute "$contract_address" "$msg" \
+    --amount 2000000untrn \
+    --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
+    --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \
+    --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"
+
+code="$(echo "$tx_result" | jq '.code')"
+if [[ "$code" -ne 0 ]]; then
+    echo "Failed to config_pool: $(echo "$tx_result" | jq '.raw_log')" && exit 1
+fi
+
+echo "Waiting 20 seconds for config_pool (sometimes it takes a lot of time)…"
+# shellcheck disable=SC2034
+for i in $(seq 20); do
+    sleep 1
+    echo -n .
+done
+echo " done"
+
+query="{\"pool_info\":{\"pool_addr\":\"$ica_address\"}}"
+query_b64_urlenc="$(echo -n "$query" | base64 | tr -d '\n' | jq -sRr '@uri')"
+url="http://127.0.0.1:1317/wasm/contract/$contract_address/smart/$query_b64_urlenc?encoding=base64"
+echo "url is: $url"
+pool_info=$(curl -s "$url" | jq -r '.result.smart' | base64 -d | jq)
+echo "pool_info is: $pool_info"
