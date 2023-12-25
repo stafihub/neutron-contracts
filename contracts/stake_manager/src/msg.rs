@@ -1,4 +1,4 @@
-use cosmwasm_std::{ Addr, Uint128 };
+use cosmwasm_std::{ Addr, Uint128, Coin };
 use schemars::JsonSchema;
 use serde::{ Deserialize, Serialize };
 
@@ -38,6 +38,7 @@ pub enum ExecuteMsg {
     RegisterPool {
         connection_id: String,
         interchain_account_id: String,
+        register_fee: Vec<Coin>,
     },
     ConfigPool {
         interchain_account_id: String,

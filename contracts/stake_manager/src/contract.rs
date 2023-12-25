@@ -256,8 +256,15 @@ pub fn execute(
         // NOTE: this is an example contract that shows how to make IBC transfers!
         // todo: Please add necessary authorization or other protection mechanisms
         // if you intend to send funds over IBC
-        ExecuteMsg::RegisterPool { connection_id, interchain_account_id } =>
-            execute_register_pool(deps, env, info, connection_id, interchain_account_id),
+        ExecuteMsg::RegisterPool { connection_id, interchain_account_id, register_fee } =>
+            execute_register_pool(
+                deps,
+                env,
+                info,
+                connection_id,
+                interchain_account_id,
+                register_fee
+            ),
         ExecuteMsg::ConfigPool {
             interchain_account_id,
             validator_addrs,
@@ -311,11 +318,13 @@ fn execute_register_pool(
     env: Env,
     _: MessageInfo,
     connection_id: String,
-    interchain_account_id: String
+    interchain_account_id: String,
+    register_fee: Vec<cosmwasm_std::Coin>
 ) -> NeutronResult<Response<NeutronMsg>> {
     let register = NeutronMsg::register_interchain_account(
         connection_id.clone(),
-        interchain_account_id.clone()
+        interchain_account_id.clone(),
+        Some(register_fee)
     );
     let key = get_port_id(env.contract.address.as_str(), &interchain_account_id);
     // we are saving empty data here because we handle response of registering ICA in sudo_open_ack method
@@ -565,7 +574,7 @@ fn execute_unstake(
     UNSTAKES_OF_INDEX.save(deps.storage, will_use_unstake_index.u128(), &unstake_info)?;
 
     pool_info.next_unstake_index = pool_info.next_unstake_index.add(Uint128::one());
-    POOLS.save(deps.storage, pool_addr.clone(),&pool_info)?;
+    POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
 
     // burn
     let msg = WasmMsg::Execute {
