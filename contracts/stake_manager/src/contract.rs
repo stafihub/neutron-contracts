@@ -501,7 +501,7 @@ fn execute_stake(
     let msg = WasmMsg::Execute {
         contract_addr: pool_info.rtoken.to_string(),
         msg: to_json_binary(
-            &(cw20_ratom::msg::ExecuteMsg::Mint {
+            &(rtoken::msg::ExecuteMsg::Mint {
                 recipient: neutron_address.to_string(),
                 amount: Uint128::from(amount),
             })
@@ -571,7 +571,7 @@ fn execute_unstake(
     let msg = WasmMsg::Execute {
         contract_addr: pool_info.rtoken.to_string(),
         msg: to_json_binary(
-            &(cw20_ratom::msg::ExecuteMsg::BurnFrom {
+            &(rtoken::msg::ExecuteMsg::BurnFrom {
                 owner: info.sender.to_string(),
                 amount: Default::default(),
             })
@@ -1117,7 +1117,7 @@ fn execute_bond_active(
         total_amount.amount = total_amount.amount.add(delegation.amount.amount);
     }
 
-    let token_info_msg = cw20_ratom::msg::QueryMsg::TokenInfo {};
+    let token_info_msg = rtoken::msg::QueryMsg::TokenInfo {};
     let token_info: cw20::TokenInfoResponse = deps.querier.query(
         &QueryRequest::Wasm(WasmQuery::Smart {
             contract_addr: pool_info.rtoken.to_string(),
