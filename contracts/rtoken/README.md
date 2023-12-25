@@ -1,4 +1,10 @@
-# CW20 rATOM
+---
+runme:
+  id: 01HJFZ3QYTBN64SW4CT9JH4EDP
+  version: v2.0
+---
+
+# CW20 rToken
 
 This is a basic implementation of a cw20 contract. It implements
 the [CW20 spec](../../packages/cw20/README.md) and is designed to
@@ -21,7 +27,7 @@ You can run unit tests on this via:
 
 Once you are happy with the content, you can compile it to wasm via:
 
-```
+```sh {"id":"01HJFZ3QYTBN64SW4CT5M6YNSY"}
 RUSTFLAGS='-C link-arg=-s' cargo wasm
 cp ../../target/wasm32-unknown-unknown/release/rtoken.wasm .
 ls -l rtoken.wasm
