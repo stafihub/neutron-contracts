@@ -14,6 +14,9 @@ pub enum QueryMsg {
     Balance {
         query_id: u64,
     },
+    PoolInfo {
+        pool_addr: String,
+    },
     /// this query goes to neutron and get stored ICA with a specific query
     InterchainAccountAddress {
         interchain_account_id: String,

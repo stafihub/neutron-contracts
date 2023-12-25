@@ -68,6 +68,7 @@ use crate::{
         PoolBondState,
         ACKNOWLEDGEMENT_RESULTS,
         read_errors_from_queue,
+        PoolInfo,
     },
 };
 use crate::state::{
@@ -172,6 +173,7 @@ pub fn query(deps: Deps<NeutronQuery>, env: Env, msg: QueryMsg) -> NeutronResult
             Ok(to_json_binary(&get_registered_query(deps, query_id)?)?)
         }
         QueryMsg::Balance { query_id } => Ok(to_json_binary(&query_balance(deps, env, query_id)?)?),
+        QueryMsg::PoolInfo { pool_addr } => Ok(to_json_binary(&query_pool_info(deps, env, pool_addr)?)?),
         QueryMsg::InterchainAccountAddress { interchain_account_id, connection_id } =>
             query_interchain_address(deps, env, interchain_account_id, connection_id),
         QueryMsg::InterchainAccountAddressFromContract { interchain_account_id } =>
@@ -199,6 +201,15 @@ pub fn query_balance(
         last_submitted_local_height: registered_query.registered_query.last_submitted_result_local_height,
         balances,
     })
+}
+
+pub fn query_pool_info(
+    deps: Deps<NeutronQuery>,
+    _env: Env,
+    pool_addr: String
+) -> NeutronResult<PoolInfo> {
+    let pool_info = POOLS.load(deps.storage, pool_addr)?;
+    Ok(pool_info)
 }
 
 // returns ICA address from Neutron ICA SDK module
