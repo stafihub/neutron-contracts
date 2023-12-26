@@ -99,9 +99,9 @@ if [[ "$code" -ne 0 ]]; then
     echo "Failed to register interchain account: $(echo "$tx_result" | jq '.raw_log')" && exit 1
 fi
 
-echo "Waiting 10 seconds for interchain account (sometimes it takes a lot of time)…"
+echo "Waiting 20 seconds for interchain account (sometimes it takes a lot of time)…"
 # shellcheck disable=SC2034
-for i in $(seq 10); do
+for i in $(seq 20); do
     sleep 1
     echo -n .
 done
@@ -164,10 +164,12 @@ msg=$(printf '{
     "rate": "1000000",
     "minimal_stake": "1000",
     "unstake_times_limit": "10",
+    "unbond_commission": "1",
     "next_unstake_index": "1",
-    "unbonding_period": "2"
+    "unbonding_period": "2",
+    "protocol_fee_receiver": "%s"
   }
-}' "$rtoken_contract_address")
+}' "$rtoken_contract_address" "$ADDRESS_1")
 
 tx_result="$(neutrond tx wasm execute "$contract_address" "$msg" \
     --amount 2000000untrn \
@@ -227,6 +229,44 @@ if [[ "$code" -ne 0 ]]; then
     echo "Failed to send ibc hook to contract: $(echo "$tx_result" | jq '.raw_log')" && exit 1
 fi
 echo "$tx_hash"
+
+echo "Waiting 20 seconds for rtoken mint (sometimes it takes a lot of time)…"
+# shellcheck disable=SC2034
+for i in $(seq 20); do
+    sleep 1
+    echo -n .
+done
+echo " done"
+
+query="$(printf '{"balance": {"address": "%s"}}' "$ADDRESS_1")"
+neutrond query wasm contract-state smart "$rtoken_contract_address" "$query" --output json | jq
+echo "---------------------------------------------------------------"
+
+unstake_msg=$(printf '{
+  "unstake": {
+    "amount": "9999950000",
+    "pool_addr": "%s"
+  }
+}' "$ica_address")
+
+tx_result="$(neutrond tx wasm execute "$contract_address" "$unstake_msg" \
+    --amount 2000000untrn \
+    --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
+    --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \
+    --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"
+
+code="$(echo "$tx_result" | jq '.code')"
+if [[ "$code" -ne 0 ]]; then
+    echo "Failed to config_pool: $(echo "$tx_result" | jq '.raw_log')" && exit 1
+fi
+
+echo "Waiting 20 seconds for unstake (sometimes it takes a lot of time)…"
+# shellcheck disable=SC2034
+for i in $(seq 20); do
+    sleep 1
+    echo -n .
+done
+echo " done"
 
 query="$(printf '{"balance": {"address": "%s"}}' "$ADDRESS_1")"
 neutrond query wasm contract-state smart "$rtoken_contract_address" "$query" --output json | jq

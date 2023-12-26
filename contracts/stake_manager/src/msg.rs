@@ -63,6 +63,8 @@ pub enum ExecuteMsg {
         unstake_times_limit: Uint128,
         next_unstake_index: Uint128,
         unbonding_period: u128,
+        unbond_commission: Uint128,
+        protocol_fee_receiver: Addr,
     },
     RegisterBalanceQuery {
         connection_id: String,
@@ -82,7 +84,6 @@ pub enum ExecuteMsg {
     },
     Unstake {
         amount: Uint128,
-        interchain_account_id: String,
         pool_addr: String,
     },
     Withdraw {

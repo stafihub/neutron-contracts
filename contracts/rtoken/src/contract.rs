@@ -190,6 +190,7 @@ pub fn execute(
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
+    deps.as_ref().api.debug(format!("WASMDEBUG: rtoken execute msg is {:?}", msg).as_str());
     match msg {
         ExecuteMsg::Transfer { recipient, amount } => {
             execute_transfer(deps, env, info, recipient, amount)
@@ -505,6 +506,8 @@ pub fn execute_upload_logo(
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+    deps.api.debug(format!("WASMDEBUG: rtoken query msg is {:?}", msg).as_str());
+
     match msg {
         QueryMsg::Balance { address } => to_json_binary(&query_balance(deps, address)?),
         QueryMsg::TokenInfo {} => to_json_binary(&query_token_info(deps)?),

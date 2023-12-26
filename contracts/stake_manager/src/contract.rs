@@ -376,6 +376,8 @@ pub fn execute(
             unstake_times_limit,
             next_unstake_index,
             unbonding_period,
+            unbond_commission,
+            protocol_fee_receiver,
         } =>
             execute_config_pool(
                 deps,
@@ -395,7 +397,9 @@ pub fn execute(
                 minimal_stake,
                 unstake_times_limit,
                 next_unstake_index,
-                unbonding_period
+                unbonding_period,
+                unbond_commission,
+                protocol_fee_receiver
             ),
         ExecuteMsg::RegisterBalanceQuery { connection_id, addr, denom, update_period } =>
             register_balance_query(connection_id, addr, denom, update_period),
@@ -407,8 +411,7 @@ pub fn execute(
         } => register_delegations_query(connection_id, delegator, validators, update_period),
         ExecuteMsg::Stake { neutron_address, pool_addr } =>
             execute_stake(deps, env, neutron_address, pool_addr, info),
-        ExecuteMsg::Unstake { amount, interchain_account_id, pool_addr } =>
-            execute_unstake(deps, env, info, amount, interchain_account_id, pool_addr),
+        ExecuteMsg::Unstake { amount, pool_addr } => execute_unstake(deps, info, amount, pool_addr),
         ExecuteMsg::Withdraw { pool_addr, receiver, interchain_account_id } =>
             execute_withdraw(deps, env, info, pool_addr, receiver, interchain_account_id),
         ExecuteMsg::PoolRmValidator { pool_addr, validator_addrs } =>
@@ -470,7 +473,9 @@ fn execute_config_pool(
     minimal_stake: Uint128,
     unstake_times_limit: Uint128,
     next_unstake_index: Uint128,
-    unbonding_period: u128
+    unbonding_period: u128,
+    unbond_commission: Uint128,
+    protocol_fee_receiver: Addr
 ) -> NeutronResult<Response<NeutronMsg>> {
     let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
     let (delegator, connection_id) = get_ica(deps.as_ref(), &env, &interchain_account_id)?;
@@ -503,7 +508,9 @@ fn execute_config_pool(
     pool_info.unstake_times_limit = unstake_times_limit;
     pool_info.connection_id = connection_id.clone();
     pool_info.validator_addrs = validator_addrs.clone(); // todo update pool_info validator_addrs in query replay
-    pool_info.withdraw_addr = delegator.clone();
+    pool_info.withdraw_addr = delegator.clone(); // todo: update withdraw addr in sudo reply
+    pool_info.unbond_commission = unbond_commission;
+    pool_info.protocol_fee_receiver = protocol_fee_receiver;
 
     POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
 
@@ -697,10 +704,8 @@ fn execute_stake(
 // Before this step, need the user to authorize burn from
 fn execute_unstake(
     deps: DepsMut<NeutronQuery>,
-    env: Env,
     info: MessageInfo,
-    rtoken_amount: Uint128,
-    interchain_account_id: String,
+    mut rtoken_amount: Uint128,
     pool_addr: String
 ) -> NeutronResult<Response<NeutronMsg>> {
     if rtoken_amount == Uint128::zero() {
@@ -713,7 +718,19 @@ fn execute_unstake(
 
     let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
 
-    let unstake_count = UNSTAKES_INDEX_FOR_USER.load(deps.storage, &info.sender)?.len() as u128;
+    deps.as_ref().api.debug(
+        format!("WASMDEBUG: execute_unstake pool_info: {:?}", pool_info).as_str()
+    );
+
+    let unstake_count = match UNSTAKES_INDEX_FOR_USER.load(deps.storage, &info.sender) {
+        Ok(unstakes) => unstakes.len() as u128,
+        Err(_) => 0u128,
+    };
+
+    deps.as_ref().api.debug(
+        format!("WASMDEBUG: execute_unstake UNSTAKES_INDEX_FOR_USER: {:?}", unstake_count).as_str()
+    );
+
     let unstake_limit = pool_info.unstake_times_limit.u128();
     if unstake_count >= unstake_limit {
         return Err(
@@ -726,29 +743,36 @@ fn execute_unstake(
     // Calculate the number of tokens(atom)
     let token_amount = rtoken_amount.mul(Uint128::new(1_000_000)).div(pool_info.rate);
 
-    let (delegator, _) = get_ica(deps.as_ref(), &env, &interchain_account_id)?;
+    // cal fee
+    let mut cms_fee = Uint128::zero();
+    if pool_info.unbond_commission > Uint128::zero() {
+        cms_fee = rtoken_amount.mul(pool_info.unbond_commission).div(Uint128::new(1_000_000));
+        rtoken_amount = rtoken_amount.div(cms_fee);
+    }
+    deps.as_ref().api.debug(
+        format!(
+            "WASMDEBUG: execute_unstake cms_fee: {:?} rtoken_amount: {:?}",
+            cms_fee,
+            rtoken_amount
+        ).as_str()
+    );
 
     // update pool info
-    let mut pools = POOLS.load(deps.storage, pool_addr.clone())?;
-    pools.unbond = pools.unbond.add(token_amount);
-    pools.active = pools.active.sub(token_amount);
-    POOLS.save(deps.storage, pool_addr.clone(), &pools)?;
+    pool_info.unbond = pool_info.unbond.add(token_amount);
+    pool_info.active = pool_info.active.sub(token_amount);
 
     // update unstake info
     let unstake_info = UnstakeInfo {
         era: pool_info.era,
-        pool_addr: delegator,
+        pool_addr: pool_addr.clone(),
         amount: token_amount,
     };
 
     let will_use_unstake_index = pool_info.next_unstake_index;
-
-    UNSTAKES_OF_INDEX.save(deps.storage, will_use_unstake_index.u128(), &unstake_info)?;
-
     pool_info.next_unstake_index = pool_info.next_unstake_index.add(Uint128::one());
 
     // burn
-    let msg = WasmMsg::Execute {
+    let burn_msg = WasmMsg::Execute {
         contract_addr: pool_info.rtoken.to_string(),
         msg: to_json_binary(
             &(rtoken::msg::ExecuteMsg::BurnFrom {
@@ -759,16 +783,30 @@ fn execute_unstake(
         funds: vec![],
     };
 
+    let send_fee = WasmMsg::Execute {
+        contract_addr: pool_info.rtoken.to_string(),
+        msg: to_json_binary(
+            &(rtoken::msg::ExecuteMsg::TransferFrom {
+                owner: info.sender.to_string(),
+                recipient: pool_info.protocol_fee_receiver.to_string(),
+                amount: cms_fee,
+            })
+        )?,
+        funds: vec![],
+    };
+
+    UNSTAKES_OF_INDEX.save(deps.storage, will_use_unstake_index.u128(), &unstake_info)?;
     POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
 
     // send event
     Ok(
         Response::new()
-            .add_message(CosmosMsg::Wasm(msg))
+            .add_message(CosmosMsg::Wasm(burn_msg))
+            .add_message(CosmosMsg::Wasm(send_fee))
             .add_attribute("action", "unstake")
             .add_attribute("from", info.sender)
             .add_attribute("token_amount", token_amount.to_string())
-            .add_attribute("lsd_token_amount", rtoken_amount.to_string())
+            .add_attribute("rtoken_amount", rtoken_amount.to_string())
             .add_attribute("unstake_index", will_use_unstake_index.to_string())
     )
 }
@@ -1554,6 +1592,7 @@ fn sudo_open_ack(
             unbonding_period: 0,
             era_update_status: PoolBondState::ActiveReported,
             unbond_commission: Uint128::zero(),
+            protocol_fee_receiver: Addr::unchecked(""),
         };
         POOLS.save(deps.storage, parsed_version.address.clone(), &pool_info)?;
         return Ok(Response::default());

@@ -50,6 +50,7 @@ pub struct PoolInfo {
     pub unbonding_period: u128,
     pub era_update_status: PoolBondState,
     pub unbond_commission: Uint128,
+    pub protocol_fee_receiver: Addr
 }
 
 pub const POOLS: Map<String, PoolInfo> = Map::new("pools");
