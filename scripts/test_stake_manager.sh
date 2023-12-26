@@ -139,7 +139,7 @@ msg='{
     "remote_denom": "uatom",
     "validator_addrs": ["cosmosvaloper18hl5c9xn5dze2g50uaw0l2mr02ew57zk0auktn"],
     "era": "1",
-    "rate": "1",
+    "rate": "1000000",
     "minimal_stake": "1000",
     "unstake_times_limit": "10",
     "next_unstake_index": "1",

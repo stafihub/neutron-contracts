@@ -1,4 +1,5 @@
 use std::ops::{ Add, Div, Mul, Sub };
+use std::vec;
 
 use cosmos_sdk_proto::cosmos::{ bank::v1beta1::MsgSend, staking::v1beta1::MsgBeginRedelegate };
 use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
@@ -81,7 +82,7 @@ use crate::{
 };
 use crate::state::{
     INTERCHAIN_ACCOUNTS,
-    POOL_DENOM_MPA,
+    OWN_QUERY_ID_TO_ICQ_ID,
     POOL_ICA_MAP,
     POOLS,
     STATE,
@@ -89,7 +90,6 @@ use crate::state::{
     UnstakeInfo,
     UNSTAKES_INDEX_FOR_USER,
     UNSTAKES_OF_INDEX,
-    OWN_QUERY_ID_TO_ICQ_ID,
 };
 use crate::state::PoolBondState::{ BondReported, EraUpdated };
 
@@ -194,8 +194,27 @@ pub fn query(deps: Deps<NeutronQuery>, env: Env, msg: QueryMsg) -> NeutronResult
             query_interchain_address_contract(deps, env, interchain_account_id),
         QueryMsg::AcknowledgementResult { interchain_account_id, sequence_id } =>
             query_acknowledgement_result(deps, env, interchain_account_id, sequence_id),
+        QueryMsg::UserUnstake { pool_addr, user_neutron_addr } =>
+            query_user_unstake(deps, pool_addr, user_neutron_addr),
         QueryMsg::ErrorsQueue {} => query_errors_queue(deps),
     }
+}
+
+pub fn query_user_unstake(
+    deps: Deps<NeutronQuery>,
+    pool_addr: String,
+    user_neutron_addr: Addr
+) -> NeutronResult<Binary> {
+    let index_list = UNSTAKES_INDEX_FOR_USER.load(deps.storage, &user_neutron_addr)?;
+    let mut results = vec![];
+    for index in index_list {
+        let unstake_info = UNSTAKES_OF_INDEX.load(deps.storage, index)?;
+        if unstake_info.pool_addr != pool_addr {
+            continue;
+        }
+        results.push(unstake_info);
+    }
+    Ok(to_json_binary(&results)?)
 }
 
 pub fn query_balance(
@@ -439,6 +458,7 @@ fn execute_config_pool(
     pool_info.unstake_times_limit = unstake_times_limit;
     pool_info.connection_id = connection_id.clone();
     pool_info.validator_addrs = validator_addrs.clone();
+    pool_info.withdraw_addr = delegator.clone();
 
     POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
 
@@ -594,32 +614,35 @@ fn execute_stake(
     pool_addr: String,
     info: MessageInfo
 ) -> NeutronResult<Response<NeutronMsg>> {
-    let pool_denom = POOL_DENOM_MPA.load(deps.storage, pool_addr.clone())?;
-    let pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
+    let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
 
-    let mut amount = 0;
+    let mut token_amount = 0;
     if !info.funds.is_empty() {
-        amount = u128::from(
+        token_amount = u128::from(
             info.funds
                 .iter()
-                .find(|c| c.denom == pool_denom)
+                .find(|c| c.denom == pool_info.ibc_denom.clone())
                 .map(|c| c.amount)
                 .unwrap_or(Uint128::zero())
         );
     }
 
-    amount = amount.mul(pool_info.rate.u128()).div(1_000_000);
+    pool_info.active = pool_info.active.add(Uint128::new(token_amount));
+
+    let rtoken_amount = token_amount.mul(pool_info.rate.u128()).div(1_000_000);
 
     let msg = WasmMsg::Execute {
         contract_addr: pool_info.rtoken.to_string(),
         msg: to_json_binary(
             &(rtoken::msg::ExecuteMsg::Mint {
                 recipient: neutron_address.to_string(),
-                amount: Uint128::from(amount),
+                amount: Uint128::from(rtoken_amount),
             })
         )?,
         funds: vec![],
     };
+
+    POOLS.save(deps.storage, pool_addr, &pool_info)?;
 
     Ok(Response::new().add_message(CosmosMsg::Wasm(msg)).add_attribute("mint", "call_contract_b"))
 }
@@ -629,14 +652,14 @@ fn execute_unstake(
     deps: DepsMut<NeutronQuery>,
     env: Env,
     info: MessageInfo,
-    amount: Uint128,
+    rtoken_amount: Uint128,
     interchain_account_id: String,
     pool_addr: String
 ) -> NeutronResult<Response<NeutronMsg>> {
-    if amount == Uint128::zero() {
+    if rtoken_amount == Uint128::zero() {
         return Err(
             NeutronError::Std(
-                StdError::generic_err(format!("Encode error: {}", "LSD token amount is zero"))
+                StdError::generic_err(format!("Encode error: {}", "rtoken amount is zero"))
             )
         );
     }
@@ -654,21 +677,20 @@ fn execute_unstake(
     }
 
     // Calculate the number of tokens(atom)
-    let token_amount = amount.mul(pool_info.rate);
+    let token_amount = rtoken_amount.mul(Uint128::new(1_000_000)).div(pool_info.rate);
 
     let (delegator, _) = get_ica(deps.as_ref(), &env, &interchain_account_id)?;
 
     // update pool info
     let mut pools = POOLS.load(deps.storage, pool_addr.clone())?;
     pools.unbond = pools.unbond.add(token_amount);
-    // todo: Numerical check
     pools.active = pools.active.sub(token_amount);
     POOLS.save(deps.storage, pool_addr.clone(), &pools)?;
 
     // update unstake info
     let unstake_info = UnstakeInfo {
         era: pool_info.era,
-        pool: delegator,
+        pool_addr: delegator,
         amount: token_amount,
     };
 
@@ -677,7 +699,6 @@ fn execute_unstake(
     UNSTAKES_OF_INDEX.save(deps.storage, will_use_unstake_index.u128(), &unstake_info)?;
 
     pool_info.next_unstake_index = pool_info.next_unstake_index.add(Uint128::one());
-    POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
 
     // burn
     let msg = WasmMsg::Execute {
@@ -685,11 +706,13 @@ fn execute_unstake(
         msg: to_json_binary(
             &(rtoken::msg::ExecuteMsg::BurnFrom {
                 owner: info.sender.to_string(),
-                amount: Default::default(),
+                amount: rtoken_amount,
             })
         )?,
         funds: vec![],
     };
+
+    POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
 
     // send event
     Ok(
@@ -698,7 +721,7 @@ fn execute_unstake(
             .add_attribute("action", "unstake")
             .add_attribute("from", info.sender)
             .add_attribute("token_amount", token_amount.to_string())
-            .add_attribute("lsd_token_amount", amount.to_string())
+            .add_attribute("lsd_token_amount", rtoken_amount.to_string())
             .add_attribute("unstake_index", will_use_unstake_index.to_string())
     )
 }
@@ -720,10 +743,10 @@ fn execute_withdraw(
     let pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
 
     for (i, unstake_index) in unstakes.iter().enumerate() {
-        let unstake_info = UNSTAKES_OF_INDEX.load(deps.storage, unstake_index.u128())?;
+        let unstake_info = UNSTAKES_OF_INDEX.load(deps.storage,*unstake_index)?;
         if
             unstake_info.era + pool_info.unbonding_period > pool_info.era ||
-            unstake_info.pool != pool_addr
+            unstake_info.pool_addr != pool_addr
         {
             continue;
         }
@@ -754,19 +777,18 @@ fn execute_withdraw(
 
     let unstake_index_list_str = emit_unstake_index_list
         .iter()
-        .map(|index| index.u128().to_string())
+        .map(|index| index.to_string())
         .collect::<Vec<String>>()
         .join(",");
 
     // interchain tx send atom
     let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
-    let (delegator, connection_id) = get_ica(deps.as_ref(), &env, &interchain_account_id)?;
     let ica_send = MsgSend {
-        from_address: delegator,
+        from_address: pool_addr.clone(),
         to_address: receiver.to_string(),
         amount: Vec::from([
             Coin {
-                denom: pool_info.ibc_denom,
+                denom: pool_info.remote_denom,
                 amount: total_withdraw_amount.to_string(),
             },
         ]),
@@ -784,7 +806,7 @@ fn execute_withdraw(
     };
 
     let cosmos_msg = NeutronMsg::submit_tx(
-        connection_id,
+        pool_info.connection_id.clone(),
         interchain_account_id.clone(),
         vec![send_msg],
         "".to_string(),

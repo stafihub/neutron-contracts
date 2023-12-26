@@ -31,6 +31,10 @@ pub enum QueryMsg {
         interchain_account_id: String,
         sequence_id: u64,
     },
+    UserUnstake {
+        pool_addr: String,
+        user_neutron_addr: Addr,
+    },
     // this query returns non-critical errors list
     ErrorsQueue {},
 }

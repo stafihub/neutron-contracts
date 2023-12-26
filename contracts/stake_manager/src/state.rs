@@ -64,16 +64,13 @@ pub enum PoolBondState {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct UnstakeInfo {
     pub era: u128,
-    pub pool: String,
+    pub pool_addr: String,
     pub amount: Uint128,
 }
 
 pub const UNSTAKES_OF_INDEX: Map<u128, UnstakeInfo> = Map::new("unstakes_of_index");
 
-pub const UNSTAKES_INDEX_FOR_USER: Map<&Addr, Vec<Uint128>> = Map::new("unstakes_index_for_user");
-
-// key: pool_addr value: denom
-pub const POOL_DENOM_MPA: Map<String, String> = Map::new("pool_denom_mpa");
+pub const UNSTAKES_INDEX_FOR_USER: Map<&Addr, Vec<u128>> = Map::new("unstakes_index_for_user");
 
 //  key: port_id value: Option<pool_addr,interchain_connection_id>
 pub const INTERCHAIN_ACCOUNTS: Map<String, Option<(String, String)>> = Map::new(
