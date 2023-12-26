@@ -513,7 +513,7 @@ fn execute_config_pool(
     }
 
     let any_msg = ProtobufAny {
-        type_url: "/cosmos.distribution.v1beta1.Msg/SetWithdrawAddress".to_string(),
+        type_url: "/cosmos.distribution.v1beta1.MsgSetWithdrawAddress".to_string(),
         value: Binary::from(buf),
     };
 
@@ -526,6 +526,10 @@ fn execute_config_pool(
         fee.clone()
     );
 
+    deps.as_ref().api.debug(
+        format!("WASMDEBUG: execute_config_pool cosmos_msg is {:?}", cosmos_msg).as_str()
+    );
+
     // We use a submessage here because we need the process message reply to save
     // the outgoing IBC packet identifier for later.
     let submsg_set_withdraw = msg_with_sudo_callback(
@@ -533,14 +537,19 @@ fn execute_config_pool(
         cosmos_msg,
         SudoPayload::HandlerPayloadInterTx(InterTxType {
             port_id: get_port_id(env.contract.address.to_string(), interchain_account_id),
-            // Here you can store some information about the transaction to help you parse
-            // the acknowledgement later.
             message: format!("set_withdraw_{}_{}.to_string()", delegator, withdraw_addr),
         })
     )?;
 
+    deps.as_ref().api.debug(
+        format!(
+            "WASMDEBUG: execute_config_pool submsg_set_withdraw: {:?}",
+            submsg_set_withdraw
+        ).as_str()
+    );
+
     Ok(
-        Response::new().add_submessages(
+        Response::default().add_submessages(
             vec![
                 register_delegation_query_submsg,
                 register_balance_pool_submsg,
@@ -1249,37 +1258,6 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> StdResult<Response> {
     }
 }
 
-// todo: update pool era state
-#[entry_point]
-pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> StdResult<Response> {
-    deps.api.debug(format!("WASMDEBUG: sudo: received sudo msg: {:?}", msg).as_str());
-
-    match msg {
-        // For handling kv query result
-        // For handling successful (non-error) acknowledgements
-        SudoMsg::Response { request, data } => sudo_response(deps, request, data),
-
-        // For handling error acknowledgements
-        SudoMsg::Error { request, details } => sudo_error(deps, request, details),
-
-        // For handling error timeouts
-        SudoMsg::Timeout { request } => sudo_timeout(deps, request),
-
-        // For handling successful registering of ICA
-        SudoMsg::OpenAck { port_id, channel_id, counterparty_channel_id, counterparty_version } =>
-            sudo_open_ack(
-                deps,
-                env,
-                port_id,
-                channel_id,
-                counterparty_channel_id,
-                counterparty_version
-            ),
-
-        _ => Ok(Response::default()),
-    }
-}
-
 // save query_id to query_type information in reply, so that we can understand the kind of query we're getting in sudo kv call
 fn write_balance_query_id_to_reply_id(deps: DepsMut, reply: Reply) -> StdResult<Response> {
     let resp: MsgRegisterInterchainQueryResponse = serde_json_wasm
@@ -1323,6 +1301,37 @@ fn write_delegation_query_id_to_reply_id(deps: DepsMut, reply: Reply) -> StdResu
     );
 
     Ok(Response::default())
+}
+
+// todo: update pool era state
+#[entry_point]
+pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> StdResult<Response> {
+    deps.api.debug(format!("WASMDEBUG: sudo: received sudo msg: {:?}", msg).as_str());
+
+    match msg {
+        // For handling kv query result
+        // For handling successful (non-error) acknowledgements
+        SudoMsg::Response { request, data } => sudo_response(deps, request, data),
+
+        // For handling error acknowledgements
+        SudoMsg::Error { request, details } => sudo_error(deps, request, details),
+
+        // For handling error timeouts
+        SudoMsg::Timeout { request } => sudo_timeout(deps, request),
+
+        // For handling successful registering of ICA
+        SudoMsg::OpenAck { port_id, channel_id, counterparty_channel_id, counterparty_version } =>
+            sudo_open_ack(
+                deps,
+                env,
+                port_id,
+                channel_id,
+                counterparty_channel_id,
+                counterparty_version
+            ),
+
+        _ => Ok(Response::default()),
+    }
 }
 
 // a callback handler for payload of IbcSendType
