@@ -28,6 +28,7 @@ use cosmwasm_std::{
     Uint128,
     WasmMsg,
     WasmQuery,
+    Order,
 };
 use cw2::set_contract_version;
 use neutron_sdk::{
@@ -91,7 +92,7 @@ use crate::state::{
     UNSTAKES_INDEX_FOR_USER,
     UNSTAKES_OF_INDEX,
 };
-use crate::state::PoolBondState::{ BondReported, EraUpdated };
+use crate::state::PoolBondState::{ BondReported, EraUpdated, ActiveReported };
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -215,6 +216,48 @@ pub fn query_user_unstake(
         results.push(unstake_info);
     }
     Ok(to_json_binary(&results)?)
+}
+
+pub fn query_balance_by_addr(
+    deps: Deps<NeutronQuery>,
+    addr: String
+) -> NeutronResult<BalanceResponse> {
+    let contract_query_id = ADDR_QUERY_ID.load(deps.storage, addr)?;
+    let registered_query_id = OWN_QUERY_ID_TO_ICQ_ID.load(deps.storage, contract_query_id)?;
+    // get info about the query
+    let registered_query = get_registered_query(deps, registered_query_id)?;
+    // check that query type is KV
+    check_query_type(registered_query.registered_query.query_type, QueryType::KV)?;
+    // reconstruct a nice Balances structure from raw KV-storage values
+    let balances: Balances = query_kv_result(deps, registered_query_id)?;
+
+    deps.api.debug(format!("WASMDEBUG: query_balance_by_addr Balances is {:?}", balances).as_str());
+
+    Ok(BalanceResponse {
+        // last_submitted_height tells us when the query result was updated last time (block height)
+        last_submitted_local_height: registered_query.registered_query.last_submitted_result_local_height,
+        balances,
+    })
+}
+
+pub fn query_delegation_by_addr(
+    deps: Deps<NeutronQuery>,
+    addr: String
+) -> NeutronResult<Delegations> {
+    let contract_query_id = ADDR_QUERY_ID.load(deps.storage, addr)?;
+    let registered_query_id = OWN_QUERY_ID_TO_ICQ_ID.load(deps.storage, contract_query_id)?;
+    // get info about the query
+    let registered_query = get_registered_query(deps, registered_query_id)?;
+    // check that query type is KV
+    check_query_type(registered_query.registered_query.query_type, QueryType::KV)?;
+    // reconstruct a nice Balances structure from raw KV-storage values
+    let delegations: Delegations = query_kv_result(deps, registered_query_id)?;
+
+    deps.api.debug(
+        format!("WASMDEBUG: query_delegation_by_addr Delegations is {:?}", delegations).as_str()
+    );
+
+    Ok(delegations)
 }
 
 pub fn query_balance(
@@ -370,6 +413,8 @@ pub fn execute(
             execute_withdraw(deps, env, info, pool_addr, receiver, interchain_account_id),
         ExecuteMsg::PoolRmValidator { pool_addr, validator_addrs } =>
             execute_rm_pool_validators(deps, env, info, pool_addr, validator_addrs),
+        ExecuteMsg::PoolAddValidator { pool_addr, validator_addrs } =>
+            execute_add_pool_validators(deps, pool_addr, validator_addrs),
         ExecuteMsg::EraUpdate { channel, pool_addr } =>
             // Different rtoken are executed separately.
             execute_era_update(deps, env, channel, pool_addr),
@@ -457,26 +502,28 @@ fn execute_config_pool(
     pool_info.unbonding_period = unbonding_period;
     pool_info.unstake_times_limit = unstake_times_limit;
     pool_info.connection_id = connection_id.clone();
-    pool_info.validator_addrs = validator_addrs.clone();
+    pool_info.validator_addrs = validator_addrs.clone(); // todo update pool_info validator_addrs in query replay
     pool_info.withdraw_addr = delegator.clone();
 
     POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
 
-    let latest_query_id = LATEST_BALANCES_QUERY_ID.load(deps.as_ref().storage)?;
+    let latest_balance_query_id = LATEST_BALANCES_QUERY_ID.load(deps.as_ref().storage)?;
+    let latest_delegation_query_id = LATEST_DELEGATIONS_QUERY_ID.load(deps.as_ref().storage)?;
 
     deps.as_ref().api.debug(
         format!(
             "WASMDEBUG: execute_config_pool pool update: {:?},latest_query_id is {:?}",
             pool_info,
-            latest_query_id
+            latest_balance_query_id
         ).as_str()
     );
 
-    let pool_delegation_query_id = latest_query_id + 1;
-    let pool_query_id = latest_query_id + 2;
-    let withdraw_query_id = latest_query_id + 3;
+    let pool_delegation_query_id = latest_delegation_query_id + 1;
+    let pool_query_id = latest_balance_query_id + 1;
+    let withdraw_query_id = latest_balance_query_id + 2;
 
-    LATEST_BALANCES_QUERY_ID.save(deps.storage, &(withdraw_query_id.clone() + 1))?;
+    LATEST_BALANCES_QUERY_ID.save(deps.storage, &(withdraw_query_id + 1))?;
+    LATEST_DELEGATIONS_QUERY_ID.save(deps.storage, &(pool_delegation_query_id + 1))?;
 
     let register_delegation_query_msg = new_register_delegator_delegations_query_msg(
         connection_id.clone(),
@@ -743,7 +790,7 @@ fn execute_withdraw(
     let pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
 
     for (i, unstake_index) in unstakes.iter().enumerate() {
-        let unstake_info = UNSTAKES_OF_INDEX.load(deps.storage,*unstake_index)?;
+        let unstake_info = UNSTAKES_OF_INDEX.load(deps.storage, *unstake_index)?;
         if
             unstake_info.era + pool_info.unbonding_period > pool_info.era ||
             unstake_info.pool_addr != pool_addr
@@ -832,7 +879,7 @@ fn execute_withdraw(
             .add_attribute("pool", pool_addr.clone())
             .add_attribute("unstake_index_list", unstake_index_list_str)
             .add_attribute("amount", total_withdraw_amount)
-            .add_submessages(vec![submsg])
+            .add_submessage(submsg)
     )
 }
 
@@ -843,6 +890,35 @@ fn execute_stake_lsm(
 ) -> NeutronResult<Response<NeutronMsg>> {
     // todo!
     Ok(Response::new())
+}
+
+fn execute_add_pool_validators(
+    deps: DepsMut<NeutronQuery>,
+    pool_addr: String,
+    validator_addrs: Vec<String>
+) -> NeutronResult<Response<NeutronMsg>> {
+    let pool_info = POOLS.load(deps.as_ref().storage, pool_addr.clone())?;
+
+    let latest_delegation_query_id = LATEST_DELEGATIONS_QUERY_ID.load(deps.as_ref().storage)?;
+    let pool_delegation_query_id = latest_delegation_query_id + 1;
+
+    let register_delegation_query_msg = new_register_delegator_delegations_query_msg(
+        pool_info.connection_id.clone(),
+        pool_addr.clone(),
+        validator_addrs,
+        DEFAULT_UPDATE_PERIOD
+    )?;
+
+    // wrap into submessage to save {query_id, query_type} on reply that'll later be used to handle sudo kv callback
+    let register_delegation_query_submsg = SubMsg::reply_on_success(
+        register_delegation_query_msg,
+        pool_delegation_query_id
+    );
+
+    LATEST_DELEGATIONS_QUERY_ID.save(deps.storage, &(latest_delegation_query_id + 1))?;
+
+    // todo update pool_info in query replay
+    Ok(Response::default().add_submessage(register_delegation_query_submsg))
 }
 
 fn execute_rm_pool_validators(
@@ -865,12 +941,22 @@ fn execute_rm_pool_validators(
     // reconstruct a nice Delegations structure from raw KV-storage values
     let delegations: Delegations = query_kv_result(deps.as_ref(), registered_query_id)?;
 
-    let target_validator = find_redelegation_target(&delegations, &validator_addrs).unwrap();
+    let target_validator = match find_redelegation_target(&delegations, &validator_addrs) {
+        Some(target_validator) => target_validator,
+        None => {
+            return Err(NeutronError::Std(StdError::generic_err("find_redelegation_target failed")));
+        }
+    };
 
     let mut msgs = vec![];
 
     for src_validator in validator_addrs {
-        let amount = find_validator_amount(&delegations, src_validator.clone()).unwrap();
+        let amount = match find_validator_amount(&delegations, src_validator.clone()) {
+            Some(amount) => amount,
+            None => {
+                continue;
+            }
+        };
         // add submessage to unstake
         let redelegate_msg = MsgBeginRedelegate {
             delegator_address: pool_addr.clone(),
@@ -921,7 +1007,8 @@ fn execute_rm_pool_validators(
     }
 
     // todo: update state in sudo reply
-    // todo: update delegation_query
+    // todo: update delegation_query in sudo reply
+    // todo: update pool validator list
     Ok(Response::default().add_submessages(msgs))
 }
 
@@ -931,14 +1018,21 @@ fn execute_era_update(
     channel: String,
     pool_addr: String
 ) -> NeutronResult<Response<NeutronMsg>> {
+    let unstaks = UNSTAKES_OF_INDEX.range(deps.storage, None, None, Order::Ascending);
+    let mut need_withdraw = Uint128::zero();
+    for unstake in unstaks {
+        let (_, unstake_info) = unstake?;
+        need_withdraw = need_withdraw.add(unstake_info.amount);
+    }
+
     // --------------------------------------------------------------------------------------------------
     // contract must pay for relaying of acknowledgements
     // See more info here: https://docs.neutron.org/neutron/feerefunder/overview
     let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
     let mut msgs = vec![];
-    let pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
+    let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
     // check era state
-    if pool_info.era_update_status != EraUpdated {
+    if pool_info.era_update_status != ActiveReported {
         deps.as_ref().api.debug(
             format!("WASMDEBUG: execute_era_update skip pool: {:?}", pool_addr).as_str()
         );
@@ -983,7 +1077,7 @@ fn execute_era_update(
         deps.branch(),
         msg,
         SudoPayload::HandlerPayloadIbcSend(IbcSendType {
-            message: "message".to_string(),
+            message: "era_update_ibc_token_send".to_string(),
         })
     )?;
     deps.as_ref().api.debug(
@@ -992,14 +1086,10 @@ fn execute_era_update(
     msgs.push(submsg_pool_ibc_send);
 
     // check withdraw address balance and send it to the pool
-    let deps_as_ref = deps.as_ref();
-
-    let query_id = ADDR_QUERY_ID.load(deps.storage, pool_info.withdraw_addr.clone())?;
-    let registered_query = get_registered_query(deps_as_ref, query_id)?;
-    // check that query type is KV
-    check_query_type(registered_query.registered_query.query_type, QueryType::KV)?;
-    // reconstruct a nice Balances structure from raw KV-storage values
-    let withdraw_balances: Balances = query_kv_result(deps_as_ref, query_id)?;
+    let withdraw_balances: Balances = query_balance_by_addr(
+        deps.as_ref(),
+        pool_info.withdraw_addr.clone()
+    )?.balances;
 
     let mut withdraw_amount = 0;
     if !withdraw_balances.coins.is_empty() {
@@ -1010,6 +1100,13 @@ fn execute_era_update(
                 .map(|c| c.amount)
                 .unwrap_or(Uint128::zero())
         );
+    }
+
+    pool_info.era_update_status = EraUpdated;
+    pool_info.need_withdraw = need_withdraw;
+    POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
+    if withdraw_amount == 0 {
+        return Ok(Response::default());
     }
 
     let tx_withdraw_coin = coin(withdraw_amount, pool_info.ibc_denom.clone());
@@ -1062,7 +1159,7 @@ fn execute_era_bond(
     let mut msgs = vec![];
     let pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
     // check era state
-    if pool_info.era_update_status != BondReported {
+    if pool_info.era_update_status != EraUpdated {
         deps.as_ref().api.debug(
             format!("WASMDEBUG: execute_era_bond skip pool: {:?}", pool_addr).as_str()
         );
@@ -1073,14 +1170,7 @@ fn execute_era_bond(
     if pool_info.unbond > pool_info.active {
         let unbond_amount = pool_info.unbond - pool_info.active;
 
-        // get info about the query
-        let registered_query_id = ADDR_QUERY_ID.load(deps.storage, pool_addr.clone())?;
-        let deps_as_ref = deps.as_ref();
-        let registered_query = get_registered_query(deps_as_ref, registered_query_id)?;
-        // check that query type is KV
-        check_query_type(registered_query.registered_query.query_type, QueryType::KV)?;
-        // reconstruct a nice Delegations structure from raw KV-storage values
-        let delegations: Delegations = query_kv_result(deps_as_ref, registered_query_id)?;
+        let delegations = query_delegation_by_addr(deps.as_ref(), pool_addr.clone())?;
 
         let unbond_infos = allocate_unbond_amount(&delegations, unbond_amount);
         for info in unbond_infos {
@@ -1232,15 +1322,8 @@ fn execute_bond_active(
         );
         return Ok(Response::default());
     }
-    let registered_query_id = ADDR_QUERY_ID.load(deps.storage, pool_addr.clone())?;
 
-    // get info about the query
-    let deps_as_ref = deps.as_ref();
-    let registered_query = get_registered_query(deps_as_ref, registered_query_id)?;
-    // check that query type is KV
-    check_query_type(registered_query.registered_query.query_type, QueryType::KV)?;
-    // reconstruct a nice Delegations structure from raw KV-storage values
-    let delegations: Delegations = query_kv_result(deps_as_ref, registered_query_id)?;
+    let delegations = query_delegation_by_addr(deps.as_ref(), pool_addr.clone())?;
 
     let mut total_amount = cosmwasm_std::Coin {
         denom: pool_info.remote_denom.clone(),

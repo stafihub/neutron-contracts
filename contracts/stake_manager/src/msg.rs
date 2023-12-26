@@ -94,6 +94,10 @@ pub enum ExecuteMsg {
         pool_addr: String,
         validator_addrs: Vec<String>,
     },
+    PoolAddValidator {
+        pool_addr: String,
+        validator_addrs: Vec<String>,
+    },
     EraUpdate {
         channel: String,
         pool_addr: String,
