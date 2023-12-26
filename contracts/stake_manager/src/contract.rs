@@ -1,25 +1,31 @@
 use std::ops::{ Add, Div, Mul, Sub };
+
+use cosmos_sdk_proto::cosmos::{ bank::v1beta1::MsgSend, staking::v1beta1::MsgBeginRedelegate };
+use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
+use cosmos_sdk_proto::cosmos::distribution::v1beta1::MsgSetWithdrawAddress;
+use cosmos_sdk_proto::cosmos::staking::v1beta1::{ MsgDelegate, MsgUndelegate };
+use cosmos_sdk_proto::prost::Message;
 use cosmwasm_std::{
-    coin,
-    to_json_binary,
-    entry_point,
-    from_json,
+    Addr,
     Binary,
+    coin,
     CosmosMsg,
+    CustomQuery,
     Deps,
     DepsMut,
+    entry_point,
     Env,
+    from_json,
     MessageInfo,
+    QueryRequest,
     Reply,
     Response,
     StdError,
     StdResult,
     SubMsg,
+    to_json_binary,
     Uint128,
     WasmMsg,
-    CustomQuery,
-    Addr,
-    QueryRequest,
     WasmQuery,
 };
 use cw2::set_contract_version;
@@ -28,60 +34,62 @@ use neutron_sdk::{
         msg::{ IbcFee, MsgIbcTransferResponse, NeutronMsg },
         query::{ NeutronQuery, QueryInterchainAccountAddressResponse },
     },
+    interchain_queries::{
+        check_query_type,
+        get_registered_query,
+        query_kv_result,
+        types::QueryType,
+        v045::{ queries::BalanceResponse, types::Balances, types::Delegations },
+    },
+    NeutronError,
+    NeutronResult,
     query::min_ibc_fee::query_min_ibc_fee,
     sudo::msg::{ RequestPacket, RequestPacketTimeoutHeight },
-    NeutronResult,
-    NeutronError,
-    interchain_queries::{
-        get_registered_query,
-        v045::{ queries::BalanceResponse, types::Balances, types::Delegations },
-        check_query_type,
-        types::QueryType,
-        query_kv_result,
-    },
 };
+use neutron_sdk::bindings::msg::MsgRegisterInterchainQueryResponse;
 use neutron_sdk::bindings::types::ProtobufAny;
+use neutron_sdk::interchain_queries::v045::new_register_balance_query_msg;
+use neutron_sdk::interchain_queries::v045::new_register_delegator_delegations_query_msg;
 use neutron_sdk::interchain_txs::helpers::get_port_id;
+use neutron_sdk::sudo::msg::SudoMsg;
 use schemars::JsonSchema;
 use serde::{ Deserialize, Serialize };
-use cosmos_sdk_proto::cosmos::{ bank::v1beta1::{ MsgSend }, staking::v1beta1::MsgBeginRedelegate };
-use neutron_sdk::interchain_queries::{ v045::{ new_register_delegator_delegations_query_msg } };
-use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
-use cosmos_sdk_proto::cosmos::distribution::v1beta1::MsgSetWithdrawAddress;
-use cosmos_sdk_proto::cosmos::staking::v1beta1::{ MsgDelegate, MsgUndelegate };
-use cosmos_sdk_proto::prost::Message;
-use neutron_sdk::interchain_queries::v045::new_register_balance_query_msg;
-use neutron_sdk::sudo::msg::SudoMsg;
+
 use crate::{
     msg::{ ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg },
     state::{
+        ACKNOWLEDGEMENT_RESULTS,
+        ADDR_QUERY_ID,
+        IBC_SUDO_ID_RANGE_END,
+        IBC_SUDO_ID_RANGE_START,
+        KV_QUERY_ID_TO_CALLBACKS,
+        LATEST_BALANCES_QUERY_ID,
+        LATEST_DELEGATIONS_QUERY_ID,
+        PoolBondState,
+        PoolInfo,
+        QUERY_BALANCES_REPLY_ID_END,
+        QUERY_BALANCES_REPLY_ID_RANGE_START,
+        QUERY_DELEGATIONS_REPLY_ID_END,
+        QUERY_DELEGATIONS_REPLY_ID_RANGE_START,
+        QueryKind,
+        read_errors_from_queue,
         read_reply_payload,
         read_sudo_payload,
         save_reply_payload,
         save_sudo_payload,
-        IBC_SUDO_ID_RANGE_END,
-        IBC_SUDO_ID_RANGE_START,
-        KV_QUERY_ID_TO_CALLBACKS,
-        QueryKind,
-        LATEST_BALANCES_QUERY_ID,
-        ADDR_QUERY_ID,
-        PoolBondState,
-        ACKNOWLEDGEMENT_RESULTS,
-        read_errors_from_queue,
-        PoolInfo,
-        QUERY_BALANCES_REPLY_ID_RANGE_START, QUERY_BALANCES_REPLY_ID_END, QUERY_DELEGATIONS_REPLY_ID_RANGE_START, QUERY_DELEGATIONS_REPLY_ID_END, LATEST_DELEGATIONS_QUERY_ID,
     },
 };
 use crate::state::{
     INTERCHAIN_ACCOUNTS,
+    POOL_DENOM_MPA,
+    POOL_ICA_MAP,
+    POOLS,
     STATE,
     State,
     UnstakeInfo,
     UNSTAKES_INDEX_FOR_USER,
     UNSTAKES_OF_INDEX,
-    POOLS,
-    POOL_DENOM_MPA,
-    POOL_ICA_MAP,
+    OWN_QUERY_ID_TO_ICQ_ID,
 };
 use crate::state::PoolBondState::{ BondReported, EraUpdated };
 
@@ -172,13 +180,14 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps<NeutronQuery>, env: Env, msg: QueryMsg) -> NeutronResult<Binary> {
+    deps.api.debug(format!("WASMDEBUG: query msg is {:?}", msg).as_str());
+
     match msg {
         QueryMsg::GetRegisteredQuery { query_id } => {
             Ok(to_json_binary(&get_registered_query(deps, query_id)?)?)
         }
-        QueryMsg::Balance { query_id } => Ok(to_json_binary(&query_balance(deps, env, query_id)?)?),
-        QueryMsg::PoolInfo { pool_addr } =>
-            Ok(to_json_binary(&query_pool_info(deps, env, pool_addr)?)?),
+        QueryMsg::Balance { query_id } => query_balance(deps, env, query_id),
+        QueryMsg::PoolInfo { pool_addr } => query_pool_info(deps, env, pool_addr),
         QueryMsg::InterchainAccountAddress { interchain_account_id, connection_id } =>
             query_interchain_address(deps, env, interchain_account_id, connection_id),
         QueryMsg::InterchainAccountAddressFromContract { interchain_account_id } =>
@@ -193,7 +202,7 @@ pub fn query_balance(
     deps: Deps<NeutronQuery>,
     _env: Env,
     registered_query_id: u64
-) -> NeutronResult<BalanceResponse> {
+) -> NeutronResult<Binary> {
     // get info about the query
     let registered_query = get_registered_query(deps, registered_query_id)?;
     // check that query type is KV
@@ -201,20 +210,27 @@ pub fn query_balance(
     // reconstruct a nice Balances structure from raw KV-storage values
     let balances: Balances = query_kv_result(deps, registered_query_id)?;
 
-    Ok(BalanceResponse {
-        // last_submitted_height tells us when the query result was updated last time (block height)
-        last_submitted_local_height: registered_query.registered_query.last_submitted_result_local_height,
-        balances,
-    })
+    deps.api.debug(format!("WASMDEBUG: query_balance Balances is {:?}", balances).as_str());
+
+    Ok(
+        to_json_binary(
+            &(BalanceResponse {
+                // last_submitted_height tells us when the query result was updated last time (block height)
+                last_submitted_local_height: registered_query.registered_query.last_submitted_result_local_height,
+                balances,
+            })
+        )?
+    )
 }
 
 pub fn query_pool_info(
     deps: Deps<NeutronQuery>,
     _env: Env,
     pool_addr: String
-) -> NeutronResult<PoolInfo> {
+) -> NeutronResult<Binary> {
     let pool_info = POOLS.load(deps.storage, pool_addr)?;
-    Ok(pool_info)
+
+    Ok(to_json_binary(&pool_info)?)
 }
 
 // returns ICA address from Neutron ICA SDK module
@@ -268,6 +284,7 @@ pub fn execute(
     info: MessageInfo,
     msg: ExecuteMsg
 ) -> NeutronResult<Response<NeutronMsg>> {
+    deps.as_ref().api.debug(format!("WASMDEBUG: execute msg is {:?}", msg).as_str());
     match msg {
         // NOTE: this is an example contract that shows how to make IBC transfers!
         // todo: Please add necessary authorization or other protection mechanisms
@@ -420,6 +437,8 @@ fn execute_config_pool(
     pool_info.next_unstake_index = next_unstake_index;
     pool_info.unbonding_period = unbonding_period;
     pool_info.unstake_times_limit = unstake_times_limit;
+    pool_info.connection_id = connection_id.clone();
+    pool_info.validator_addrs = validator_addrs.clone();
 
     POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
 
@@ -470,7 +489,7 @@ fn execute_config_pool(
     let register_balance_withdraw_msg = new_register_balance_query_msg(
         connection_id.clone(),
         withdraw_addr.clone(),
-        withdraw_addr.clone(),
+        pool_info.remote_denom.clone(),
         DEFAULT_UPDATE_PERIOD
     )?;
 
@@ -1222,8 +1241,10 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> StdResult<Response> {
     match msg.id {
         // It's convenient to use range of ID's to handle multiple reply messages
         IBC_SUDO_ID_RANGE_START..=IBC_SUDO_ID_RANGE_END => prepare_sudo_payload(deps, env, msg),
-        QUERY_BALANCES_REPLY_ID_RANGE_START..=QUERY_BALANCES_REPLY_ID_END => sudo_kv_query_balances_result(deps, env, msg.id),
-        QUERY_DELEGATIONS_REPLY_ID_RANGE_START..=QUERY_DELEGATIONS_REPLY_ID_END => sudo_kv_query_delegations_result(deps, env, msg.id),
+        QUERY_BALANCES_REPLY_ID_RANGE_START..=QUERY_BALANCES_REPLY_ID_END =>
+            write_balance_query_id_to_reply_id(deps, msg),
+        QUERY_DELEGATIONS_REPLY_ID_RANGE_START..=QUERY_DELEGATIONS_REPLY_ID_END =>
+            write_delegation_query_id_to_reply_id(deps, msg),
         _ => Err(StdError::generic_err(format!("unsupported reply message id {}", msg.id))),
     }
 }
@@ -1255,27 +1276,51 @@ pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> StdResult<Response> {
                 counterparty_version
             ),
 
-        SudoMsg::KVQueryResult { query_id } => sudo_kv_query_balances_result(deps, env, query_id),
         _ => Ok(Response::default()),
     }
 }
 
-pub fn sudo_kv_query_balances_result(deps: DepsMut, _env: Env, query_id: u64) -> StdResult<Response> {
+// save query_id to query_type information in reply, so that we can understand the kind of query we're getting in sudo kv call
+fn write_balance_query_id_to_reply_id(deps: DepsMut, reply: Reply) -> StdResult<Response> {
+    let resp: MsgRegisterInterchainQueryResponse = serde_json_wasm
+        ::from_slice(
+            reply.result
+                .into_result()
+                .map_err(StdError::generic_err)?
+                .data.ok_or_else(|| StdError::generic_err("no result"))?
+                .as_slice()
+        )
+        .map_err(|e| StdError::generic_err(format!("failed to parse response: {:?}", e)))?;
+
     deps.api.debug(
-        format!("WASMDEBUG: sudo_kv_query_result received; query_id: {:?}", query_id).as_str()
+        format!("WASMDEBUG: write_balance_query_id_to_reply_id query_id: {:?}", resp.id).as_str()
     );
 
-    KV_QUERY_ID_TO_CALLBACKS.save(deps.storage, query_id, &QueryKind::Balances)?;
+    // then in success reply handler we do thiss
+    KV_QUERY_ID_TO_CALLBACKS.save(deps.storage, resp.id, &QueryKind::Balances)?;
+    OWN_QUERY_ID_TO_ICQ_ID.save(deps.storage, reply.id, &resp.id)?;
 
     Ok(Response::default())
 }
 
-pub fn sudo_kv_query_delegations_result(deps: DepsMut, _env: Env, query_id: u64) -> StdResult<Response> {
-    deps.api.debug(
-        format!("WASMDEBUG: sudo_kv_query_result received; query_id: {:?}", query_id).as_str()
-    );
+fn write_delegation_query_id_to_reply_id(deps: DepsMut, reply: Reply) -> StdResult<Response> {
+    let resp: MsgRegisterInterchainQueryResponse = serde_json_wasm
+        ::from_slice(
+            reply.result
+                .into_result()
+                .map_err(StdError::generic_err)?
+                .data.ok_or_else(|| StdError::generic_err("no result"))?
+                .as_slice()
+        )
+        .map_err(|e| StdError::generic_err(format!("failed to parse query response: {:?}", e)))?;
 
-    KV_QUERY_ID_TO_CALLBACKS.save(deps.storage, query_id, &QueryKind::Delegations)?;
+    // then in success reply handler we do thiss
+    KV_QUERY_ID_TO_CALLBACKS.save(deps.storage, resp.id, &QueryKind::Delegations)?;
+    OWN_QUERY_ID_TO_ICQ_ID.save(deps.storage, reply.id, &resp.id)?;
+
+    deps.api.debug(
+        format!("WASMDEBUG: write_delegation_query_id_to_reply_id query_id: {:?}", resp.id).as_str()
+    );
 
     Ok(Response::default())
 }
@@ -1394,6 +1439,7 @@ fn sudo_open_ack(
             next_unstake_index: Uint128::zero(),
             unbonding_period: 0,
             era_update_status: PoolBondState::ActiveReported,
+            unbond_commission: Uint128::zero(),
         };
         POOLS.save(deps.storage, parsed_version.address.clone(), &pool_info)?;
         return Ok(Response::default());

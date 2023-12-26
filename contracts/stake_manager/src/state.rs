@@ -49,6 +49,7 @@ pub struct PoolInfo {
     pub next_unstake_index: Uint128,
     pub unbonding_period: u128,
     pub era_update_status: PoolBondState,
+    pub unbond_commission: Uint128,
 }
 
 pub const POOLS: Map<String, PoolInfo> = Map::new("pools");
@@ -93,6 +94,8 @@ pub const LATEST_BALANCES_QUERY_ID: Item<u64> = Item::new("latest_balances_query
 pub const LATEST_DELEGATIONS_QUERY_ID: Item<u64> = Item::new("latest_delegations_query_id");
 
 pub const KV_QUERY_ID_TO_CALLBACKS: Map<u64, QueryKind> = Map::new("kv_query_id_to_callbacks");
+
+pub const OWN_QUERY_ID_TO_ICQ_ID: Map<u64, u64> = Map::new("own_query_id_to_icq_id");
 
 // contains query kinds that we expect to handle in `sudo_kv_query_result`
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
