@@ -92,6 +92,7 @@ use crate::state::{
     UnstakeInfo,
     UNSTAKES_INDEX_FOR_USER,
     UNSTAKES_OF_INDEX,
+    WithdrawStatus,
 };
 use crate::state::PoolBondState::{ BondReported, EraUpdated, ActiveReported };
 
@@ -224,15 +225,18 @@ pub fn query_user_unstake(
     pool_addr: String,
     user_neutron_addr: Addr
 ) -> NeutronResult<Binary> {
-    let index_list = UNSTAKES_INDEX_FOR_USER.load(deps.storage, &user_neutron_addr)?;
     let mut results = vec![];
-    for index in index_list {
-        let unstake_info = UNSTAKES_OF_INDEX.load(deps.storage, index)?;
-        if unstake_info.pool_addr != pool_addr {
-            continue;
+
+    if let Some(unstakes) = UNSTAKES_INDEX_FOR_USER.may_load(deps.storage, &user_neutron_addr)? {
+        for (unstake_pool, unstake_index) in unstakes.into_iter().flatten() {
+            if unstake_pool != pool_addr {
+                continue;
+            }
+            let unstake_info = UNSTAKES_OF_INDEX.load(deps.storage, unstake_index)?;
+            results.push(unstake_info);
         }
-        results.push(unstake_info);
     }
+
     Ok(to_json_binary(&results)?)
 }
 
@@ -716,20 +720,6 @@ fn execute_unstake(
         ).as_str()
     );
 
-    // update pool info
-    pool_info.unbond = pool_info.unbond.add(token_amount);
-    pool_info.active = pool_info.active.sub(token_amount);
-
-    // update unstake info
-    let unstake_info = UnstakeInfo {
-        era: pool_info.era,
-        pool_addr: pool_addr.clone(),
-        amount: token_amount,
-    };
-
-    let will_use_unstake_index = pool_info.next_unstake_index;
-    pool_info.next_unstake_index = pool_info.next_unstake_index.add(Uint128::one());
-
     // burn
     let burn_msg = WasmMsg::Execute {
         contract_addr: pool_info.rtoken.to_string(),
@@ -754,7 +744,23 @@ fn execute_unstake(
         funds: vec![],
     };
 
-    UNSTAKES_OF_INDEX.save(deps.storage, will_use_unstake_index.u128(), &unstake_info)?;
+    // update unstake info
+    let will_use_unstake_index = pool_info.next_unstake_index;
+    let index = format!("{}-{}", pool_info.pool_addr, will_use_unstake_index);
+    let unstake_info = UnstakeInfo {
+        era: pool_info.era,
+        index: index.clone(),
+        pool_addr: pool_addr.clone(),
+        amount: token_amount,
+        status: WithdrawStatus::Default,
+    };
+
+    // update pool info
+    pool_info.next_unstake_index = pool_info.next_unstake_index.add(Uint128::one());
+    pool_info.unbond = pool_info.unbond.add(token_amount);
+    pool_info.active = pool_info.active.sub(token_amount);
+
+    UNSTAKES_OF_INDEX.save(deps.storage, index, &unstake_info)?;
     POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
 
     // send event
@@ -779,37 +785,32 @@ fn execute_withdraw(
     interchain_account_id: String
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut total_withdraw_amount = Uint128::zero();
-    let mut unstakes = UNSTAKES_INDEX_FOR_USER.load(deps.storage, &info.sender)?;
 
     let mut emit_unstake_index_list = vec![];
-    let mut indices_to_remove = Vec::new();
 
     let pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
 
-    for (i, unstake_index) in unstakes.iter().enumerate() {
-        let unstake_info = UNSTAKES_OF_INDEX.load(deps.storage, *unstake_index)?;
-        if
-            unstake_info.era + pool_info.unbonding_period > pool_info.era ||
-            unstake_info.pool_addr != pool_addr
-        {
-            continue;
+    if let Some(unstakes) = UNSTAKES_INDEX_FOR_USER.may_load(deps.storage, &info.sender)? {
+        for (unstake_pool, unstake_index) in unstakes.into_iter().flatten() {
+            if unstake_pool != pool_addr {
+                continue;
+            }
+            let mut unstake_info = UNSTAKES_OF_INDEX.load(deps.storage, unstake_index.clone())?;
+            if unstake_info.status == WithdrawStatus::Pending {
+                continue;
+            }
+            if unstake_info.era + pool_info.unbonding_period > pool_info.era {
+                continue;
+            }
+
+            // Remove the unstake index element of info.sender from UNSTAKES_INDEX_FOR_USER
+            total_withdraw_amount += unstake_info.amount;
+            emit_unstake_index_list.push(unstake_index.clone());
+
+            unstake_info.status = WithdrawStatus::Pending;
+            UNSTAKES_OF_INDEX.save(deps.storage, unstake_index, &unstake_info)?;
         }
-
-        // Remove the unstake index element of info.sender from UNSTAKES_INDEX_FOR_USER
-        total_withdraw_amount += unstake_info.amount;
-        emit_unstake_index_list.push(*unstake_index);
-        indices_to_remove.push(i);
     }
-
-    // Reverse sort the indices to remove to avoid shifting issues during removal
-    indices_to_remove.sort_unstable_by(|a, b| b.cmp(a));
-
-    // Remove the elements
-    for index in indices_to_remove {
-        unstakes.remove(index);
-    }
-
-    UNSTAKES_INDEX_FOR_USER.save(deps.storage, &info.sender, &unstakes)?;
 
     if total_withdraw_amount.is_zero() {
         return Err(
@@ -823,7 +824,7 @@ fn execute_withdraw(
         .iter()
         .map(|index| index.to_string())
         .collect::<Vec<String>>()
-        .join(",");
+        .join("_");
 
     // interchain tx send atom
     let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
@@ -862,7 +863,7 @@ fn execute_withdraw(
     // the outgoing IBC packet identifier for later.
     let submsg = msg_with_sudo_callback(deps.branch(), cosmos_msg, SudoPayload {
         port_id: get_port_id(env.contract.address.as_str(), &interchain_account_id),
-        message: format!("user_withdraw_{}_{}_{}", info.sender, pool_addr, unstake_index_list_str),
+        message: format!("{}_{}", info.sender, unstake_index_list_str),
         tx_type: TxType::UserWithdraw,
     })?;
 
@@ -1430,6 +1431,69 @@ fn sudo_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
             let mut pool_info = POOLS.load(deps.storage, delegator.clone())?;
             pool_info.withdraw_addr = withdraw_addr;
             POOLS.save(deps.storage, delegator, &pool_info)?;
+        }
+        TxType::UserWithdraw => {
+            let parts: Vec<String> = payload.message.split('_').map(String::from).collect();
+            let user_addr = Addr::unchecked(parts.first().unwrap_or(&String::new()));
+
+            if let Some(mut unstakes) = UNSTAKES_INDEX_FOR_USER.may_load(deps.storage, &user_addr)? {
+                deps.api.debug(
+                    format!(
+                        "WASMDEBUG: sudo_callback: UserWithdraw before unstakes: {:?}",
+                        unstakes
+                    ).as_str()
+                );
+
+                unstakes.retain(|unstake| {
+                    if let Some((_, unstake_index)) = unstake {
+                        if parts.contains(unstake_index) {
+                            UNSTAKES_OF_INDEX.remove(deps.storage, unstake_index.to_string());
+                            return false;
+                        }
+                    }
+                    true
+                });
+
+                deps.api.debug(
+                    format!(
+                        "WASMDEBUG: sudo_callback: UserWithdraw after unstakes: {:?}",
+                        unstakes
+                    ).as_str()
+                );
+
+                UNSTAKES_INDEX_FOR_USER.save(deps.storage, &user_addr, &unstakes)?;
+            }
+
+            // let parts: Vec<String> = payload.message
+            //     .split('_')
+            //     .map(|s| s.to_string())
+            //     .collect();
+            // let user_addr_str = parts.first().unwrap_or(&String::new()).clone();
+            // let user_addr = Addr::unchecked(user_addr_str);
+            // let mut indices_to_remove = Vec::new();
+            // if
+            //     let Some(mut unstakes) = UNSTAKES_INDEX_FOR_USER.may_load(
+            //         deps.storage,
+            //         &user_addr.clone()
+            //     )?
+            // {
+            //     for (i, unstake) in unstakes.iter().enumerate() {
+            //         let (_, unstake_index) = unstake.clone().unwrap();
+            //         for index in &parts {
+            //             if  index.to_string() == unstake_index {
+            //                 indices_to_remove.push(i);
+            //                 UNSTAKES_OF_INDEX.remove(deps.storage, index.to_string());
+            //             }
+            //         }
+            //     }
+            //     // Remove the elements
+            //     indices_to_remove.sort_unstable_by(|a, b| b.cmp(a));
+            //     for index in indices_to_remove {
+            //         unstakes.remove(index);
+            //     }
+
+            //     UNSTAKES_INDEX_FOR_USER.save(deps.storage, &&user_addr, &unstakes)?;
+            // }
         }
 
         _ => {}

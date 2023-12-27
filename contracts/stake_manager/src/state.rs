@@ -50,7 +50,7 @@ pub struct PoolInfo {
     pub unbonding_period: u128,
     pub era_update_status: PoolBondState,
     pub unbond_commission: Uint128,
-    pub protocol_fee_receiver: Addr
+    pub protocol_fee_receiver: Addr,
 }
 
 pub const POOLS: Map<String, PoolInfo> = Map::new("pools");
@@ -63,15 +63,26 @@ pub enum PoolBondState {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct UnstakeInfo {
-    pub era: u128,
-    pub pool_addr: String,
-    pub amount: Uint128,
+pub enum WithdrawStatus {
+    Default,
+    Pending,
 }
 
-pub const UNSTAKES_OF_INDEX: Map<u128, UnstakeInfo> = Map::new("unstakes_of_index");
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct UnstakeInfo {
+    pub era: u128,
+    pub index: String,
+    pub pool_addr: String,
+    pub amount: Uint128,
+    pub status: WithdrawStatus,
+}
 
-pub const UNSTAKES_INDEX_FOR_USER: Map<&Addr, Vec<u128>> = Map::new("unstakes_index_for_user");
+pub const UNSTAKES_OF_INDEX: Map<String, UnstakeInfo> = Map::new("unstakes_of_index");
+
+// Option<(String, String) 1-pool_addr 2-String-> index -> pool_addr+"-"+will_unstake_index
+pub const UNSTAKES_INDEX_FOR_USER: Map<&Addr, Vec<Option<(String, String)>>> = Map::new(
+    "unstakes_index_for_user"
+);
 
 //  key: port_id value: Option<pool_addr,interchain_connection_id>
 pub const INTERCHAIN_ACCOUNTS: Map<String, Option<(String, String)>> = Map::new(
