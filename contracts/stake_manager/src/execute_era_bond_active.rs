@@ -1,27 +1,24 @@
-use std::ops::{Add, Div};
+use std::ops::{ Add, Div };
 
-use cosmwasm_std::{to_json_binary, DepsMut, Env, QueryRequest, Response, Uint128, WasmQuery};
-use neutron_sdk::{
-    bindings::{msg::NeutronMsg, query::NeutronQuery},
-    NeutronResult,
-};
+use cosmwasm_std::{ to_json_binary, DepsMut, Env, QueryRequest, Response, Uint128, WasmQuery };
+use neutron_sdk::{ bindings::{ msg::NeutronMsg, query::NeutronQuery }, NeutronResult };
 
 use crate::query::query_delegation_by_addr;
 use crate::state::PoolBondState;
-use crate::state::PoolBondState::BondReported;
+use crate::state::PoolBondState::{ WithdrawReported };
 use crate::state::POOLS;
 
 pub fn execute_bond_active(
     deps: DepsMut<NeutronQuery>,
     _: Env,
-    pool_addr: String,
+    pool_addr: String
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
     // check era state
-    if pool_info.era_update_status != BondReported {
-        deps.as_ref()
-            .api
-            .debug(format!("WASMDEBUG: execute_era_bond skip pool: {:?}", pool_addr).as_str());
+    if pool_info.era_update_status != WithdrawReported {
+        deps.as_ref().api.debug(
+            format!("WASMDEBUG: execute_era_bond skip pool: {:?}", pool_addr).as_str()
+        );
         return Ok(Response::default());
     }
 
@@ -37,11 +34,12 @@ pub fn execute_bond_active(
     }
 
     let token_info_msg = rtoken::msg::QueryMsg::TokenInfo {};
-    let token_info: cw20::TokenInfoResponse =
-        deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
+    let token_info: cw20::TokenInfoResponse = deps.querier.query(
+        &QueryRequest::Wasm(WasmQuery::Smart {
             contract_addr: pool_info.rtoken.to_string(),
             msg: to_json_binary(&token_info_msg)?,
-        }))?;
+        })
+    )?;
     // todo: calculate protocol fee
     pool_info.rate = total_amount.amount.div(token_info.total_supply);
     pool_info.era_update_status = PoolBondState::ActiveReported;

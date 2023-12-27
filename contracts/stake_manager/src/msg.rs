@@ -110,6 +110,10 @@ pub enum ExecuteMsg {
     EraBond {
         pool_addr: String,
     },
+    EraCollectWithdraw {
+        channel: String,
+        pool_addr: String,
+    },
     EraBondActive {
         pool_addr: String,
     },

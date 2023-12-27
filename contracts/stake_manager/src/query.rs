@@ -1,7 +1,7 @@
 use std::vec;
 
 use cosmwasm_std::{to_json_binary, Addr, Binary, Deps, Env};
-use neutron_sdk::interchain_txs::helpers::get_port_id;
+use neutron_sdk::{interchain_txs::helpers::get_port_id, interchain_queries::v045::queries::DelegatorDelegationsResponse};
 use neutron_sdk::{
     bindings::query::{NeutronQuery, QueryInterchainAccountAddressResponse},
     interchain_queries::{
@@ -68,7 +68,7 @@ pub fn query_balance_by_addr(
 pub fn query_delegation_by_addr(
     deps: Deps<NeutronQuery>,
     addr: String,
-) -> NeutronResult<Delegations> {
+) -> NeutronResult<DelegatorDelegationsResponse> {
     let contract_query_id = ADDR_QUERY_ID.load(deps.storage, addr)?;
     let registered_query_id = OWN_QUERY_ID_TO_ICQ_ID.load(deps.storage, contract_query_id)?;
     // get info about the query
@@ -86,7 +86,13 @@ pub fn query_delegation_by_addr(
         .as_str(),
     );
 
-    Ok(delegations)
+    Ok(DelegatorDelegationsResponse {
+        // last_submitted_height tells us when the query result was updated last time (block height)
+        last_submitted_local_height: registered_query
+            .registered_query
+            .last_submitted_result_local_height,
+        delegations:delegations.delegations,
+    })
 }
 
 pub fn query_balance(

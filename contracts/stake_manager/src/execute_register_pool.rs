@@ -62,6 +62,10 @@ pub fn sudo_open_ack(
     _counterparty_channel_id: String,
     counterparty_version: String,
 ) -> StdResult<Response> {
+
+    deps.api.debug(format!("WASMDEBUG: sudo_open_ack: sudo received: {:?} {}", port_id, counterparty_version).as_str());
+
+
     // The version variable contains a JSON value with multiple fields,
     // including the generated account address.
     let parsed_version: Result<OpenAckVersion, _> =

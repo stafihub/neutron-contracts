@@ -1,23 +1,26 @@
-use std::ops::{Div, Mul, Sub};
+use std::{ ops::{ Div, Mul, Sub }, collections::HashSet };
 use std::vec;
 
-use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
-use cosmos_sdk_proto::cosmos::staking::v1beta1::{MsgDelegate, MsgUndelegate};
+use cosmos_sdk_proto::cosmos::{
+    base::v1beta1::Coin,
+    distribution::v1beta1::MsgWithdrawDelegatorReward,
+};
+use cosmos_sdk_proto::cosmos::staking::v1beta1::{ MsgDelegate, MsgUndelegate };
 use cosmos_sdk_proto::prost::Message;
-use cosmwasm_std::{Binary, DepsMut, Env, Response, StdError, Uint128};
+use cosmwasm_std::{ Binary, DepsMut, Env, Response, StdError, Uint128, Delegation, StdResult };
 use neutron_sdk::bindings::types::ProtobufAny;
-use neutron_sdk::interchain_queries::v045::types::Delegations;
 use neutron_sdk::interchain_txs::helpers::get_port_id;
 use neutron_sdk::{
-    bindings::{msg::NeutronMsg, query::NeutronQuery},
+    bindings::{ msg::NeutronMsg, query::NeutronQuery },
     query::min_ibc_fee::query_min_ibc_fee,
-    NeutronError, NeutronResult,
+    NeutronError,
+    NeutronResult,
 };
 
-use crate::contract::{SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS};
+use crate::{ contract::{ SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS }, state::POOL_ERA_SHOT };
 use crate::query::query_delegation_by_addr;
-use crate::state::PoolBondState::EraUpdated;
-use crate::state::{POOLS, POOL_ICA_MAP};
+use crate::state::PoolBondState::{ EraUpdated, BondReported };
+use crate::state::{ POOLS, POOL_ICA_MAP };
 
 #[derive(Clone, Debug)]
 struct ValidatorUnbondInfo {
@@ -29,21 +32,23 @@ struct ValidatorUnbondInfo {
 pub fn execute_era_bond(
     mut deps: DepsMut<NeutronQuery>,
     env: Env,
-    pool_addr: String,
+    pool_addr: String
 ) -> NeutronResult<Response<NeutronMsg>> {
-    // --------------------------------------------------------------------------------------------------
-    // contract must pay for relaying of acknowledgements
-    // See more info here: https://docs.neutron.org/neutron/feerefunder/overview
     let fee = crate::contract::min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
     let mut msgs = vec![];
     let pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
     // check era state
     if pool_info.era_update_status != EraUpdated {
-        deps.as_ref()
-            .api
-            .debug(format!("WASMDEBUG: execute_era_bond skip pool: {:?}", pool_addr).as_str());
+        deps.as_ref().api.debug(
+            format!("WASMDEBUG: execute_era_bond skip pool: {:?}", pool_addr).as_str()
+        );
         return Ok(Response::new());
     }
+
+    let mut shot = POOL_ERA_SHOT.load(deps.storage, pool_addr.clone())?;
+
+    // Check whether the delegator-validator needs to manually withdraw
+    let mut op_validators = vec![];
 
     let interchain_account_id = POOL_ICA_MAP.load(deps.storage, pool_addr.clone())?;
     if pool_info.unbond > pool_info.active {
@@ -51,12 +56,17 @@ pub fn execute_era_bond(
 
         let delegations = query_delegation_by_addr(deps.as_ref(), pool_addr.clone())?;
 
-        let unbond_infos = allocate_unbond_amount(&delegations, unbond_amount);
+        let unbond_infos = allocate_unbond_amount(&delegations.delegations, unbond_amount);
         for info in unbond_infos {
             println!(
                 "Validator: {}, Delegation: {}, Unbond: {}",
-                info.validator, info.delegation_amount, info.unbond_amount
+                info.validator,
+                info.delegation_amount,
+                info.unbond_amount
             );
+
+            op_validators.push(info.validator.clone());
+            shot.unstake_tx_num += 1;
 
             // add submessage to unstake
             let delegate_msg = MsgUndelegate {
@@ -71,10 +81,9 @@ pub fn execute_era_bond(
             buf.reserve(delegate_msg.encoded_len());
 
             if let Err(e) = delegate_msg.encode(&mut buf) {
-                return Err(NeutronError::Std(StdError::generic_err(format!(
-                    "Encode error: {}",
-                    e
-                ))));
+                return Err(
+                    NeutronError::Std(StdError::generic_err(format!("Encode error: {}", e)))
+                );
             }
 
             let any_msg = ProtobufAny {
@@ -88,7 +97,7 @@ pub fn execute_era_bond(
                 vec![any_msg],
                 "".to_string(),
                 DEFAULT_TIMEOUT_SECONDS,
-                fee.clone(),
+                fee.clone()
             );
 
             // We use a submessage here because we need the process message reply to save
@@ -99,13 +108,13 @@ pub fn execute_era_bond(
                 SudoPayload {
                     port_id: get_port_id(
                         env.contract.address.to_string(),
-                        interchain_account_id.clone(),
+                        interchain_account_id.clone()
                     ),
                     // Here you can store some information about the transaction to help you parse
                     // the acknowledgement later.
-                    message: "interchain_undelegate".to_string(),
+                    message: pool_addr.clone(),
                     tx_type: TxType::EraBondUnstake,
-                },
+                }
             )?;
 
             msgs.push(submsg_unstake);
@@ -116,9 +125,7 @@ pub fn execute_era_bond(
         let validator_count = pool_info.validator_addrs.len() as u128;
 
         if validator_count == 0 {
-            return Err(NeutronError::Std(StdError::generic_err(
-                "validator_count is zero",
-            )));
+            return Err(NeutronError::Std(StdError::generic_err("validator_count is zero")));
         }
 
         let amount_per_validator = stake_amount.div(Uint128::from(validator_count));
@@ -131,6 +138,9 @@ pub fn execute_era_bond(
             if index == 0 {
                 amount_for_this_validator += remainder;
             }
+
+            op_validators.push(validator_addr.clone());
+            shot.stake_tx_num += 1;
 
             // add submessage to stake
             let delegate_msg = MsgDelegate {
@@ -147,10 +157,9 @@ pub fn execute_era_bond(
             buf.reserve(delegate_msg.encoded_len());
 
             if let Err(e) = delegate_msg.encode(&mut buf) {
-                return Err(NeutronError::Std(StdError::generic_err(format!(
-                    "Encode error: {}",
-                    e
-                ))));
+                return Err(
+                    NeutronError::Std(StdError::generic_err(format!("Encode error: {}", e)))
+                );
             }
 
             // Put the serialized Delegate message to a types.Any protobuf message.
@@ -166,7 +175,7 @@ pub fn execute_era_bond(
                 vec![any_msg],
                 "".to_string(),
                 DEFAULT_TIMEOUT_SECONDS,
-                fee.clone(),
+                fee.clone()
             );
 
             // We use a submessage here because we need the process message reply to save
@@ -177,30 +186,94 @@ pub fn execute_era_bond(
                 SudoPayload {
                     port_id: get_port_id(
                         env.contract.address.to_string(),
-                        interchain_account_id.clone(),
+                        interchain_account_id.clone()
                     ),
                     // Here you can store some information about the transaction to help you parse
                     // the acknowledgement later.
-                    message: "interchain_delegate".to_string(),
+                    message: pool_addr.clone(),
                     tx_type: TxType::EraBondStake,
-                },
+                }
             )?;
             msgs.push(submsg_stake);
         }
     }
 
+    // Find the difference between pool_info.validator_addrs and op_validators
+    let pool_validators: HashSet<_> = pool_info.validator_addrs.into_iter().collect();
+    let op_validators_set: HashSet<_> = op_validators.into_iter().collect();
+
+    // Find the difference
+    let difference: HashSet<_> = pool_validators.difference(&op_validators_set).collect();
+
+    // Convert the difference back to Vec
+    let difference_vec: Vec<_> = difference.into_iter().collect();
+    for validator_addr in difference_vec {
+        shot.claim_tx_num += 1;
+
+        // Create a MsgWithdrawDelegatorReward message
+        let withdraw_msg = MsgWithdrawDelegatorReward {
+            delegator_address: pool_addr.clone(),
+            validator_address: validator_addr.clone(),
+        };
+
+        // Serialize the MsgWithdrawDelegatorReward message
+        let mut buf = Vec::new();
+        buf.reserve(withdraw_msg.encoded_len());
+
+        if let Err(e) = withdraw_msg.encode(&mut buf) {
+            return Err(NeutronError::Std(StdError::generic_err(format!("Encode error: {}", e))));
+        }
+
+        // Put the serialized MsgWithdrawDelegatorReward message to a types.Any protobuf message
+        let any_msg = ProtobufAny {
+            type_url: "/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward".to_string(),
+            value: Binary::from(buf),
+        };
+
+        // Form the neutron SubmitTx message containing the binary MsgWithdrawDelegatorReward message
+        let cosmos_msg = NeutronMsg::submit_tx(
+            pool_info.connection_id.clone(),
+            interchain_account_id.clone(),
+            vec![any_msg],
+            "".to_string(),
+            DEFAULT_TIMEOUT_SECONDS,
+            fee.clone()
+        );
+
+        // We use a submessage here because we need the process message reply to save
+        // the outgoing IBC packet identifier for later
+        let submsg_withdraw = crate::contract::msg_with_sudo_callback(
+            deps.branch(),
+            cosmos_msg,
+            SudoPayload {
+                port_id: get_port_id(
+                    env.contract.address.to_string(),
+                    interchain_account_id.clone()
+                ),
+                // Here you can store some information about the transaction to help you parse
+                // the acknowledgement later
+                message: pool_addr.clone(),
+                tx_type: TxType::EraBondClaimReward,
+            }
+        )?;
+
+        msgs.push(submsg_withdraw);
+    }
+
+    POOL_ERA_SHOT.save(deps.storage, pool_addr, &shot)?;
+
     Ok(Response::default().add_submessages(msgs))
 }
 
 fn allocate_unbond_amount(
-    delegations: &Delegations,
-    unbond_amount: Uint128,
+    delegations: &[Delegation],
+    unbond_amount: Uint128
 ) -> Vec<ValidatorUnbondInfo> {
     let mut unbond_infos: Vec<ValidatorUnbondInfo> = Vec::new();
     let mut remaining_unbond = unbond_amount;
 
     // Sort the delegations by amount in descending order
-    let mut sorted_delegations = delegations.delegations.clone();
+    let mut sorted_delegations = delegations.to_vec();
     sorted_delegations.sort_by(|a, b| b.amount.amount.cmp(&a.amount.amount));
 
     for delegation in sorted_delegations.iter() {
@@ -225,4 +298,55 @@ fn allocate_unbond_amount(
     }
 
     unbond_infos
+}
+
+pub fn sudo_era_bond_withdraw_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
+    let mut shot = POOL_ERA_SHOT.load(deps.storage, payload.message.clone())?;
+    shot.stake_complete_num += 1;
+    if
+        shot.stake_complete_num == shot.stake_tx_num &&
+        shot.unstake_complete_num == shot.unstake_tx_num &&
+        shot.claim_complete_num == shot.claim_tx_num
+    {
+        let mut pool_info = POOLS.load(deps.storage, payload.message)?;
+        pool_info.era_update_status = BondReported;
+        POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
+    }
+    Ok(Response::new())
+}
+
+pub fn sudo_era_unbond_withdraw_callback(
+    deps: DepsMut,
+    payload: SudoPayload
+) -> StdResult<Response> {
+    let mut shot = POOL_ERA_SHOT.load(deps.storage, payload.message.clone())?;
+    shot.unstake_complete_num += 1;
+    if
+        shot.stake_complete_num == shot.stake_tx_num &&
+        shot.unstake_complete_num == shot.unstake_tx_num &&
+        shot.claim_complete_num == shot.claim_tx_num
+    {
+        let mut pool_info = POOLS.load(deps.storage, payload.message)?;
+        pool_info.era_update_status = BondReported;
+        POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
+    }
+    Ok(Response::new())
+}
+
+pub fn sudo_era_claim_withdraw_callback(
+    deps: DepsMut,
+    payload: SudoPayload
+) -> StdResult<Response> {
+    let mut shot = POOL_ERA_SHOT.load(deps.storage, payload.message.clone())?;
+    shot.claim_complete_num += 1;
+    if
+        shot.stake_complete_num == shot.stake_tx_num &&
+        shot.unstake_complete_num == shot.unstake_tx_num &&
+        shot.claim_complete_num == shot.claim_tx_num
+    {
+        let mut pool_info = POOLS.load(deps.storage, payload.message)?;
+        pool_info.era_update_status = BondReported;
+        POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
+    }
+    Ok(Response::new())
 }

@@ -29,7 +29,10 @@ use neutron_sdk::{
 use schemars::JsonSchema;
 use serde::{ Deserialize, Serialize };
 
-use crate::execute_config_pool::{execute_config_pool, sudo_config_pool_callback};
+use crate::{
+    execute_config_pool::{ execute_config_pool, sudo_config_pool_callback },
+    execute_era_collect_withdraw::{execute_era_collect_withdraw, sudo_era_collect_withdraw_callback}, execute_era_update::sudo_era_update_callback, execute_era_bond::{sudo_era_bond_withdraw_callback, sudo_era_unbond_withdraw_callback, sudo_era_claim_withdraw_callback},
+};
 use crate::execute_era_bond::execute_era_bond;
 use crate::execute_era_bond_active::execute_bond_active;
 use crate::execute_era_update::execute_era_update;
@@ -80,8 +83,6 @@ use crate::{
 // Default timeout for IbcTransfer is 10000000 blocks
 pub const DEFAULT_TIMEOUT_HEIGHT: u64 = 10000000;
 
-pub const SUDO_PAYLOAD_REPLY_ID: u64 = 1;
-
 // Default timeout for SubmitTX is two weeks
 pub const DEFAULT_TIMEOUT_SECONDS: u64 = 60 * 60 * 24 * 7 * 2;
 
@@ -96,7 +97,6 @@ const FEE_DENOM: &str = "untrn";
 const CONTRACT_NAME: &str = concat!("crates.io:neutron-sdk__", env!("CARGO_PKG_NAME"));
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum TxType {
@@ -104,11 +104,11 @@ pub enum TxType {
     SetWithdrawAddr,
     RmValidator,
     UserWithdraw,
-    EraUpdate,
     EraUpdateIbcSend,
     EraUpdateWithdrawSend,
     EraBondStake,
     EraBondUnstake,
+    EraBondClaimReward,
     EraActive,
 }
 
@@ -213,13 +213,13 @@ pub fn execute(
             execute_rm_pool_validators(deps, env, info, pool_addr, validator_addrs),
         ExecuteMsg::PoolAddValidator { pool_addr, validator_addrs } =>
             execute_add_pool_validators(deps, pool_addr, validator_addrs),
-        ExecuteMsg::EraUpdate {
-            channel,
-            pool_addr,
-        } => { // Different rtoken are executed separately.
+        ExecuteMsg::EraUpdate { channel, pool_addr } => {
+            // Different rtoken are executed separately.
             execute_era_update(deps, env, channel, pool_addr)
         }
         ExecuteMsg::EraBond { pool_addr } => execute_era_bond(deps, env, pool_addr),
+        ExecuteMsg::EraCollectWithdraw { channel, pool_addr } =>
+            execute_era_collect_withdraw(deps, env, channel, pool_addr),
         ExecuteMsg::EraBondActive { pool_addr } => execute_bond_active(deps, env, pool_addr),
         ExecuteMsg::StakeLSM {} => execute_stake_lsm(deps, env, info),
     }
@@ -241,11 +241,8 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> StdResult<Response> {
     }
 }
 
-// todo: update pool era state
 #[entry_point]
 pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> StdResult<Response> {
-    deps.api.debug(format!("WASMDEBUG: sudo: received sudo msg: {:?}", msg).as_str());
-
     match msg {
         // For handling kv query result
         // For handling successful (non-error) acknowledgements
@@ -276,6 +273,11 @@ fn sudo_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
     match payload.tx_type {
         TxType::SetWithdrawAddr => sudo_config_pool_callback(deps, payload),
         TxType::UserWithdraw => sudo_withdraw_callback(deps, payload),
+        TxType::EraUpdateIbcSend => sudo_era_update_callback(deps, payload),
+        TxType::EraUpdateWithdrawSend => sudo_era_collect_withdraw_callback(deps, payload),
+        TxType::EraBondStake => sudo_era_bond_withdraw_callback(deps, payload),
+        TxType::EraBondUnstake => sudo_era_unbond_withdraw_callback(deps, payload),
+        TxType::EraBondClaimReward => sudo_era_claim_withdraw_callback(deps, payload),
 
         _ => Ok(Response::new()),
     }
@@ -325,6 +327,7 @@ fn sudo_timeout(deps: DepsMut, req: RequestPacket) -> StdResult<Response> {
 
 fn sudo_response(deps: DepsMut, req: RequestPacket, data: Binary) -> StdResult<Response> {
     deps.api.debug(format!("WASMDEBUG: sudo_response: sudo received: {:?} {}", req, data).as_str());
+
     let seq_id = req.sequence.ok_or_else(|| StdError::generic_err("sequence not found"))?;
     let channel_id = req.source_channel.ok_or_else(||
         StdError::generic_err("channel_id not found")
