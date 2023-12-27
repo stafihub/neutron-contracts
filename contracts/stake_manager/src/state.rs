@@ -1,7 +1,7 @@
-use cosmwasm_std::{ from_json, Binary, StdResult, Storage, to_json_vec, Addr, Uint128, Order };
-use cw_storage_plus::{ Item, Map };
+use cosmwasm_std::{from_json, to_json_vec, Addr, Binary, Order, StdResult, Storage, Uint128};
+use cw_storage_plus::{Item, Map};
 use schemars::JsonSchema;
-use serde::{ Deserialize, Serialize };
+use serde::{Deserialize, Serialize};
 
 use crate::contract::SudoPayload;
 
@@ -53,6 +53,15 @@ pub struct PoolInfo {
     pub protocol_fee_receiver: Addr,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct EraShot {
+    pub pool_addr: String,
+    pub era: u128,
+    pub bond: Uint128,
+    pub unbond: Uint128,
+    pub active: Uint128,
+}
+
 pub const POOLS: Map<String, PoolInfo> = Map::new("pools");
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -80,14 +89,12 @@ pub struct UnstakeInfo {
 pub const UNSTAKES_OF_INDEX: Map<String, UnstakeInfo> = Map::new("unstakes_of_index");
 
 // Option<(String, String) 1-pool_addr 2-String-> index -> pool_addr+"-"+will_unstake_index
-pub const UNSTAKES_INDEX_FOR_USER: Map<&Addr, Vec<Option<(String, String)>>> = Map::new(
-    "unstakes_index_for_user"
-);
+pub const UNSTAKES_INDEX_FOR_USER: Map<&Addr, Vec<Option<(String, String)>>> =
+    Map::new("unstakes_index_for_user");
 
 //  key: port_id value: Option<pool_addr,interchain_connection_id>
-pub const INTERCHAIN_ACCOUNTS: Map<String, Option<(String, String)>> = Map::new(
-    "interchain_accounts"
-);
+pub const INTERCHAIN_ACCOUNTS: Map<String, Option<(String, String)>> =
+    Map::new("interchain_accounts");
 
 //  key: pool_addr value: interchain_account_id
 pub const POOL_ICA_MAP: Map<String, String> = Map::new("pool_ica_map");
@@ -128,14 +135,15 @@ pub enum AcknowledgementResult {
 }
 
 // interchain transaction responses - ack/err/timeout state to query later
-pub const ACKNOWLEDGEMENT_RESULTS: Map<(String, u64), AcknowledgementResult> = Map::new(
-    "acknowledgement_results"
-);
+pub const ACKNOWLEDGEMENT_RESULTS: Map<(String, u64), AcknowledgementResult> =
+    Map::new("acknowledgement_results");
 
 pub const ERRORS_QUEUE: Map<u32, String> = Map::new("errors_queue");
 
 pub fn read_errors_from_queue(store: &dyn Storage) -> StdResult<Vec<(Vec<u8>, String)>> {
-    ERRORS_QUEUE.range_raw(store, None, None, Order::Ascending).collect()
+    ERRORS_QUEUE
+        .range_raw(store, None, None, Order::Ascending)
+        .collect()
 }
 
 /// get_next_id gives us an id for a reply msg
@@ -175,7 +183,7 @@ pub fn save_sudo_payload(
     store: &mut dyn Storage,
     channel_id: String,
     seq_id: u64,
-    payload: SudoPayload
+    payload: SudoPayload,
 ) -> StdResult<()> {
     SUDO_PAYLOAD.save(store, (channel_id, seq_id), &to_json_vec(&payload)?)
 }
@@ -183,7 +191,7 @@ pub fn save_sudo_payload(
 pub fn read_sudo_payload(
     store: &dyn Storage,
     channel_id: String,
-    seq_id: u64
+    seq_id: u64,
 ) -> StdResult<SudoPayload> {
     let data = SUDO_PAYLOAD.load(store, (channel_id, seq_id))?;
     from_json(Binary(data))
