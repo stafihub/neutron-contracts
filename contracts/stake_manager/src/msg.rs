@@ -41,31 +41,35 @@ pub enum QueryMsg {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
+pub struct ConfigPoolParams {
+    pub interchain_account_id: String,
+    pub need_withdraw: Uint128,
+    pub unbond: Uint128,
+    pub active: Uint128,
+    pub rtoken: Addr,
+    pub withdraw_addr: String,
+    pub ibc_denom: String,
+    pub remote_denom: String,
+    pub validator_addrs: Vec<String>,
+    pub era: u128,
+    pub rate: Uint128,
+    pub minimal_stake: Uint128,
+    pub unstake_times_limit: Uint128,
+    pub next_unstake_index: Uint128,
+    pub unbonding_period: u128,
+    pub unbond_commission: Uint128,
+    pub protocol_fee_receiver: Addr,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
     RegisterPool {
         connection_id: String,
         interchain_account_id: String,
         register_fee: Vec<Coin>,
     },
-    ConfigPool {
-        interchain_account_id: String,
-        need_withdraw: Uint128,
-        unbond: Uint128,
-        active: Uint128,
-        rtoken: Addr,
-        withdraw_addr: String,
-        ibc_denom: String,
-        remote_denom: String,
-        validator_addrs: Vec<String>,
-        era: u128,
-        rate: Uint128,
-        minimal_stake: Uint128,
-        unstake_times_limit: Uint128,
-        next_unstake_index: Uint128,
-        unbonding_period: u128,
-        unbond_commission: Uint128,
-        protocol_fee_receiver: Addr,
-    },
+    ConfigPool(Box<ConfigPoolParams>),
     RegisterBalanceQuery {
         connection_id: String,
         update_period: u64,

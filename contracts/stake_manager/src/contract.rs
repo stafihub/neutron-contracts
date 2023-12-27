@@ -57,6 +57,7 @@ use neutron_sdk::sudo::msg::SudoMsg;
 use schemars::JsonSchema;
 use serde::{ Deserialize, Serialize };
 
+use crate::msg::ConfigPoolParams;
 use crate::{
     msg::{ ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg },
     state::{
@@ -139,16 +140,33 @@ pub struct IbcSendType {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
+pub enum TxType {
+    Default,
+    SetWithdrawAddr,
+    RmValidator,
+    UserWithdraw,
+    EraUpdate,
+    EraUpdateIbcSend,
+    EraUpdateWithdrawSend,
+    EraBondStake,
+    EraBondUnstake,
+    EraActive,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
 pub struct InterTxType {
     pub message: String,
     pub port_id: String,
+    pub tx_type: TxType,
 }
 
-// Enum representing payload to process during handling acknowledgement messages in Sudo handler
-#[derive(Serialize, Deserialize)]
-pub enum SudoPayload {
-    HandlerPayloadIbcSend(IbcSendType),
-    HandlerPayloadInterTx(InterTxType),
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct SudoPayload {
+    pub message: String,
+    pub port_id: String,
+    pub tx_type: TxType,
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -360,47 +378,7 @@ pub fn execute(
                 interchain_account_id,
                 register_fee
             ),
-        ExecuteMsg::ConfigPool {
-            interchain_account_id,
-            need_withdraw,
-            unbond,
-            active,
-            rtoken,
-            withdraw_addr,
-            ibc_denom,
-            remote_denom,
-            validator_addrs,
-            era,
-            rate,
-            minimal_stake,
-            unstake_times_limit,
-            next_unstake_index,
-            unbonding_period,
-            unbond_commission,
-            protocol_fee_receiver,
-        } =>
-            execute_config_pool(
-                deps,
-                env,
-                info,
-                interchain_account_id,
-                need_withdraw,
-                unbond,
-                active,
-                rtoken,
-                withdraw_addr,
-                ibc_denom,
-                remote_denom,
-                validator_addrs,
-                era,
-                rate,
-                minimal_stake,
-                unstake_times_limit,
-                next_unstake_index,
-                unbonding_period,
-                unbond_commission,
-                protocol_fee_receiver
-            ),
+        ExecuteMsg::ConfigPool(params) => { execute_config_pool(deps, env, info, *params) }
         ExecuteMsg::RegisterBalanceQuery { connection_id, addr, denom, update_period } =>
             register_balance_query(connection_id, addr, denom, update_period),
         ExecuteMsg::RegisterDelegatorDelegationsQuery {
@@ -459,26 +437,10 @@ fn execute_config_pool(
     mut deps: DepsMut<NeutronQuery>,
     env: Env,
     _: MessageInfo,
-    interchain_account_id: String,
-    need_withdraw: Uint128,
-    unbond: Uint128,
-    active: Uint128,
-    rtoken: Addr,
-    withdraw_addr: String,
-    ibc_denom: String,
-    remote_denom: String,
-    validator_addrs: Vec<String>,
-    era: u128,
-    rate: Uint128,
-    minimal_stake: Uint128,
-    unstake_times_limit: Uint128,
-    next_unstake_index: Uint128,
-    unbonding_period: u128,
-    unbond_commission: Uint128,
-    protocol_fee_receiver: Addr
+    param: ConfigPoolParams
 ) -> NeutronResult<Response<NeutronMsg>> {
     let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
-    let (delegator, connection_id) = get_ica(deps.as_ref(), &env, &interchain_account_id)?;
+    let (delegator, connection_id) = get_ica(deps.as_ref(), &env, &param.interchain_account_id)?;
 
     deps.as_ref().api.debug(
         format!(
@@ -494,23 +456,23 @@ fn execute_config_pool(
         format!("WASMDEBUG: execute_config_pool POOLS.load: {:?}", pool_info).as_str()
     );
 
-    pool_info.need_withdraw = need_withdraw;
-    pool_info.unbond = unbond;
-    pool_info.active = active;
-    pool_info.ibc_denom = ibc_denom;
-    pool_info.remote_denom = remote_denom;
-    pool_info.era = era;
-    pool_info.rate = rate;
-    pool_info.minimal_stake = minimal_stake;
-    pool_info.rtoken = rtoken;
-    pool_info.next_unstake_index = next_unstake_index;
-    pool_info.unbonding_period = unbonding_period;
-    pool_info.unstake_times_limit = unstake_times_limit;
+    pool_info.need_withdraw = param.need_withdraw;
+    pool_info.unbond = param.unbond;
+    pool_info.active = param.active;
+    pool_info.ibc_denom = param.ibc_denom;
+    pool_info.remote_denom = param.remote_denom;
+    pool_info.era = param.era;
+    pool_info.rate = param.rate;
+    pool_info.minimal_stake = param.minimal_stake;
+    pool_info.rtoken = param.rtoken;
+    pool_info.next_unstake_index = param.next_unstake_index;
+    pool_info.unbonding_period = param.unbonding_period;
+    pool_info.unstake_times_limit = param.unstake_times_limit;
     pool_info.connection_id = connection_id.clone();
-    pool_info.validator_addrs = validator_addrs.clone(); // todo update pool_info validator_addrs in query replay
+    pool_info.validator_addrs = param.validator_addrs.clone(); // todo update pool_info validator_addrs in query replay
     pool_info.withdraw_addr = delegator.clone(); // todo: update withdraw addr in sudo reply
-    pool_info.unbond_commission = unbond_commission;
-    pool_info.protocol_fee_receiver = protocol_fee_receiver;
+    pool_info.unbond_commission = param.unbond_commission;
+    pool_info.protocol_fee_receiver = param.protocol_fee_receiver;
 
     POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
 
@@ -535,7 +497,7 @@ fn execute_config_pool(
     let register_delegation_query_msg = new_register_delegator_delegations_query_msg(
         connection_id.clone(),
         delegator.clone(),
-        validator_addrs,
+        param.validator_addrs,
         DEFAULT_UPDATE_PERIOD
     )?;
 
@@ -562,7 +524,7 @@ fn execute_config_pool(
 
     let register_balance_withdraw_msg = new_register_balance_query_msg(
         connection_id.clone(),
-        withdraw_addr.clone(),
+        param.withdraw_addr.clone(),
         pool_info.remote_denom.clone(),
         DEFAULT_UPDATE_PERIOD
     )?;
@@ -573,11 +535,11 @@ fn execute_config_pool(
         withdraw_query_id
     );
 
-    ADDR_QUERY_ID.save(deps.storage, withdraw_addr.clone(), &withdraw_query_id)?;
+    ADDR_QUERY_ID.save(deps.storage, param.withdraw_addr.clone(), &withdraw_query_id)?;
 
     let set_withdraw_msg = MsgSetWithdrawAddress {
         delegator_address: delegator.clone(),
-        withdraw_address: withdraw_addr.clone(),
+        withdraw_address: param.withdraw_addr.clone(),
     };
     let mut buf = Vec::new();
     buf.reserve(set_withdraw_msg.encoded_len());
@@ -593,7 +555,7 @@ fn execute_config_pool(
 
     let cosmos_msg = NeutronMsg::submit_tx(
         connection_id.clone(),
-        interchain_account_id.clone(),
+        param.interchain_account_id.clone(),
         vec![any_msg],
         "".to_string(),
         DEFAULT_TIMEOUT_SECONDS,
@@ -606,14 +568,11 @@ fn execute_config_pool(
 
     // We use a submessage here because we need the process message reply to save
     // the outgoing IBC packet identifier for later.
-    let submsg_set_withdraw = msg_with_sudo_callback(
-        deps.branch(),
-        cosmos_msg,
-        SudoPayload::HandlerPayloadInterTx(InterTxType {
-            port_id: get_port_id(env.contract.address.to_string(), interchain_account_id),
-            message: format!("set_withdraw_{}_{}.to_string()", delegator, withdraw_addr),
-        })
-    )?;
+    let submsg_set_withdraw = msg_with_sudo_callback(deps.branch(), cosmos_msg, SudoPayload {
+        port_id: get_port_id(env.contract.address.to_string(), param.interchain_account_id),
+        message: format!("{}_{}", delegator, param.withdraw_addr),
+        tx_type: TxType::SetWithdrawAddr,
+    })?;
 
     deps.as_ref().api.debug(
         format!(
@@ -901,14 +860,11 @@ fn execute_withdraw(
 
     // We use a submessage here because we need the process message reply to save
     // the outgoing IBC packet identifier for later.
-    let submsg = msg_with_sudo_callback(
-        deps.branch(),
-        cosmos_msg,
-        SudoPayload::HandlerPayloadInterTx(InterTxType {
-            port_id: get_port_id(env.contract.address.as_str(), &interchain_account_id),
-            message: "message".to_string(),
-        })
-    )?;
+    let submsg = msg_with_sudo_callback(deps.branch(), cosmos_msg, SudoPayload {
+        port_id: get_port_id(env.contract.address.as_str(), &interchain_account_id),
+        message: format!("user_withdraw_{}_{}_{}", info.sender, pool_addr, unstake_index_list_str),
+        tx_type: TxType::UserWithdraw,
+    })?;
 
     Ok(
         Response::new()
@@ -1028,19 +984,11 @@ fn execute_rm_pool_validators(
 
         // We use a submessage here because we need the process message reply to save
         // the outgoing IBC packet identifier for later.
-        let submsg_redelegate = msg_with_sudo_callback(
-            deps.branch(),
-            cosmos_msg,
-            SudoPayload::HandlerPayloadInterTx(InterTxType {
-                port_id: get_port_id(
-                    env.contract.address.to_string(),
-                    interchain_account_id.clone()
-                ),
-                // Here you can store some information about the transaction to help you parse
-                // the acknowledgement later.
-                message: "interchain_undelegate".to_string(),
-            })
-        )?;
+        let submsg_redelegate = msg_with_sudo_callback(deps.branch(), cosmos_msg, SudoPayload {
+            port_id: get_port_id(env.contract.address.to_string(), interchain_account_id.clone()),
+            message: "interchain_undelegate".to_string(),
+            tx_type: TxType::RmValidator,
+        })?;
         msgs.push(submsg_redelegate);
     }
 
@@ -1111,13 +1059,13 @@ fn execute_era_update(
 
     deps.as_ref().api.debug(format!("WASMDEBUG: IbcTransfer msg: {:?}", msg).as_str());
 
-    let submsg_pool_ibc_send = msg_with_sudo_callback(
-        deps.branch(),
-        msg,
-        SudoPayload::HandlerPayloadIbcSend(IbcSendType {
-            message: "era_update_ibc_token_send".to_string(),
-        })
-    )?;
+    let interchain_account_id = POOL_ICA_MAP.load(deps.storage, pool_addr.clone())?;
+
+    let submsg_pool_ibc_send = msg_with_sudo_callback(deps.branch(), msg, SudoPayload {
+        port_id: get_port_id(env.contract.address.to_string(), interchain_account_id.clone()),
+        message: "era_update_ibc_token_send".to_string(),
+        tx_type: TxType::EraUpdateIbcSend,
+    })?;
     deps.as_ref().api.debug(
         format!("WASMDEBUG: execute_send: sent submsg: {:?}", submsg_pool_ibc_send).as_str()
     );
@@ -1147,6 +1095,7 @@ fn execute_era_update(
         return Ok(Response::default());
     }
 
+    // todo: Check whether the delegator-validator needs to manually withdraw
     let tx_withdraw_coin = coin(withdraw_amount, pool_info.ibc_denom.clone());
     let withdraw_token_send = NeutronMsg::IbcTransfer {
         source_port: "transfer".to_string(),
@@ -1171,16 +1120,16 @@ fn execute_era_update(
     let submsg_withdraw_ibc_send = msg_with_sudo_callback(
         deps.branch(),
         withdraw_token_send,
-        SudoPayload::HandlerPayloadIbcSend(IbcSendType {
-            message: "message".to_string(),
-        })
+        SudoPayload {
+            port_id: get_port_id(env.contract.address.to_string(), interchain_account_id),
+            message: "era_update_withdraw_token_send".to_string(),
+            tx_type: TxType::EraUpdateWithdrawSend,
+        }
     )?;
     deps.as_ref().api.debug(
         format!("WASMDEBUG: execute_send: sent submsg: {:?}", submsg_withdraw_ibc_send).as_str()
     );
     msgs.push(submsg_withdraw_ibc_send);
-
-    // todo: calu need withdraw --> use unstake index map
 
     Ok(Response::default().add_submessages(msgs))
 }
@@ -1253,19 +1202,16 @@ fn execute_era_bond(
 
             // We use a submessage here because we need the process message reply to save
             // the outgoing IBC packet identifier for later.
-            let submsg_unstake = msg_with_sudo_callback(
-                deps.branch(),
-                cosmos_msg,
-                SudoPayload::HandlerPayloadInterTx(InterTxType {
-                    port_id: get_port_id(
-                        env.contract.address.to_string(),
-                        interchain_account_id.clone()
-                    ),
-                    // Here you can store some information about the transaction to help you parse
-                    // the acknowledgement later.
-                    message: "interchain_undelegate".to_string(),
-                })
-            )?;
+            let submsg_unstake = msg_with_sudo_callback(deps.branch(), cosmos_msg, SudoPayload {
+                port_id: get_port_id(
+                    env.contract.address.to_string(),
+                    interchain_account_id.clone()
+                ),
+                // Here you can store some information about the transaction to help you parse
+                // the acknowledgement later.
+                message: "interchain_undelegate".to_string(),
+                tx_type: TxType::EraBondUnstake,
+            })?;
 
             msgs.push(submsg_unstake);
         }
@@ -1327,19 +1273,16 @@ fn execute_era_bond(
 
             // We use a submessage here because we need the process message reply to save
             // the outgoing IBC packet identifier for later.
-            let submsg_stake = msg_with_sudo_callback(
-                deps.branch(),
-                cosmos_msg,
-                SudoPayload::HandlerPayloadInterTx(InterTxType {
-                    port_id: get_port_id(
-                        env.contract.address.to_string(),
-                        interchain_account_id.clone()
-                    ),
-                    // Here you can store some information about the transaction to help you parse
-                    // the acknowledgement later.
-                    message: "interchain_delegate".to_string(),
-                })
-            )?;
+            let submsg_stake = msg_with_sudo_callback(deps.branch(), cosmos_msg, SudoPayload {
+                port_id: get_port_id(
+                    env.contract.address.to_string(),
+                    interchain_account_id.clone()
+                ),
+                // Here you can store some information about the transaction to help you parse
+                // the acknowledgement later.
+                message: "interchain_delegate".to_string(),
+                tx_type: TxType::EraBondStake,
+            })?;
             msgs.push(submsg_stake);
         }
     }
@@ -1477,15 +1420,20 @@ pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> StdResult<Response> {
     }
 }
 
-// a callback handler for payload of IbcSendType
-fn sudo_ibc_send_callback(deps: Deps, payload: IbcSendType) -> StdResult<Response> {
-    deps.api.debug(format!("WASMDEBUG: callback: ibc send sudo payload: {:?}", payload).as_str());
-    Ok(Response::new())
-}
+fn sudo_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
+    match payload.tx_type {
+        TxType::SetWithdrawAddr => {
+            let parts: Vec<&str> = payload.message.split('_').collect();
 
-// a callback handler for payload of InterTxType
-fn sudo_inter_tx_callback(deps: Deps, payload: InterTxType) -> StdResult<Response> {
-    deps.api.debug(format!("WASMDEBUG: callback: inter tx sudo payload: {:?}", payload).as_str());
+            let delegator = parts.first().unwrap_or(&"").to_string();
+            let withdraw_addr = parts.get(1).unwrap_or(&"").to_string();
+            let mut pool_info = POOLS.load(deps.storage, delegator.clone())?;
+            pool_info.withdraw_addr = withdraw_addr;
+            POOLS.save(deps.storage, delegator, &pool_info)?;
+        }
+
+        _ => {}
+    }
     Ok(Response::new())
 }
 
@@ -1538,10 +1486,11 @@ fn sudo_response(deps: DepsMut, req: RequestPacket, data: Binary) -> StdResult<R
         StdError::generic_err("channel_id not found")
     )?;
 
-    match read_sudo_payload(deps.storage, channel_id, seq_id)? {
-        SudoPayload::HandlerPayloadIbcSend(t) => sudo_ibc_send_callback(deps.as_ref(), t),
-        SudoPayload::HandlerPayloadInterTx(t) => sudo_inter_tx_callback(deps.as_ref(), t),
+    if let Ok(payload) = read_sudo_payload(deps.storage, channel_id, seq_id) {
+        return sudo_callback(deps, payload);
     }
+
+    Err(StdError::generic_err("Error message"))
     // at this place we can safely remove the data under (channel_id, seq_id) key
     // but it costs an extra gas, so its on you how to use the storage
 }
