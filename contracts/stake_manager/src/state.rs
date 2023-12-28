@@ -43,14 +43,14 @@ pub struct PoolInfo {
     pub remote_denom: String,
     pub connection_id: String,
     pub validator_addrs: Vec<String>,
-    pub era: u128,
+    pub era: u64,
     pub rate: Uint128,
     pub era_seconds: u64,
     pub offset: u64,
     pub minimal_stake: Uint128,
     pub unstake_times_limit: Uint128,
     pub next_unstake_index: Uint128,
-    pub unbonding_period: u128,
+    pub unbonding_period: u64,
     pub era_update_status: PoolBondState,
     pub unbond_commission: Uint128,
     pub protocol_fee_receiver: Addr,
@@ -61,10 +61,11 @@ pub const POOLS: Map<String, PoolInfo> = Map::new("pools");
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct EraShot {
     pub pool_addr: String,
-    pub era: u128,
+    pub era: u64,
     pub bond: Uint128,
     pub unbond: Uint128,
     pub active: Uint128,
+    pub bond_height: u64,
     pub failed_tx: Option<TxType>,
 }
 
@@ -86,7 +87,7 @@ pub enum WithdrawStatus {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct UnstakeInfo {
-    pub era: u128,
+    pub era: u64,
     pub index: String,
     pub pool_addr: String,
     pub amount: Uint128,

@@ -113,7 +113,7 @@ pub fn execute_withdraw(
             tx_type: TxType::UserWithdraw,
         },
     )?;
-    
+
     Ok(Response::new()
         .add_attribute("action", "withdraw")
         .add_attribute("from", info.sender)

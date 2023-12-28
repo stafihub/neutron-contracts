@@ -200,10 +200,8 @@ pub fn execute_config_pool(
 }
 
 pub fn sudo_config_pool_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
-    let parts: Vec<&str> = payload.message.split('_').collect();
-
-    let delegator = parts.first().unwrap_or(&"").to_string();
-    let withdraw_addr = parts.get(1).unwrap_or(&"").to_string();
+    let delegator = payload.pool_addr;
+    let withdraw_addr = payload.message;
     let mut pool_info = POOLS.load(deps.storage, delegator.clone())?;
     pool_info.withdraw_addr = withdraw_addr;
     POOLS.save(deps.storage, delegator, &pool_info)?;

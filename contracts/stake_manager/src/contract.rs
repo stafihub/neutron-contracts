@@ -239,7 +239,7 @@ pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> StdResult<Response> {
     match msg {
         // For handling kv query result
         // For handling successful (non-error) acknowledgements
-        SudoMsg::Response { request, data } => sudo_response(deps, request, data),
+        SudoMsg::Response { request, data } => sudo_response(deps, env, request, data),
 
         // For handling error acknowledgements
         SudoMsg::Error { request, details } => sudo_error(deps, request, details),
@@ -266,13 +266,13 @@ pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> StdResult<Response> {
     }
 }
 
-fn sudo_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
+fn sudo_callback(deps: DepsMut, env: Env, payload: SudoPayload) -> StdResult<Response> {
     match payload.tx_type {
         TxType::SetWithdrawAddr => sudo_config_pool_callback(deps, payload),
         TxType::UserWithdraw => sudo_withdraw_callback(deps, payload),
         TxType::EraUpdateIbcSend => sudo_era_update_callback(deps, payload),
         TxType::EraUpdateWithdrawSend => sudo_era_collect_withdraw_callback(deps, payload),
-        TxType::EraBond => sudo_era_bond_withdraw_callback(deps, payload),
+        TxType::EraBond => sudo_era_bond_withdraw_callback(deps, env, payload),
 
         _ => Ok(Response::new()),
     }
@@ -349,7 +349,7 @@ fn sudo_timeout(deps: DepsMut, req: RequestPacket) -> StdResult<Response> {
     Ok(Response::new())
 }
 
-fn sudo_response(deps: DepsMut, req: RequestPacket, data: Binary) -> StdResult<Response> {
+fn sudo_response(deps: DepsMut, env: Env, req: RequestPacket, data: Binary) -> StdResult<Response> {
     deps.api.debug(
         format!(
             "WASMDEBUG: sudo_response: sudo received: {:?} {}",
@@ -366,7 +366,7 @@ fn sudo_response(deps: DepsMut, req: RequestPacket, data: Binary) -> StdResult<R
         .ok_or_else(|| StdError::generic_err("channel_id not found"))?;
 
     if let Ok(payload) = read_sudo_payload(deps.storage, channel_id, seq_id) {
-        return sudo_callback(deps, payload);
+        return sudo_callback(deps, env, payload);
     }
 
     Err(StdError::generic_err("Error message"))

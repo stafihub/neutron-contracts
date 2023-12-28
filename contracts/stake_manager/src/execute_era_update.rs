@@ -49,6 +49,7 @@ pub fn execute_era_update(
                 bond: pool_info.bond,
                 unbond: pool_info.unbond,
                 active: pool_info.active,
+                bond_height: 0,
                 failed_tx: None,
             }),
         )?;
@@ -146,7 +147,7 @@ pub fn execute_era_update(
 }
 
 pub fn sudo_era_update_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
-    let mut pool_info = POOLS.load(deps.storage, payload.message)?;
+    let mut pool_info = POOLS.load(deps.storage, payload.pool_addr)?;
     pool_info.era_update_status = EraUpdated;
     POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
     Ok(Response::new())

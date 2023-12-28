@@ -1,57 +1,57 @@
-use cosmwasm_std::{ coin, DepsMut, Env, Response, StdResult, Uint128 };
+use cosmwasm_std::{coin, DepsMut, Env, Response, StdError, StdResult, Uint128};
 use neutron_sdk::{
-    bindings::{ msg::NeutronMsg, query::NeutronQuery },
+    bindings::{msg::NeutronMsg, query::NeutronQuery},
     interchain_queries::v045::types::Balances,
     interchain_txs::helpers::get_port_id,
-    NeutronResult,
     query::min_ibc_fee::query_min_ibc_fee,
     sudo::msg::RequestPacketTimeoutHeight,
+    NeutronError, NeutronResult,
 };
 
+use crate::helper::min_ntrn_ibc_fee;
+use crate::state::PoolBondState::{BondReported, WithdrawReported};
+use crate::state::POOLS;
 use crate::{
     contract::{
-        DEFAULT_TIMEOUT_HEIGHT,
+        msg_with_sudo_callback, SudoPayload, TxType, DEFAULT_TIMEOUT_HEIGHT,
         DEFAULT_TIMEOUT_SECONDS,
-        msg_with_sudo_callback,
-        SudoPayload,
-        TxType,
     },
     query::query_balance_by_addr,
     state::POOL_ICA_MAP,
 };
-use crate::helper::min_ntrn_ibc_fee;
-use crate::state::PoolBondState::{ BondReported, WithdrawReported };
-use crate::state::POOLS;
 
 pub fn execute_era_collect_withdraw(
     mut deps: DepsMut<NeutronQuery>,
     env: Env,
     channel: String,
-    pool_addr: String
+    pool_addr: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
     // check era state
     if pool_info.era_update_status != BondReported {
         deps.as_ref().api.debug(
-            format!("WASMDEBUG: execute_era_collect_withdraw skip pool: {:?}", pool_addr).as_str()
+            format!(
+                "WASMDEBUG: execute_era_collect_withdraw skip pool: {:?}",
+                pool_addr
+            )
+            .as_str(),
         );
-        return Ok(Response::default());
+        return Err(NeutronError::Std(StdError::generic_err("status not allow")));
     }
 
     // check withdraw address balance and send it to the pool
-    let withdraw_balances: Balances = query_balance_by_addr(
-        deps.as_ref(),
-        pool_info.withdraw_addr.clone()
-    )?.balances;
+    let withdraw_balances: Balances =
+        query_balance_by_addr(deps.as_ref(), pool_info.withdraw_addr.clone())?.balances;
 
     let mut withdraw_amount = 0;
     if !withdraw_balances.coins.is_empty() {
         withdraw_amount = u128::from(
-            withdraw_balances.coins
+            withdraw_balances
+                .coins
                 .iter()
                 .find(|c| c.denom == pool_info.ibc_denom.clone())
                 .map(|c| c.amount)
-                .unwrap_or(Uint128::zero())
+                .unwrap_or(Uint128::zero()),
         );
     }
     if withdraw_amount == 0 {
@@ -79,9 +79,9 @@ pub fn execute_era_collect_withdraw(
         fee: fee.clone(),
     };
 
-    deps.as_ref().api.debug(
-        format!("WASMDEBUG: IbcTransfer msg: {:?}", withdraw_token_send).as_str()
-    );
+    deps.as_ref()
+        .api
+        .debug(format!("WASMDEBUG: IbcTransfer msg: {:?}", withdraw_token_send).as_str());
 
     let interchain_account_id = POOL_ICA_MAP.load(deps.storage, pool_addr.clone())?;
 
@@ -93,13 +93,14 @@ pub fn execute_era_collect_withdraw(
             message: "".to_string(),
             pool_addr: pool_addr.clone(),
             tx_type: TxType::EraUpdateWithdrawSend,
-        }
+        },
     )?;
     deps.as_ref().api.debug(
         format!(
             "WASMDEBUG: submsg_withdraw_ibc_send: sent submsg: {:?}",
             submsg_withdraw_ibc_send
-        ).as_str()
+        )
+        .as_str(),
     );
 
     Ok(Response::default().add_submessage(submsg_withdraw_ibc_send))
@@ -107,9 +108,9 @@ pub fn execute_era_collect_withdraw(
 
 pub fn sudo_era_collect_withdraw_callback(
     deps: DepsMut,
-    payload: SudoPayload
+    payload: SudoPayload,
 ) -> StdResult<Response> {
-    let mut pool_info = POOLS.load(deps.storage, payload.message)?;
+    let mut pool_info = POOLS.load(deps.storage, payload.pool_addr)?;
     pool_info.era_update_status = WithdrawReported;
     POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
     Ok(Response::new())

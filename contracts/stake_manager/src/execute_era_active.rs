@@ -2,11 +2,11 @@ use core::ops::{Mul, Sub};
 use std::ops::{Add, Div};
 
 use cosmwasm_std::{
-    to_json_binary, DepsMut, Env, QueryRequest, Response, Uint128, WasmMsg, WasmQuery,
+    to_json_binary, DepsMut, Env, QueryRequest, Response, Uint128, WasmMsg, WasmQuery, StdError,
 };
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
-    NeutronResult,
+    NeutronResult, NeutronError,
 };
 
 use crate::state::PoolBondState;
@@ -25,10 +25,16 @@ pub fn execute_era_active(
         deps.as_ref()
             .api
             .debug(format!("WASMDEBUG: execute_era_active skip pool: {:?}", pool_addr).as_str());
-        return Ok(Response::default());
+        return Err(NeutronError::Std(StdError::generic_err("status not allow")));
     }
 
+    let pool_era_shot = POOL_ERA_SHOT.load(deps.storage, pool_addr.clone())?;
+
     let delegations = query_delegation_by_addr(deps.as_ref(), pool_addr.clone())?;
+
+    if delegations.last_submitted_local_height <=  pool_era_shot.bond_height {
+        return Err(NeutronError::Std(StdError::generic_err("Delegation submission height is less than or equal to the bond height of the pool era, which is not allowed.")));
+    }
 
     let mut total_amount = cosmwasm_std::Coin {
         denom: pool_info.remote_denom.clone(),
