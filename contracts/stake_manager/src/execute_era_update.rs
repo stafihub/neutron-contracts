@@ -1,42 +1,41 @@
 use std::ops::Add;
 
-use cosmwasm_std::{ coin, DepsMut, Env, Order, Response, StdResult, Uint128 };
+use cosmwasm_std::{coin, DepsMut, Env, Order, Response, StdResult, Uint128};
+use neutron_sdk::interchain_txs::helpers::get_port_id;
 use neutron_sdk::{
-    bindings::{ msg::NeutronMsg, query::NeutronQuery },
-    NeutronResult,
+    bindings::{msg::NeutronMsg, query::NeutronQuery},
     query::min_ibc_fee::query_min_ibc_fee,
     sudo::msg::RequestPacketTimeoutHeight,
+    NeutronResult,
 };
-use neutron_sdk::interchain_txs::helpers::get_port_id;
 
-use crate::{
-    contract::{ DEFAULT_TIMEOUT_SECONDS, msg_with_sudo_callback, SudoPayload, TxType },
-    state::{ EraShot, POOL_ERA_SHOT, WithdrawStatus },
-};
 use crate::helper::min_ntrn_ibc_fee;
-use crate::state::{ POOL_ICA_MAP, POOLS, UNSTAKES_OF_INDEX };
-use crate::state::PoolBondState::{ ActiveReported, EraUpdated };
+use crate::state::PoolBondState::{ActiveReported, EraUpdated};
+use crate::state::{POOLS, POOL_ICA_MAP, UNSTAKES_OF_INDEX};
+use crate::{
+    contract::{msg_with_sudo_callback, SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS},
+    state::{EraShot, WithdrawStatus, POOL_ERA_SHOT},
+};
 
 pub fn execute_era_update(
     mut deps: DepsMut<NeutronQuery>,
     env: Env,
     channel: String,
-    pool_addr: String
+    pool_addr: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
 
     // check era state
     if pool_info.era_update_status != ActiveReported {
-        deps.as_ref().api.debug(
-            format!("WASMDEBUG: execute_era_update skip pool: {:?}", pool_addr).as_str()
-        );
+        deps.as_ref()
+            .api
+            .debug(format!("WASMDEBUG: execute_era_update skip pool: {:?}", pool_addr).as_str());
         return Ok(Response::new());
     }
 
     if let Some(pool_era_shot) = POOL_ERA_SHOT.may_load(deps.storage, pool_addr.clone())? {
-        if
-            pool_era_shot.failed_tx.is_some() &&
-            pool_era_shot.failed_tx != Some(TxType::EraUpdateIbcSend)
+        if pool_era_shot.failed_tx.is_some()
+            && pool_era_shot.failed_tx != Some(TxType::EraUpdateIbcSend)
         {
             return Ok(Response::new());
         }
@@ -47,11 +46,11 @@ pub fn execute_era_update(
             &(EraShot {
                 pool_addr: pool_addr.clone(),
                 era: pool_info.era,
-                bond: Uint128::zero(),
+                bond: pool_info.bond,
                 unbond: pool_info.unbond,
                 active: pool_info.active,
                 failed_tx: None,
-            })
+            }),
         )?;
     }
 
@@ -68,7 +67,7 @@ pub fn execute_era_update(
                 .iter()
                 .find(|c| c.denom == pool_info.ibc_denom.clone())
                 .map(|c| c.amount)
-                .unwrap_or(Uint128::zero())
+                .unwrap_or(Uint128::zero()),
         );
     }
 
@@ -90,18 +89,31 @@ pub fn execute_era_update(
         fee: fee.clone(),
     };
 
-    deps.as_ref().api.debug(format!("WASMDEBUG: IbcTransfer msg: {:?}", msg).as_str());
+    deps.as_ref()
+        .api
+        .debug(format!("WASMDEBUG: IbcTransfer msg: {:?}", msg).as_str());
 
     let interchain_account_id = POOL_ICA_MAP.load(deps.storage, pool_addr.clone())?;
 
-    let submsg_pool_ibc_send = msg_with_sudo_callback(deps.branch(), msg, SudoPayload {
-        port_id: get_port_id(env.contract.address.to_string(), interchain_account_id.clone()),
-        pool_addr: pool_addr.clone(),
-        message: "".to_string(),
-        tx_type: TxType::EraUpdateIbcSend,
-    })?;
+    let submsg_pool_ibc_send = msg_with_sudo_callback(
+        deps.branch(),
+        msg,
+        SudoPayload {
+            port_id: get_port_id(
+                env.contract.address.to_string(),
+                interchain_account_id.clone(),
+            ),
+            pool_addr: pool_addr.clone(),
+            message: "".to_string(),
+            tx_type: TxType::EraUpdateIbcSend,
+        },
+    )?;
     deps.as_ref().api.debug(
-        format!("WASMDEBUG: execute_send: sent submsg: {:?}", submsg_pool_ibc_send).as_str()
+        format!(
+            "WASMDEBUG: execute_send: sent submsg: {:?}",
+            submsg_pool_ibc_send
+        )
+        .as_str(),
     );
 
     let mut unstaks = Vec::new();
@@ -110,10 +122,9 @@ pub fn execute_era_update(
     let unstakes_iter = UNSTAKES_OF_INDEX.range(deps.storage, None, None, Order::Ascending);
     for unstake_result in unstakes_iter {
         let (_, unstake_info) = unstake_result?;
-        if
-            unstake_info.pool_addr == pool_addr &&
-            unstake_info.status == WithdrawStatus::Default &&
-            unstake_info.era + pool_info.unbonding_period > pool_info.era
+        if unstake_info.pool_addr == pool_addr
+            && unstake_info.status == WithdrawStatus::Default
+            && unstake_info.era + pool_info.unbonding_period > pool_info.era
         {
             unstaks.push(unstake_info.clone()); // todo: After debugging is complete, can delete this sentence and the following log
             need_withdraw = need_withdraw.add(unstake_info.amount);
@@ -123,9 +134,9 @@ pub fn execute_era_update(
     deps.as_ref().api.debug(
         format!(
             "WASMDEBUG: execute_era_update unstaks is {:?},need_withdraw is:{}",
-            unstaks,
-            need_withdraw
-        ).as_str()
+            unstaks, need_withdraw
+        )
+        .as_str(),
     );
 
     pool_info.need_withdraw = need_withdraw;

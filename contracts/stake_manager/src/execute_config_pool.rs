@@ -175,7 +175,7 @@ pub fn execute_config_pool(
     // the outgoing IBC packet identifier for later.
     let submsg_set_withdraw = msg_with_sudo_callback(deps.branch(), cosmos_msg, SudoPayload {
         port_id: get_port_id(env.contract.address.to_string(), param.interchain_account_id),
-        message: format!("{}", param.withdraw_addr),
+        message: param.withdraw_addr,
         pool_addr: pool_info.pool_addr.clone(),
         tx_type: TxType::SetWithdrawAddr,
     })?;
