@@ -2,7 +2,7 @@ use std::vec;
 
 use cosmos_sdk_proto::cosmos::distribution::v1beta1::MsgSetWithdrawAddress;
 use cosmos_sdk_proto::prost::Message;
-use cosmwasm_std::{ Binary, DepsMut, Env, MessageInfo, Response, StdError, SubMsg, StdResult };
+use cosmwasm_std::{ Binary, DepsMut, Env, Response, StdError, SubMsg, StdResult };
 use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::interchain_queries::v045::new_register_balance_query_msg;
 use neutron_sdk::interchain_queries::v045::new_register_delegator_delegations_query_msg;
@@ -31,7 +31,6 @@ use crate::state::{ ADDR_QUERY_ID, LATEST_BALANCES_QUERY_ID, LATEST_DELEGATIONS_
 pub fn execute_config_pool(
     mut deps: DepsMut<NeutronQuery>,
     env: Env,
-    _: MessageInfo,
     param: ConfigPoolParams
 ) -> NeutronResult<Response<NeutronMsg>> {
     let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
@@ -44,6 +43,10 @@ pub fn execute_config_pool(
             connection_id
         ).as_str()
     );
+
+    if param.validator_addrs.is_empty() || param.validator_addrs.len()>5 {
+        return Err(NeutronError::Std(StdError::generic_err("Validator addresses list must contain between 1 and 5 addresses.")));
+    }
 
     let mut pool_info = POOLS.load(deps.as_ref().storage, delegator.clone())?;
 

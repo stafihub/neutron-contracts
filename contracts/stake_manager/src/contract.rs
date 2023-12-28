@@ -176,6 +176,7 @@ pub fn query(deps: Deps<NeutronQuery>, env: Env, msg: QueryMsg) -> NeutronResult
 }
 
 // todo: add response event
+// todo: uniform definition error
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut<NeutronQuery>,
@@ -197,7 +198,7 @@ pub fn execute(
                 interchain_account_id,
                 register_fee
             ),
-        ExecuteMsg::ConfigPool(params) => execute_config_pool(deps, env, info, *params),
+        ExecuteMsg::ConfigPool(params) => execute_config_pool(deps, env, *params),
         ExecuteMsg::RegisterBalanceQuery { connection_id, addr, denom, update_period } =>
             register_balance_query(connection_id, addr, denom, update_period),
         ExecuteMsg::RegisterDelegatorDelegationsQuery {
