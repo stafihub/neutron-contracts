@@ -99,9 +99,9 @@ if [[ "$code" -ne 0 ]]; then
     echo "Failed to register interchain account: $(echo "$tx_result" | jq '.raw_log')" && exit 1
 fi
 
-echo "Waiting 20 seconds for interchain account (sometimes it takes a lot of time)…"
+echo "Waiting 10 seconds for interchain account (sometimes it takes a lot of time)…"
 # shellcheck disable=SC2034
-for i in $(seq 20); do
+for i in $(seq 10); do
     sleep 1
     echo -n .
 done
@@ -150,26 +150,19 @@ rtoken_contract_address=$(neutrond tx wasm instantiate "$code_id" "$instantiate_
 echo "Rtoken Contract address: $rtoken_contract_address"
 
 msg=$(printf '{
-  "config_pool": {
+  "init_pool": {
     "interchain_account_id": "test1",
-    "need_withdraw": "0",
     "unbond": "0",
     "active": "0",
-    "rtoken": "%s",
+    "bond": "0",
     "withdraw_addr": "cosmos10h9stc5v6ntgeygf5xf945njqq5h32r53uquvw",
-    "ibc_denom": "ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2",
-    "remote_denom": "uatom",
     "validator_addrs": ["cosmosvaloper18hl5c9xn5dze2g50uaw0l2mr02ew57zk0auktn"],
-    "era": "1",
-    "rate": "1000000",
-    "minimal_stake": "1000",
-    "unstake_times_limit": "10",
-    "unbond_commission": "1",
-    "next_unstake_index": "1",
-    "unbonding_period": "2",
-    "protocol_fee_receiver": "%s"
+    "era": 1,
+    "rate": "1000000"
   }
-}' "$rtoken_contract_address" "$ADDRESS_1")
+}')
+
+# echo "the msg is: $msg"
 
 tx_result="$(neutrond tx wasm execute "$contract_address" "$msg" \
     --amount 2000000untrn \
@@ -179,23 +172,61 @@ tx_result="$(neutrond tx wasm execute "$contract_address" "$msg" \
 
 code="$(echo "$tx_result" | jq '.code')"
 if [[ "$code" -ne 0 ]]; then
-    echo "Failed to config_pool: $(echo "$tx_result" | jq '.raw_log')" && exit 1
+    echo "Failed to init pool: $(echo "$tx_result" | jq '.raw_log')" && exit 1
 fi
 
-echo "Waiting 20 seconds for config_pool (sometimes it takes a lot of time)…"
+echo "Waiting 10 seconds for init pool (sometimes it takes a lot of time)…"
 # shellcheck disable=SC2034
-for i in $(seq 20); do
+for i in $(seq 10); do
     sleep 1
     echo -n .
 done
 echo " done"
 
-query="{\"pool_info\":{\"pool_addr\":\"$ica_address\"}}"
-query_b64_urlenc="$(echo -n "$query" | base64 | tr -d '\n' | jq -sRr '@uri')"
-url="http://127.0.0.1:1317/wasm/contract/$contract_address/smart/$query_b64_urlenc?encoding=base64"
-echo "url is: $url"
-pool_info=$(curl -s "$url" | jq -r '.result.smart' | base64 -d | jq)
-echo "pool_info is: $pool_info"
+msg=$(printf '{
+  "config_pool": {
+    "pool_addr": "%s",
+    "rtoken": "%s",
+    "protocol_fee_receiver": "%s",
+    "ibc_denom": "ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2",
+    "remote_denom": "uatom",
+    "minimal_stake": "1000",
+    "unstake_times_limit": 10,
+    "next_unstake_index": 1,
+    "unbonding_period": 2,
+    "unbond_commission":"100000",
+    "era_seconds": 60,
+    "offset": 26657
+  }
+}' "$ica_address" "$rtoken_contract_address" "$ADDRESS_1")
+
+# echo "the msg is: $msg"
+
+tx_result="$(neutrond tx wasm execute "$contract_address" "$msg" \
+    --amount 2000000untrn \
+    --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
+    --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \
+    --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"
+
+code="$(echo "$tx_result" | jq '.code')"
+if [[ "$code" -ne 0 ]]; then
+    echo "Failed to config pool: $(echo "$tx_result" | jq '.raw_log')" && exit 1
+fi
+
+echo "Waiting 10 seconds for config pool (sometimes it takes a lot of time)…"
+# shellcheck disable=SC2034
+for i in $(seq 10); do
+    sleep 1
+    echo -n .
+done
+echo " done"
+
+# query="{\"pool_info\":{\"pool_addr\":\"$ica_address\"}}"
+# query_b64_urlenc="$(echo -n "$query" | base64 | tr -d '\n' | jq -sRr '@uri')"
+# url="http://127.0.0.1:1317/wasm/contract/$contract_address/smart/$query_b64_urlenc?encoding=base64"
+# echo "url is: $url"
+# pool_info=$(curl -s "$url" | jq -r '.result.smart' | base64 -d | jq)
+# echo "pool_info is: $pool_info"
 
 msg=$(
     cat <<EOF
@@ -230,17 +261,39 @@ if [[ "$code" -ne 0 ]]; then
 fi
 echo "$tx_hash"
 
-echo "Waiting 20 seconds for rtoken mint (sometimes it takes a lot of time)…"
+echo "Waiting 10 seconds for rtoken mint (sometimes it takes a lot of time)…"
 # shellcheck disable=SC2034
-for i in $(seq 20); do
+for i in $(seq 10); do
     sleep 1
     echo -n .
 done
 echo " done"
 
+echo "--------------------------user balance-------------------------------------"
 query="$(printf '{"balance": {"address": "%s"}}' "$ADDRESS_1")"
 neutrond query wasm contract-state smart "$rtoken_contract_address" "$query" --output json | jq
-echo "---------------------------------------------------------------"
+
+# rtoken allow
+allow_msg=$(printf '{
+  "increase_allowance": {
+    "amount": "11111119999950000",
+    "spender": "%s"
+  }
+}' "$contract_address")
+
+tx_result="$(neutrond tx wasm execute "$rtoken_contract_address" "$allow_msg" \
+    --amount 2000000untrn \
+    --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
+    --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \
+    --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"
+
+echo "Waiting 10 seconds for rtoken allow msg (sometimes it takes a lot of time)…"
+# shellcheck disable=SC2034
+for i in $(seq 10); do
+    sleep 1
+    echo -n .
+done
+echo " done"
 
 unstake_msg=$(printf '{
   "unstake": {
@@ -257,12 +310,12 @@ tx_result="$(neutrond tx wasm execute "$contract_address" "$unstake_msg" \
 
 code="$(echo "$tx_result" | jq '.code')"
 if [[ "$code" -ne 0 ]]; then
-    echo "Failed to config_pool: $(echo "$tx_result" | jq '.raw_log')" && exit 1
+    echo "Failed to unstake msg: $(echo "$tx_result" | jq '.raw_log')" && exit 1
 fi
 
-echo "Waiting 20 seconds for unstake (sometimes it takes a lot of time)…"
+echo "Waiting 10 seconds for unstake (sometimes it takes a lot of time)…"
 # shellcheck disable=SC2034
-for i in $(seq 20); do
+for i in $(seq 10); do
     sleep 1
     echo -n .
 done
@@ -271,3 +324,9 @@ echo " done"
 query="$(printf '{"balance": {"address": "%s"}}' "$ADDRESS_1")"
 neutrond query wasm contract-state smart "$rtoken_contract_address" "$query" --output json | jq
 echo "---------------------------------------------------------------"
+
+query="{\"pool_info\":{\"pool_addr\":\"$ica_address\"}}"
+query_b64_urlenc="$(echo -n "$query" | base64 | tr -d '\n' | jq -sRr '@uri')"
+url="http://127.0.0.1:1317/wasm/contract/$contract_address/smart/$query_b64_urlenc?encoding=base64"
+pool_info=$(curl -s "$url" | jq -r '.result.smart' | base64 -d | jq)
+echo "pool_info is: $pool_info"

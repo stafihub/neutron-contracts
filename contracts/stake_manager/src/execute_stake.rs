@@ -2,7 +2,7 @@ use std::ops::{Add, Div, Mul};
 use std::vec;
 
 use cosmwasm_std::{
-    to_json_binary, CosmosMsg, DepsMut, Env, MessageInfo, Response, Uint128, WasmMsg,
+    CosmosMsg, DepsMut, Env, MessageInfo, Response, to_json_binary, Uint128, WasmMsg,
 };
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
@@ -32,7 +32,7 @@ pub fn execute_stake(
     }
 
     pool_info.active = pool_info.active.add(Uint128::new(token_amount));
-    pool_info.bond = pool_info.active.add(Uint128::new(token_amount));
+    pool_info.bond = pool_info.bond.add(Uint128::new(token_amount));
 
     let rtoken_amount = token_amount.mul(pool_info.rate.u128()).div(1_000_000);
 
@@ -51,5 +51,5 @@ pub fn execute_stake(
 
     Ok(Response::new()
         .add_message(CosmosMsg::Wasm(msg))
-        .add_attribute("mint", "call_contract_b"))
+        .add_attribute("mint", rtoken_amount.to_string()))
 }

@@ -67,6 +67,15 @@ pub fn execute_unstake(
     let token_amount = rtoken_amount
         .mul(Uint128::new(1_000_000))
         .div(pool_info.rate);
+    
+    deps.as_ref()
+        .api
+        .debug(format!("WASMDEBUG: execute_unstake token_amount: {:?}", token_amount).as_str());
+    
+    // update pool info
+    pool_info.next_unstake_index += 1;
+    pool_info.unbond = pool_info.unbond.add(token_amount);
+    pool_info.active = pool_info.active.sub(token_amount);
 
     // cal fee
     let mut cms_fee = Uint128::zero();
@@ -74,7 +83,7 @@ pub fn execute_unstake(
         cms_fee = rtoken_amount
             .mul(pool_info.unbond_commission)
             .div(Uint128::new(1_000_000));
-        rtoken_amount = rtoken_amount.div(cms_fee);
+        rtoken_amount = rtoken_amount.sub(cms_fee);
     }
     deps.as_ref().api.debug(
         format!(
@@ -118,11 +127,6 @@ pub fn execute_unstake(
         amount: token_amount,
         status: WithdrawStatus::Default,
     };
-
-    // update pool info
-    pool_info.next_unstake_index += 1;
-    pool_info.unbond = pool_info.unbond.add(token_amount);
-    pool_info.active = pool_info.active.sub(token_amount);
 
     UNSTAKES_OF_INDEX.save(deps.storage, index, &unstake_info)?;
     POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;

@@ -36,6 +36,18 @@
     {
       "type": "object",
       "required": [
+        "init_pool"
+      ],
+      "properties": {
+        "init_pool": {
+          "$ref": "#/definitions/InitPoolParams"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
         "config_pool"
       ],
       "properties": {
@@ -370,35 +382,20 @@
     "ConfigPoolParams": {
       "type": "object",
       "required": [
-        "active",
-        "era",
         "era_seconds",
         "ibc_denom",
-        "interchain_account_id",
         "minimal_stake",
-        "need_withdraw",
         "next_unstake_index",
         "offset",
+        "pool_addr",
         "protocol_fee_receiver",
-        "rate",
         "remote_denom",
         "rtoken",
-        "unbond",
         "unbond_commission",
         "unbonding_period",
-        "unstake_times_limit",
-        "validator_addrs",
-        "withdraw_addr"
+        "unstake_times_limit"
       ],
       "properties": {
-        "active": {
-          "$ref": "#/definitions/Uint128"
-        },
-        "era": {
-          "type": "integer",
-          "format": "uint128",
-          "minimum": 0.0
-        },
         "era_seconds": {
           "type": "integer",
           "format": "uint64",
@@ -407,47 +404,77 @@
         "ibc_denom": {
           "type": "string"
         },
-        "interchain_account_id": {
-          "type": "string"
-        },
         "minimal_stake": {
           "$ref": "#/definitions/Uint128"
         },
-        "need_withdraw": {
-          "$ref": "#/definitions/Uint128"
-        },
         "next_unstake_index": {
-          "$ref": "#/definitions/Uint128"
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
         },
         "offset": {
           "type": "integer",
           "format": "uint64",
           "minimum": 0.0
         },
-        "protocol_fee_receiver": {
-          "$ref": "#/definitions/Addr"
+        "pool_addr": {
+          "type": "string"
         },
-        "rate": {
-          "$ref": "#/definitions/Uint128"
+        "protocol_fee_receiver": {
+          "type": "string"
         },
         "remote_denom": {
           "type": "string"
         },
         "rtoken": {
-          "$ref": "#/definitions/Addr"
-        },
-        "unbond": {
-          "$ref": "#/definitions/Uint128"
+          "type": "string"
         },
         "unbond_commission": {
           "$ref": "#/definitions/Uint128"
         },
         "unbonding_period": {
           "type": "integer",
-          "format": "uint128",
+          "format": "uint64",
           "minimum": 0.0
         },
         "unstake_times_limit": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      }
+    },
+    "InitPoolParams": {
+      "type": "object",
+      "required": [
+        "active",
+        "bond",
+        "era",
+        "interchain_account_id",
+        "rate",
+        "unbond",
+        "validator_addrs",
+        "withdraw_addr"
+      ],
+      "properties": {
+        "active": {
+          "$ref": "#/definitions/Uint128"
+        },
+        "bond": {
+          "$ref": "#/definitions/Uint128"
+        },
+        "era": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "interchain_account_id": {
+          "type": "string"
+        },
+        "rate": {
+          "$ref": "#/definitions/Uint128"
+        },
+        "unbond": {
           "$ref": "#/definitions/Uint128"
         },
         "validator_addrs": {
