@@ -1,4 +1,4 @@
-use core::ops::Mul;
+use core::ops::{Mul, Sub};
 use std::ops::{Add, Div};
 
 use cosmwasm_std::{
@@ -46,10 +46,11 @@ pub fn execute_era_active(
             msg: to_json_binary(&token_info_msg)?,
         }))?;
 
+    // calculate protocol fee
     let pool_era_shot = POOL_ERA_SHOT.load(deps.storage, pool_addr.clone())?;
 
     let protocol_fee = if pool_info.active > pool_era_shot.active {
-        let reward = pool_era_shot.active - pool_era_shot.active;
+        let reward = pool_era_shot.active.sub(pool_info.active);
         reward.mul(pool_info.rate).div(Uint128::new(1_000_000))
     } else {
         Uint128::zero()
@@ -63,7 +64,6 @@ pub fn execute_era_active(
         .as_str(),
     );
 
-    // calculate protocol fee
     pool_info.rate = total_amount
         .amount
         .div(token_info.total_supply.add(protocol_fee));
