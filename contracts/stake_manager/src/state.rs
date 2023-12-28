@@ -1,4 +1,4 @@
-use cosmwasm_std::{from_json, to_json_vec, Addr, Binary, Order, StdResult, Storage, Uint128};
+use cosmwasm_std::{Addr, Binary, from_json, Order, StdResult, Storage, to_json_vec, Uint128};
 use cw_storage_plus::{Item, Map};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -32,7 +32,6 @@ pub const STATE: Item<State> = Item::new("state");
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct PoolInfo {
-    pub need_withdraw: Uint128,
     pub bond: Uint128,
     pub unbond: Uint128,
     pub active: Uint128,
@@ -48,8 +47,8 @@ pub struct PoolInfo {
     pub era_seconds: u64,
     pub offset: u64,
     pub minimal_stake: Uint128,
-    pub unstake_times_limit: Uint128,
-    pub next_unstake_index: Uint128,
+    pub unstake_times_limit: u64,
+    pub next_unstake_index: u64,
     pub unbonding_period: u64,
     pub era_update_status: PoolBondState,
     pub unbond_commission: Uint128,
@@ -112,6 +111,8 @@ pub const CONNECTION_POOL_MAP: Map<String, Vec<String>> = Map::new("connection_p
 
 // key: ica address value: query id
 pub const ADDR_QUERY_ID: Map<String, u64> = Map::new("addr_query_id");
+
+pub const QUERY_ID_ADDR: Map<u64, String> = Map::new("query_id_addr");
 
 pub const LATEST_BALANCES_QUERY_ID: Item<u64> = Item::new("latest_balances_query_id");
 

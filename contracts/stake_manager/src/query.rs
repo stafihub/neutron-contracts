@@ -99,6 +99,35 @@ pub fn query_delegation_by_addr(
     })
 }
 
+
+pub fn query_delegation(
+    deps: Deps<NeutronQuery>,
+    registered_query_id: u64,
+) -> NeutronResult<DelegatorDelegationsResponse> {
+    // get info about the query
+    let registered_query = get_registered_query(deps, registered_query_id)?;
+    // check that query type is KV
+    check_query_type(registered_query.registered_query.query_type, QueryType::KV)?;
+    // reconstruct a nice Balances structure from raw KV-storage values
+    let delegations: Delegations = query_kv_result(deps, registered_query_id)?;
+
+    deps.api.debug(
+        format!(
+            "WASMDEBUG: query_delegation_by_addr Delegations is {:?}",
+            delegations
+        )
+        .as_str(),
+    );
+
+    Ok(DelegatorDelegationsResponse {
+        // last_submitted_height tells us when the query result was updated last time (block height)
+        last_submitted_local_height: registered_query
+            .registered_query
+            .last_submitted_result_local_height,
+        delegations: delegations.delegations,
+    })
+}
+
 pub fn query_balance(
     deps: Deps<NeutronQuery>,
     _env: Env,

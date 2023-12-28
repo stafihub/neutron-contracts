@@ -104,7 +104,6 @@ pub fn execute_rm_pool_validators(
         tx_type: TxType::RmValidator,
     })?;
 
-    // todo: update state in sudo reply
     // todo: update delegation_query in sudo reply
     // todo: update pool validator list
     Ok(Response::default().add_submessage(submsg_redelegate))

@@ -1,6 +1,6 @@
-use cosmwasm_std::{ Addr, Uint128, Coin };
+use cosmwasm_std::{Addr, Coin, Uint128};
 use schemars::JsonSchema;
-use serde::{ Deserialize, Serialize };
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct InstantiateMsg {}
@@ -41,26 +41,32 @@ pub enum QueryMsg {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub struct ConfigPoolParams {
+pub struct InitPoolParams {
     pub interchain_account_id: String,
-    pub need_withdraw: Uint128,
     pub unbond: Uint128,
     pub active: Uint128,
-    pub rtoken: Addr,
+    pub bond: Uint128,
     pub withdraw_addr: String,
-    pub ibc_denom: String,
-    pub remote_denom: String,
     pub validator_addrs: Vec<String>,
     pub era: u64,
     pub rate: Uint128,
-    pub era_seconds: u64,
-    pub offset: u64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct ConfigPoolParams {
+    pub pool_addr: String,
+    pub rtoken: String,
+    pub protocol_fee_receiver: String,
+    pub ibc_denom: String,
+    pub remote_denom: String,
     pub minimal_stake: Uint128,
-    pub unstake_times_limit: Uint128,
-    pub next_unstake_index: Uint128,
+    pub unstake_times_limit: u64,
+    pub next_unstake_index: u64,
     pub unbonding_period: u64,
     pub unbond_commission: Uint128,
-    pub protocol_fee_receiver: Addr,
+    pub era_seconds: u64,
+    pub offset: u64,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
@@ -71,6 +77,7 @@ pub enum ExecuteMsg {
         interchain_account_id: String,
         register_fee: Vec<Coin>,
     },
+    InitPool(Box<InitPoolParams>),
     ConfigPool(Box<ConfigPoolParams>),
     RegisterBalanceQuery {
         connection_id: String,

@@ -94,8 +94,8 @@ pub fn execute_era_bond(
 
             msgs.push(any_msg);
         }
-    } else if pool_info.active > pool_info.need_withdraw {
-        let stake_amount = pool_info.active - pool_info.need_withdraw;
+    } else {
+        let stake_amount = pool_info.active;
 
         let validator_count = pool_info.validator_addrs.len() as u128;
 

@@ -23,7 +23,7 @@ pub fn execute_era_update(
     channel: String,
     pool_addr: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
-    let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
+    let pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
 
     // check era state
     if pool_info.era_update_status != ActiveReported {
@@ -139,9 +139,6 @@ pub fn execute_era_update(
         )
         .as_str(),
     );
-
-    pool_info.need_withdraw = need_withdraw;
-    POOLS.save(deps.storage, pool_addr, &pool_info)?;
 
     Ok(Response::default().add_submessage(submsg_pool_ibc_send))
 }

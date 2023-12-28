@@ -2,7 +2,7 @@ use std::ops::{Add, Div, Mul, Sub};
 use std::vec;
 
 use cosmwasm_std::{
-    to_json_binary, CosmosMsg, DepsMut, MessageInfo, Response, StdError, Uint128, WasmMsg,
+    CosmosMsg, DepsMut, MessageInfo, Response, StdError, to_json_binary, Uint128, WasmMsg,
 };
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
@@ -10,7 +10,7 @@ use neutron_sdk::{
 };
 
 use crate::state::{
-    UnstakeInfo, WithdrawStatus, POOLS, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX,
+    POOLS, UnstakeInfo, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX, WithdrawStatus,
 };
 
 // Before this step, need the user to authorize burn from
@@ -34,8 +34,17 @@ pub fn execute_unstake(
         .debug(format!("WASMDEBUG: execute_unstake pool_info: {:?}", pool_info).as_str());
 
     let unstake_count = match UNSTAKES_INDEX_FOR_USER.load(deps.storage, &info.sender) {
-        Ok(unstakes) => unstakes.len() as u128,
-        Err(_) => 0u128,
+        Ok(unstakes) => {
+            let mut count = 0u64;
+            for unstake in unstakes {
+                let (unstake_pool_addr, _) = unstake.unwrap();
+                if pool_addr == unstake_pool_addr {
+                    count += 1;
+                }
+            }
+            count
+        }
+        Err(_) => 0u64,
     };
 
     deps.as_ref().api.debug(
@@ -46,7 +55,7 @@ pub fn execute_unstake(
         .as_str(),
     );
 
-    let unstake_limit = pool_info.unstake_times_limit.u128();
+    let unstake_limit = pool_info.unstake_times_limit;
     if unstake_count >= unstake_limit {
         return Err(NeutronError::Std(StdError::generic_err(format!(
             "Encode error: {}",
@@ -111,7 +120,7 @@ pub fn execute_unstake(
     };
 
     // update pool info
-    pool_info.next_unstake_index = pool_info.next_unstake_index.add(Uint128::one());
+    pool_info.next_unstake_index += 1;
     pool_info.unbond = pool_info.unbond.add(token_amount);
     pool_info.active = pool_info.active.sub(token_amount);
 

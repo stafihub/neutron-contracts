@@ -1,13 +1,13 @@
 use cosmwasm_std::{Addr, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128};
-use neutron_sdk::interchain_txs::helpers::get_port_id;
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     NeutronResult,
 };
+use neutron_sdk::interchain_txs::helpers::get_port_id;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::state::{PoolBondState, PoolInfo, INTERCHAIN_ACCOUNTS, POOLS, POOL_ICA_MAP};
+use crate::state::{INTERCHAIN_ACCOUNTS, POOL_ICA_MAP, PoolBondState, PoolInfo, POOLS};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -87,7 +87,6 @@ pub fn sudo_open_ack(
             &parsed_version.controller_connection_id,
         )?;
         let pool_info = PoolInfo {
-            need_withdraw: Uint128::zero(),
             bond: Uint128::zero(),
             unbond: Uint128::zero(),
             active: Uint128::zero(),
@@ -101,8 +100,8 @@ pub fn sudo_open_ack(
             era: 0,
             rate: Uint128::zero(),
             minimal_stake: Uint128::zero(),
-            unstake_times_limit: Uint128::zero(),
-            next_unstake_index: Uint128::zero(),
+            unstake_times_limit: 0,
+            next_unstake_index: 0,
             unbonding_period: 0,
             era_update_status: PoolBondState::ActiveReported,
             unbond_commission: Uint128::zero(),
