@@ -1,15 +1,14 @@
-use cosmwasm_std::{ DepsMut, Env, Response, Uint128, coin, StdResult };
+use cosmwasm_std::{ coin, DepsMut, Env, Response, StdResult, Uint128 };
 use neutron_sdk::{
     bindings::{ msg::NeutronMsg, query::NeutronQuery },
-    NeutronResult,
     interchain_queries::v045::types::Balances,
-    sudo::msg::RequestPacketTimeoutHeight,
-    query::min_ibc_fee::query_min_ibc_fee,
     interchain_txs::helpers::get_port_id,
+    NeutronResult,
+    query::min_ibc_fee::query_min_ibc_fee,
+    sudo::msg::RequestPacketTimeoutHeight,
 };
 
 use crate::{
-    query::query_balance_by_addr,
     contract::{
         DEFAULT_TIMEOUT_HEIGHT,
         DEFAULT_TIMEOUT_SECONDS,
@@ -17,8 +16,10 @@ use crate::{
         SudoPayload,
         TxType,
     },
+    query::query_balance_by_addr,
     state::POOL_ICA_MAP,
 };
+use crate::helper::min_ntrn_ibc_fee;
 use crate::state::PoolBondState::{ BondReported, WithdrawReported };
 use crate::state::POOLS;
 
@@ -59,7 +60,7 @@ pub fn execute_era_collect_withdraw(
         return Ok(Response::default());
     }
 
-    let fee = crate::contract::min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
+    let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
 
     let tx_withdraw_coin = coin(withdraw_amount, pool_info.ibc_denom.clone());
     let withdraw_token_send = NeutronMsg::IbcTransfer {
@@ -89,7 +90,8 @@ pub fn execute_era_collect_withdraw(
         withdraw_token_send,
         SudoPayload {
             port_id: get_port_id(env.contract.address.to_string(), interchain_account_id),
-            message: pool_addr,
+            message: "".to_string(),
+            pool_addr: pool_addr.clone(),
             tx_type: TxType::EraUpdateWithdrawSend,
         }
     )?;

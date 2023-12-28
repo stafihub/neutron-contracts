@@ -1,7 +1,7 @@
 use std::vec;
 
+use crate::helper::get_ica;
 use cosmwasm_std::{to_json_binary, Addr, Binary, Deps, Env};
-use neutron_sdk::{interchain_txs::helpers::get_port_id, interchain_queries::v045::queries::DelegatorDelegationsResponse};
 use neutron_sdk::{
     bindings::query::{NeutronQuery, QueryInterchainAccountAddressResponse},
     interchain_queries::{
@@ -10,6 +10,10 @@ use neutron_sdk::{
         v045::{queries::BalanceResponse, types::Balances, types::Delegations},
     },
     NeutronResult,
+};
+use neutron_sdk::{
+    interchain_queries::v045::queries::DelegatorDelegationsResponse,
+    interchain_txs::helpers::get_port_id,
 };
 
 use crate::state::{read_errors_from_queue, ACKNOWLEDGEMENT_RESULTS, ADDR_QUERY_ID};
@@ -91,7 +95,7 @@ pub fn query_delegation_by_addr(
         last_submitted_local_height: registered_query
             .registered_query
             .last_submitted_result_local_height,
-        delegations:delegations.delegations,
+        delegations: delegations.delegations,
     })
 }
 
@@ -154,7 +158,7 @@ pub fn query_interchain_address_contract(
     env: Env,
     interchain_account_id: String,
 ) -> NeutronResult<Binary> {
-    Ok(to_json_binary(&crate::contract::get_ica(
+    Ok(to_json_binary(&get_ica(
         deps,
         &env,
         &interchain_account_id,

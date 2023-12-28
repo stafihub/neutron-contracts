@@ -1,4 +1,4 @@
-use std::{ ops::{ Div, Mul, Sub }, collections::HashSet };
+use std::{ collections::HashSet, ops::{ Div, Mul, Sub } };
 use std::vec;
 
 use cosmos_sdk_proto::cosmos::{
@@ -7,20 +7,21 @@ use cosmos_sdk_proto::cosmos::{
 };
 use cosmos_sdk_proto::cosmos::staking::v1beta1::{ MsgDelegate, MsgUndelegate };
 use cosmos_sdk_proto::prost::Message;
-use cosmwasm_std::{ Binary, DepsMut, Env, Response, StdError, Uint128, Delegation, StdResult };
-use neutron_sdk::bindings::types::ProtobufAny;
-use neutron_sdk::interchain_txs::helpers::get_port_id;
+use cosmwasm_std::{ Binary, Delegation, DepsMut, Env, Response, StdError, StdResult, Uint128 };
 use neutron_sdk::{
     bindings::{ msg::NeutronMsg, query::NeutronQuery },
-    query::min_ibc_fee::query_min_ibc_fee,
     NeutronError,
     NeutronResult,
+    query::min_ibc_fee::query_min_ibc_fee,
 };
+use neutron_sdk::bindings::types::ProtobufAny;
+use neutron_sdk::interchain_txs::helpers::get_port_id;
 
-use crate::contract::{ SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS, msg_with_sudo_callback };
+use crate::contract::{ DEFAULT_TIMEOUT_SECONDS, msg_with_sudo_callback, SudoPayload, TxType };
+use crate::helper::min_ntrn_ibc_fee;
 use crate::query::query_delegation_by_addr;
-use crate::state::PoolBondState::{ EraUpdated, BondReported };
-use crate::state::{ POOLS, POOL_ICA_MAP };
+use crate::state::{ POOL_ICA_MAP, POOLS };
+use crate::state::PoolBondState::{ BondReported, EraUpdated };
 
 #[derive(Clone, Debug)]
 struct ValidatorUnbondInfo {
@@ -34,7 +35,7 @@ pub fn execute_era_bond(
     env: Env,
     pool_addr: String
 ) -> NeutronResult<Response<NeutronMsg>> {
-    let fee = crate::contract::min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
+    let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
     let mut msgs = vec![];
     let pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
     // check era state
@@ -188,7 +189,8 @@ pub fn execute_era_bond(
     let submsg = msg_with_sudo_callback(deps.branch(), cosmos_msg, SudoPayload {
         port_id: get_port_id(env.contract.address.to_string(), interchain_account_id.clone()),
         // the acknowledgement later
-        message: pool_addr.clone(),
+        message: "".to_string(),
+        pool_addr: pool_addr.clone(),
         tx_type: TxType::EraBond,
     })?;
 

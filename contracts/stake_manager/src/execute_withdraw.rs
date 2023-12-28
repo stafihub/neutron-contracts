@@ -4,27 +4,19 @@ use cosmos_sdk_proto::cosmos::bank::v1beta1::MsgSend;
 use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
 use cosmos_sdk_proto::prost::Message;
 use cosmwasm_std::{
-    Addr,
-    Binary,
-    DepsMut,
-    Env,
-    MessageInfo,
-    Response,
-    StdError,
-    StdResult,
-    Uint128,
+    Addr, Binary, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128,
+};
+use neutron_sdk::{
+    bindings::{msg::NeutronMsg, query::NeutronQuery},
+    NeutronError,
+    NeutronResult, query::min_ibc_fee::query_min_ibc_fee,
 };
 use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::interchain_txs::helpers::get_port_id;
-use neutron_sdk::{
-    bindings::{ msg::NeutronMsg, query::NeutronQuery },
-    query::min_ibc_fee::query_min_ibc_fee,
-    NeutronError,
-    NeutronResult,
-};
 
-use crate::contract::{ msg_with_sudo_callback, SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS };
-use crate::state::{ WithdrawStatus, POOLS, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX };
+use crate::contract::{DEFAULT_TIMEOUT_SECONDS, msg_with_sudo_callback, SudoPayload, TxType};
+use crate::helper::min_ntrn_ibc_fee;
+use crate::state::{POOLS, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX, WithdrawStatus};
 
 pub fn execute_withdraw(
     mut deps: DepsMut<NeutronQuery>,
@@ -32,7 +24,7 @@ pub fn execute_withdraw(
     info: MessageInfo,
     pool_addr: String,
     receiver: Addr,
-    interchain_account_id: String
+    interchain_account_id: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut total_withdraw_amount = Uint128::zero();
 
@@ -63,11 +55,10 @@ pub fn execute_withdraw(
     }
 
     if total_withdraw_amount.is_zero() {
-        return Err(
-            NeutronError::Std(
-                StdError::generic_err(format!("Encode error: {}", "Zero withdraw amount"))
-            )
-        );
+        return Err(NeutronError::Std(StdError::generic_err(format!(
+            "Encode error: {}",
+            "Zero withdraw amount"
+        ))));
     }
 
     let unstake_index_list_str = emit_unstake_index_list
@@ -77,22 +68,23 @@ pub fn execute_withdraw(
         .join("_");
 
     // interchain tx send atom
-    let fee = crate::contract::min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
+    let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
     let ica_send = MsgSend {
         from_address: pool_addr.clone(),
         to_address: receiver.to_string(),
-        amount: Vec::from([
-            Coin {
-                denom: pool_info.remote_denom,
-                amount: total_withdraw_amount.to_string(),
-            },
-        ]),
+        amount: Vec::from([Coin {
+            denom: pool_info.remote_denom,
+            amount: total_withdraw_amount.to_string(),
+        }]),
     };
     let mut buf = Vec::new();
     buf.reserve(ica_send.encoded_len());
 
     if let Err(e) = ica_send.encode(&mut buf) {
-        return Err(NeutronError::Std(StdError::generic_err(format!("Encode error: {}", e))));
+        return Err(NeutronError::Std(StdError::generic_err(format!(
+            "Encode error: {}",
+            e
+        ))));
     }
 
     let send_msg = ProtobufAny {
@@ -106,26 +98,29 @@ pub fn execute_withdraw(
         vec![send_msg],
         "".to_string(),
         DEFAULT_TIMEOUT_SECONDS,
-        fee
+        fee,
     );
 
     // We use a submessage here because we need the process message reply to save
     // the outgoing IBC packet identifier for later.
-    let submsg = msg_with_sudo_callback(deps.branch(), cosmos_msg, SudoPayload {
-        port_id: get_port_id(env.contract.address.as_str(), &interchain_account_id),
-        message: format!("{}_{}", info.sender, unstake_index_list_str),
-        tx_type: TxType::UserWithdraw,
-    })?;
-
-    Ok(
-        Response::new()
-            .add_attribute("action", "withdraw")
-            .add_attribute("from", info.sender)
-            .add_attribute("pool", pool_addr.clone())
-            .add_attribute("unstake_index_list", unstake_index_list_str)
-            .add_attribute("amount", total_withdraw_amount)
-            .add_submessage(submsg)
-    )
+    let submsg = msg_with_sudo_callback(
+        deps.branch(),
+        cosmos_msg,
+        SudoPayload {
+            port_id: get_port_id(env.contract.address.as_str(), &interchain_account_id),
+            message: format!("{}_{}", info.sender, unstake_index_list_str),
+            pool_addr: pool_addr.clone(),
+            tx_type: TxType::UserWithdraw,
+        },
+    )?;
+    
+    Ok(Response::new()
+        .add_attribute("action", "withdraw")
+        .add_attribute("from", info.sender)
+        .add_attribute("pool", pool_addr.clone())
+        .add_attribute("unstake_index_list", unstake_index_list_str)
+        .add_attribute("amount", total_withdraw_amount)
+        .add_submessage(submsg))
 }
 
 pub fn sudo_withdraw_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
@@ -137,7 +132,8 @@ pub fn sudo_withdraw_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<
             format!(
                 "WASMDEBUG: sudo_callback: UserWithdraw before unstakes: {:?}",
                 unstakes
-            ).as_str()
+            )
+                .as_str(),
         );
 
         unstakes.retain(|unstake| {
@@ -154,7 +150,8 @@ pub fn sudo_withdraw_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<
             format!(
                 "WASMDEBUG: sudo_callback: UserWithdraw after unstakes: {:?}",
                 unstakes
-            ).as_str()
+            )
+                .as_str(),
         );
 
         UNSTAKES_INDEX_FOR_USER.save(deps.storage, &user_addr, &unstakes)?;

@@ -1,20 +1,21 @@
 use std::ops::Add;
 
-use cosmwasm_std::{ coin, DepsMut, Env, Order, Response, Uint128, StdResult };
-use neutron_sdk::interchain_txs::helpers::get_port_id;
+use cosmwasm_std::{ coin, DepsMut, Env, Order, Response, StdResult, Uint128 };
 use neutron_sdk::{
     bindings::{ msg::NeutronMsg, query::NeutronQuery },
+    NeutronResult,
     query::min_ibc_fee::query_min_ibc_fee,
     sudo::msg::RequestPacketTimeoutHeight,
-    NeutronResult,
 };
+use neutron_sdk::interchain_txs::helpers::get_port_id;
 
 use crate::{
-    contract::{ msg_with_sudo_callback, SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS },
-    state::{ WithdrawStatus, POOL_ERA_SHOT, EraShot },
+    contract::{ DEFAULT_TIMEOUT_SECONDS, msg_with_sudo_callback, SudoPayload, TxType },
+    state::{ EraShot, POOL_ERA_SHOT, WithdrawStatus },
 };
-use crate::state::PoolBondState::{ EraUpdated, ActiveReported };
-use crate::state::{ POOLS, POOL_ICA_MAP, UNSTAKES_OF_INDEX };
+use crate::helper::min_ntrn_ibc_fee;
+use crate::state::{ POOL_ICA_MAP, POOLS, UNSTAKES_OF_INDEX };
+use crate::state::PoolBondState::{ ActiveReported, EraUpdated };
 
 pub fn execute_era_update(
     mut deps: DepsMut<NeutronQuery>,
@@ -55,7 +56,7 @@ pub fn execute_era_update(
     }
 
     // See more info here: https://docs.neutron.org/neutron/feerefunder/overview
-    let fee = crate::contract::min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
+    let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
 
     let balance = deps.querier.query_all_balances(&env.contract.address)?;
 
@@ -95,7 +96,8 @@ pub fn execute_era_update(
 
     let submsg_pool_ibc_send = msg_with_sudo_callback(deps.branch(), msg, SudoPayload {
         port_id: get_port_id(env.contract.address.to_string(), interchain_account_id.clone()),
-        message: pool_addr.clone(),
+        pool_addr: pool_addr.clone(),
+        message: "".to_string(),
         tx_type: TxType::EraUpdateIbcSend,
     })?;
     deps.as_ref().api.debug(

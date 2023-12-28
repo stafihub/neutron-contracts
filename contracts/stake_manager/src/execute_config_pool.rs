@@ -2,30 +2,29 @@ use std::vec;
 
 use cosmos_sdk_proto::cosmos::distribution::v1beta1::MsgSetWithdrawAddress;
 use cosmos_sdk_proto::prost::Message;
-use cosmwasm_std::{ Binary, DepsMut, Env, Response, StdError, SubMsg, StdResult };
+use cosmwasm_std::{ Binary, DepsMut, Env, Response, StdError, StdResult, SubMsg };
+use neutron_sdk::{
+    bindings::{ msg::NeutronMsg, query::NeutronQuery },
+    NeutronError,
+    NeutronResult,
+    query::min_ibc_fee::query_min_ibc_fee,
+};
 use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::interchain_queries::v045::new_register_balance_query_msg;
 use neutron_sdk::interchain_queries::v045::new_register_delegator_delegations_query_msg;
 use neutron_sdk::interchain_txs::helpers::get_port_id;
-use neutron_sdk::{
-    bindings::{ msg::NeutronMsg, query::NeutronQuery },
-    query::min_ibc_fee::query_min_ibc_fee,
-    NeutronError,
-    NeutronResult,
-};
 
 use crate::contract::{
-    get_ica,
-    min_ntrn_ibc_fee,
+    DEFAULT_TIMEOUT_SECONDS,
+    DEFAULT_UPDATE_PERIOD,
     msg_with_sudo_callback,
     SudoPayload,
     TxType,
-    DEFAULT_TIMEOUT_SECONDS,
-    DEFAULT_UPDATE_PERIOD,
 };
+use crate::helper::{ get_ica, min_ntrn_ibc_fee };
 use crate::msg::ConfigPoolParams;
-use crate::state::POOLS;
 use crate::state::{ ADDR_QUERY_ID, LATEST_BALANCES_QUERY_ID, LATEST_DELEGATIONS_QUERY_ID };
+use crate::state::POOLS;
 
 // add execute to config the validator addrs and withdraw address on reply
 pub fn execute_config_pool(
@@ -44,8 +43,14 @@ pub fn execute_config_pool(
         ).as_str()
     );
 
-    if param.validator_addrs.is_empty() || param.validator_addrs.len()>5 {
-        return Err(NeutronError::Std(StdError::generic_err("Validator addresses list must contain between 1 and 5 addresses.")));
+    if param.validator_addrs.is_empty() || param.validator_addrs.len() > 5 {
+        return Err(
+            NeutronError::Std(
+                StdError::generic_err(
+                    "Validator addresses list must contain between 1 and 5 addresses."
+                )
+            )
+        );
     }
 
     let mut pool_info = POOLS.load(deps.as_ref().storage, delegator.clone())?;
@@ -170,7 +175,8 @@ pub fn execute_config_pool(
     // the outgoing IBC packet identifier for later.
     let submsg_set_withdraw = msg_with_sudo_callback(deps.branch(), cosmos_msg, SudoPayload {
         port_id: get_port_id(env.contract.address.to_string(), param.interchain_account_id),
-        message: format!("{}_{}", delegator, param.withdraw_addr),
+        message: format!("{}", param.withdraw_addr),
+        pool_addr: pool_info.pool_addr.clone(),
         tx_type: TxType::SetWithdrawAddr,
     })?;
 

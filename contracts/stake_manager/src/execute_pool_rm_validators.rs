@@ -4,8 +4,6 @@ use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
 use cosmos_sdk_proto::cosmos::staking::v1beta1::MsgBeginRedelegate;
 use cosmos_sdk_proto::prost::Message;
 use cosmwasm_std::{ Binary, DepsMut, Env, MessageInfo, Response, StdError, Uint128 };
-use neutron_sdk::bindings::types::ProtobufAny;
-use neutron_sdk::interchain_txs::helpers::get_port_id;
 use neutron_sdk::{
     bindings::{ msg::NeutronMsg, query::NeutronQuery },
     interchain_queries::{
@@ -15,14 +13,17 @@ use neutron_sdk::{
         types::QueryType,
         v045::types::Delegations,
     },
-    query::min_ibc_fee::query_min_ibc_fee,
     NeutronError,
     NeutronResult,
+    query::min_ibc_fee::query_min_ibc_fee,
 };
+use neutron_sdk::bindings::types::ProtobufAny;
+use neutron_sdk::interchain_txs::helpers::get_port_id;
 
-use crate::contract::{ msg_with_sudo_callback, SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS };
+use crate::contract::{ DEFAULT_TIMEOUT_SECONDS, msg_with_sudo_callback, SudoPayload, TxType };
+use crate::helper::min_ntrn_ibc_fee;
+use crate::state::{ POOL_ICA_MAP, POOLS };
 use crate::state::ADDR_QUERY_ID;
-use crate::state::{ POOLS, POOL_ICA_MAP };
 
 pub fn execute_rm_pool_validators(
     mut deps: DepsMut<NeutronQuery>,
@@ -31,7 +32,7 @@ pub fn execute_rm_pool_validators(
     pool_addr: String,
     validator_addrs: Vec<String>
 ) -> NeutronResult<Response<NeutronMsg>> {
-    let fee = crate::contract::min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
+    let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
 
     // redelegate
     let registered_query_id = ADDR_QUERY_ID.load(deps.storage, pool_addr.clone())?;
@@ -98,7 +99,8 @@ pub fn execute_rm_pool_validators(
     // the outgoing IBC packet identifier for later.
     let submsg_redelegate = msg_with_sudo_callback(deps.branch(), cosmos_msg, SudoPayload {
         port_id: get_port_id(env.contract.address.to_string(), interchain_account_id.clone()),
-        message: "interchain_undelegate".to_string(),
+        pool_addr: pool_info.pool_addr.clone(),
+        message: "interchain_redelegate".to_string(),
         tx_type: TxType::RmValidator,
     })?;
 
