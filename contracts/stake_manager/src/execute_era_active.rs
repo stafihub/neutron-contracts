@@ -70,6 +70,7 @@ pub fn execute_era_active(
     pool_info.era_update_status = PoolBondState::ActiveReported;
     pool_info.era += 1;
     POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
+    POOL_ERA_SHOT.remove(deps.storage, pool_addr);
 
     let mut resp = Response::new().add_attribute("new_rate", pool_info.rate);
     if !protocol_fee.is_zero() {
