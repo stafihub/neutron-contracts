@@ -9,7 +9,7 @@ use neutron_sdk::{
 };
 
 use crate::{
-    query::{ query_balance_by_addr },
+    query::query_balance_by_addr,
     contract::{
         DEFAULT_TIMEOUT_HEIGHT,
         DEFAULT_TIMEOUT_SECONDS,

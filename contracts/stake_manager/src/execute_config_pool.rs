@@ -65,9 +65,11 @@ pub fn execute_config_pool(
     pool_info.unstake_times_limit = param.unstake_times_limit;
     pool_info.connection_id = connection_id.clone();
     pool_info.validator_addrs = param.validator_addrs.clone(); // todo update pool_info validator_addrs in query replay
-    pool_info.withdraw_addr = delegator.clone(); // todo: update withdraw addr in sudo reply
+    pool_info.withdraw_addr = delegator.clone();
     pool_info.unbond_commission = param.unbond_commission;
     pool_info.protocol_fee_receiver = param.protocol_fee_receiver;
+    pool_info.era_seconds = param.era_seconds;
+    pool_info.offset = param.offset;
 
     POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
 

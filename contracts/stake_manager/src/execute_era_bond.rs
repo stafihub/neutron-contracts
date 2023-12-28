@@ -17,7 +17,7 @@ use neutron_sdk::{
     NeutronResult,
 };
 
-use crate::{ contract::{ SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS }, state::POOL_ERA_SHOT };
+use crate::contract::{ SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS, msg_with_sudo_callback };
 use crate::query::query_delegation_by_addr;
 use crate::state::PoolBondState::{ EraUpdated, BondReported };
 use crate::state::{ POOLS, POOL_ICA_MAP };
@@ -45,8 +45,6 @@ pub fn execute_era_bond(
         return Ok(Response::new());
     }
 
-    let mut shot = POOL_ERA_SHOT.load(deps.storage, pool_addr.clone())?;
-
     // Check whether the delegator-validator needs to manually withdraw
     let mut op_validators = vec![];
 
@@ -66,7 +64,6 @@ pub fn execute_era_bond(
             );
 
             op_validators.push(info.validator.clone());
-            shot.unstake_tx_num += 1;
 
             // add submessage to unstake
             let delegate_msg = MsgUndelegate {
@@ -91,33 +88,7 @@ pub fn execute_era_bond(
                 value: Binary::from(buf),
             };
 
-            let cosmos_msg = NeutronMsg::submit_tx(
-                pool_info.connection_id.clone(),
-                interchain_account_id.clone(),
-                vec![any_msg],
-                "".to_string(),
-                DEFAULT_TIMEOUT_SECONDS,
-                fee.clone()
-            );
-
-            // We use a submessage here because we need the process message reply to save
-            // the outgoing IBC packet identifier for later.
-            let submsg_unstake = crate::contract::msg_with_sudo_callback(
-                deps.branch(),
-                cosmos_msg,
-                SudoPayload {
-                    port_id: get_port_id(
-                        env.contract.address.to_string(),
-                        interchain_account_id.clone()
-                    ),
-                    // Here you can store some information about the transaction to help you parse
-                    // the acknowledgement later.
-                    message: pool_addr.clone(),
-                    tx_type: TxType::EraBondUnstake,
-                }
-            )?;
-
-            msgs.push(submsg_unstake);
+            msgs.push(any_msg);
         }
     } else if pool_info.active > pool_info.need_withdraw {
         let stake_amount = pool_info.active - pool_info.need_withdraw;
@@ -140,7 +111,6 @@ pub fn execute_era_bond(
             }
 
             op_validators.push(validator_addr.clone());
-            shot.stake_tx_num += 1;
 
             // add submessage to stake
             let delegate_msg = MsgDelegate {
@@ -168,33 +138,7 @@ pub fn execute_era_bond(
                 value: Binary::from(buf),
             };
 
-            // Form the neutron SubmitTx message containing the binary Delegate message.
-            let cosmos_msg = NeutronMsg::submit_tx(
-                pool_info.connection_id.clone(),
-                interchain_account_id.clone(),
-                vec![any_msg],
-                "".to_string(),
-                DEFAULT_TIMEOUT_SECONDS,
-                fee.clone()
-            );
-
-            // We use a submessage here because we need the process message reply to save
-            // the outgoing IBC packet identifier for later.
-            let submsg_stake = crate::contract::msg_with_sudo_callback(
-                deps.branch(),
-                cosmos_msg,
-                SudoPayload {
-                    port_id: get_port_id(
-                        env.contract.address.to_string(),
-                        interchain_account_id.clone()
-                    ),
-                    // Here you can store some information about the transaction to help you parse
-                    // the acknowledgement later.
-                    message: pool_addr.clone(),
-                    tx_type: TxType::EraBondStake,
-                }
-            )?;
-            msgs.push(submsg_stake);
+            msgs.push(any_msg);
         }
     }
 
@@ -208,8 +152,6 @@ pub fn execute_era_bond(
     // Convert the difference back to Vec
     let difference_vec: Vec<_> = difference.into_iter().collect();
     for validator_addr in difference_vec {
-        shot.claim_tx_num += 1;
-
         // Create a MsgWithdrawDelegatorReward message
         let withdraw_msg = MsgWithdrawDelegatorReward {
             delegator_address: pool_addr.clone(),
@@ -231,38 +173,26 @@ pub fn execute_era_bond(
         };
 
         // Form the neutron SubmitTx message containing the binary MsgWithdrawDelegatorReward message
-        let cosmos_msg = NeutronMsg::submit_tx(
-            pool_info.connection_id.clone(),
-            interchain_account_id.clone(),
-            vec![any_msg],
-            "".to_string(),
-            DEFAULT_TIMEOUT_SECONDS,
-            fee.clone()
-        );
-
-        // We use a submessage here because we need the process message reply to save
-        // the outgoing IBC packet identifier for later
-        let submsg_withdraw = crate::contract::msg_with_sudo_callback(
-            deps.branch(),
-            cosmos_msg,
-            SudoPayload {
-                port_id: get_port_id(
-                    env.contract.address.to_string(),
-                    interchain_account_id.clone()
-                ),
-                // Here you can store some information about the transaction to help you parse
-                // the acknowledgement later
-                message: pool_addr.clone(),
-                tx_type: TxType::EraBondClaimReward,
-            }
-        )?;
-
-        msgs.push(submsg_withdraw);
+        msgs.push(any_msg);
     }
 
-    POOL_ERA_SHOT.save(deps.storage, pool_addr, &shot)?;
+    let cosmos_msg = NeutronMsg::submit_tx(
+        pool_info.connection_id.clone(),
+        interchain_account_id.clone(),
+        msgs,
+        "".to_string(),
+        DEFAULT_TIMEOUT_SECONDS,
+        fee.clone()
+    );
 
-    Ok(Response::default().add_submessages(msgs))
+    let submsg = msg_with_sudo_callback(deps.branch(), cosmos_msg, SudoPayload {
+        port_id: get_port_id(env.contract.address.to_string(), interchain_account_id.clone()),
+        // the acknowledgement later
+        message: pool_addr.clone(),
+        tx_type: TxType::EraBond,
+    })?;
+
+    Ok(Response::default().add_submessage(submsg))
 }
 
 fn allocate_unbond_amount(
@@ -301,52 +231,8 @@ fn allocate_unbond_amount(
 }
 
 pub fn sudo_era_bond_withdraw_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
-    let mut shot = POOL_ERA_SHOT.load(deps.storage, payload.message.clone())?;
-    shot.stake_complete_num += 1;
-    if
-        shot.stake_complete_num == shot.stake_tx_num &&
-        shot.unstake_complete_num == shot.unstake_tx_num &&
-        shot.claim_complete_num == shot.claim_tx_num
-    {
-        let mut pool_info = POOLS.load(deps.storage, payload.message)?;
-        pool_info.era_update_status = BondReported;
-        POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
-    }
-    Ok(Response::new())
-}
-
-pub fn sudo_era_unbond_withdraw_callback(
-    deps: DepsMut,
-    payload: SudoPayload
-) -> StdResult<Response> {
-    let mut shot = POOL_ERA_SHOT.load(deps.storage, payload.message.clone())?;
-    shot.unstake_complete_num += 1;
-    if
-        shot.stake_complete_num == shot.stake_tx_num &&
-        shot.unstake_complete_num == shot.unstake_tx_num &&
-        shot.claim_complete_num == shot.claim_tx_num
-    {
-        let mut pool_info = POOLS.load(deps.storage, payload.message)?;
-        pool_info.era_update_status = BondReported;
-        POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
-    }
-    Ok(Response::new())
-}
-
-pub fn sudo_era_claim_withdraw_callback(
-    deps: DepsMut,
-    payload: SudoPayload
-) -> StdResult<Response> {
-    let mut shot = POOL_ERA_SHOT.load(deps.storage, payload.message.clone())?;
-    shot.claim_complete_num += 1;
-    if
-        shot.stake_complete_num == shot.stake_tx_num &&
-        shot.unstake_complete_num == shot.unstake_tx_num &&
-        shot.claim_complete_num == shot.claim_tx_num
-    {
-        let mut pool_info = POOLS.load(deps.storage, payload.message)?;
-        pool_info.era_update_status = BondReported;
-        POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
-    }
+    let mut pool_info = POOLS.load(deps.storage, payload.message)?;
+    pool_info.era_update_status = BondReported;
+    POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
     Ok(Response::new())
 }

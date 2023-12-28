@@ -31,10 +31,15 @@ use serde::{ Deserialize, Serialize };
 
 use crate::{
     execute_config_pool::{ execute_config_pool, sudo_config_pool_callback },
-    execute_era_collect_withdraw::{execute_era_collect_withdraw, sudo_era_collect_withdraw_callback}, execute_era_update::sudo_era_update_callback, execute_era_bond::{sudo_era_bond_withdraw_callback, sudo_era_unbond_withdraw_callback, sudo_era_claim_withdraw_callback},
+    execute_era_collect_withdraw::{
+        execute_era_collect_withdraw,
+        sudo_era_collect_withdraw_callback,
+    },
+    execute_era_update::sudo_era_update_callback,
+    execute_era_bond::sudo_era_bond_withdraw_callback,
 };
 use crate::execute_era_bond::execute_era_bond;
-use crate::execute_era_bond_active::execute_bond_active;
+use crate::execute_era_active::execute_era_active;
 use crate::execute_era_update::execute_era_update;
 use crate::execute_pool_add_validators::execute_add_pool_validators;
 use crate::execute_pool_rm_validators::execute_rm_pool_validators;
@@ -100,15 +105,12 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum TxType {
-    Default,
     SetWithdrawAddr,
     RmValidator,
     UserWithdraw,
     EraUpdateIbcSend,
+    EraBond,
     EraUpdateWithdrawSend,
-    EraBondStake,
-    EraBondUnstake,
-    EraBondClaimReward,
     EraActive,
 }
 
@@ -214,13 +216,12 @@ pub fn execute(
         ExecuteMsg::PoolAddValidator { pool_addr, validator_addrs } =>
             execute_add_pool_validators(deps, pool_addr, validator_addrs),
         ExecuteMsg::EraUpdate { channel, pool_addr } => {
-            // Different rtoken are executed separately.
             execute_era_update(deps, env, channel, pool_addr)
         }
         ExecuteMsg::EraBond { pool_addr } => execute_era_bond(deps, env, pool_addr),
         ExecuteMsg::EraCollectWithdraw { channel, pool_addr } =>
             execute_era_collect_withdraw(deps, env, channel, pool_addr),
-        ExecuteMsg::EraBondActive { pool_addr } => execute_bond_active(deps, env, pool_addr),
+        ExecuteMsg::EraActive { pool_addr } => execute_era_active(deps, env, pool_addr),
         ExecuteMsg::StakeLSM {} => execute_stake_lsm(deps, env, info),
     }
 }
@@ -275,9 +276,7 @@ fn sudo_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
         TxType::UserWithdraw => sudo_withdraw_callback(deps, payload),
         TxType::EraUpdateIbcSend => sudo_era_update_callback(deps, payload),
         TxType::EraUpdateWithdrawSend => sudo_era_collect_withdraw_callback(deps, payload),
-        TxType::EraBondStake => sudo_era_bond_withdraw_callback(deps, payload),
-        TxType::EraBondUnstake => sudo_era_unbond_withdraw_callback(deps, payload),
-        TxType::EraBondClaimReward => sudo_era_claim_withdraw_callback(deps, payload),
+        TxType::EraBond => sudo_era_bond_withdraw_callback(deps, payload),
 
         _ => Ok(Response::new()),
     }

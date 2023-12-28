@@ -5,10 +5,10 @@ use neutron_sdk::{ bindings::{ msg::NeutronMsg, query::NeutronQuery }, NeutronRe
 
 use crate::query::query_delegation_by_addr;
 use crate::state::PoolBondState;
-use crate::state::PoolBondState::{ WithdrawReported };
+use crate::state::PoolBondState::WithdrawReported;
 use crate::state::POOLS;
 
-pub fn execute_bond_active(
+pub fn execute_era_active(
     deps: DepsMut<NeutronQuery>,
     _: Env,
     pool_addr: String
@@ -43,6 +43,7 @@ pub fn execute_bond_active(
     // todo: calculate protocol fee
     pool_info.rate = total_amount.amount.div(token_info.total_supply);
     pool_info.era_update_status = PoolBondState::ActiveReported;
+    pool_info.era += 1;
     POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
 
     Ok(Response::default())

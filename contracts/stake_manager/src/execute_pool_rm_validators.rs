@@ -3,29 +3,33 @@ use std::vec;
 use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
 use cosmos_sdk_proto::cosmos::staking::v1beta1::MsgBeginRedelegate;
 use cosmos_sdk_proto::prost::Message;
-use cosmwasm_std::{Binary, DepsMut, Env, MessageInfo, Response, StdError, Uint128};
+use cosmwasm_std::{ Binary, DepsMut, Env, MessageInfo, Response, StdError, Uint128 };
 use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::interchain_txs::helpers::get_port_id;
 use neutron_sdk::{
-    bindings::{msg::NeutronMsg, query::NeutronQuery},
+    bindings::{ msg::NeutronMsg, query::NeutronQuery },
     interchain_queries::{
-        check_query_type, get_registered_query, query_kv_result, types::QueryType,
+        check_query_type,
+        get_registered_query,
+        query_kv_result,
+        types::QueryType,
         v045::types::Delegations,
     },
     query::min_ibc_fee::query_min_ibc_fee,
-    NeutronError, NeutronResult,
+    NeutronError,
+    NeutronResult,
 };
 
-use crate::contract::{msg_with_sudo_callback, SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS};
+use crate::contract::{ msg_with_sudo_callback, SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS };
 use crate::state::ADDR_QUERY_ID;
-use crate::state::{POOLS, POOL_ICA_MAP};
+use crate::state::{ POOLS, POOL_ICA_MAP };
 
 pub fn execute_rm_pool_validators(
     mut deps: DepsMut<NeutronQuery>,
     env: Env,
     _: MessageInfo,
     pool_addr: String,
-    validator_addrs: Vec<String>,
+    validator_addrs: Vec<String>
 ) -> NeutronResult<Response<NeutronMsg>> {
     let fee = crate::contract::min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
 
@@ -43,9 +47,7 @@ pub fn execute_rm_pool_validators(
     let target_validator = match find_redelegation_target(&delegations, &validator_addrs) {
         Some(target_validator) => target_validator,
         None => {
-            return Err(NeutronError::Std(StdError::generic_err(
-                "find_redelegation_target failed",
-            )));
+            return Err(NeutronError::Std(StdError::generic_err("find_redelegation_target failed")));
         }
     };
 
@@ -72,10 +74,7 @@ pub fn execute_rm_pool_validators(
         buf.reserve(redelegate_msg.encoded_len());
 
         if let Err(e) = redelegate_msg.encode(&mut buf) {
-            return Err(NeutronError::Std(StdError::generic_err(format!(
-                "Encode error: {}",
-                e
-            ))));
+            return Err(NeutronError::Std(StdError::generic_err(format!("Encode error: {}", e))));
         }
 
         let any_msg = ProtobufAny {
@@ -83,36 +82,30 @@ pub fn execute_rm_pool_validators(
             value: Binary::from(buf),
         };
 
-        let cosmos_msg = NeutronMsg::submit_tx(
-            pool_info.connection_id.clone(),
-            interchain_account_id.clone(),
-            vec![any_msg],
-            "".to_string(),
-            DEFAULT_TIMEOUT_SECONDS,
-            fee.clone(),
-        );
-
-        // We use a submessage here because we need the process message reply to save
-        // the outgoing IBC packet identifier for later.
-        let submsg_redelegate = msg_with_sudo_callback(
-            deps.branch(),
-            cosmos_msg,
-            SudoPayload {
-                port_id: get_port_id(
-                    env.contract.address.to_string(),
-                    interchain_account_id.clone(),
-                ),
-                message: "interchain_undelegate".to_string(),
-                tx_type: TxType::RmValidator,
-            },
-        )?;
-        msgs.push(submsg_redelegate);
+        msgs.push(any_msg);
     }
+
+    let cosmos_msg = NeutronMsg::submit_tx(
+        pool_info.connection_id.clone(),
+        interchain_account_id.clone(),
+        msgs,
+        "".to_string(),
+        DEFAULT_TIMEOUT_SECONDS,
+        fee.clone()
+    );
+
+    // We use a submessage here because we need the process message reply to save
+    // the outgoing IBC packet identifier for later.
+    let submsg_redelegate = msg_with_sudo_callback(deps.branch(), cosmos_msg, SudoPayload {
+        port_id: get_port_id(env.contract.address.to_string(), interchain_account_id.clone()),
+        message: "interchain_undelegate".to_string(),
+        tx_type: TxType::RmValidator,
+    })?;
 
     // todo: update state in sudo reply
     // todo: update delegation_query in sudo reply
     // todo: update pool validator list
-    Ok(Response::default().add_submessages(msgs))
+    Ok(Response::default().add_submessage(submsg_redelegate))
 }
 
 fn find_validator_amount(delegations: &Delegations, validator_address: String) -> Option<Uint128> {
@@ -126,7 +119,7 @@ fn find_validator_amount(delegations: &Delegations, validator_address: String) -
 
 fn find_redelegation_target(
     delegations: &Delegations,
-    excluded_validators: &[String],
+    excluded_validators: &[String]
 ) -> Option<String> {
     // Find the validator from delegations that is not in excluded_validators and has the smallest delegate count
     let mut min_delegation: Option<(String, Uint128)> = None;

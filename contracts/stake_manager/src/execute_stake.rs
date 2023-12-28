@@ -32,6 +32,7 @@ pub fn execute_stake(
     }
 
     pool_info.active = pool_info.active.add(Uint128::new(token_amount));
+    pool_info.bond = pool_info.active.add(Uint128::new(token_amount));
 
     let rtoken_amount = token_amount.mul(pool_info.rate.u128()).div(1_000_000);
 

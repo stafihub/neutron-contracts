@@ -53,6 +53,8 @@ pub struct ConfigPoolParams {
     pub validator_addrs: Vec<String>,
     pub era: u128,
     pub rate: Uint128,
+    pub era_seconds: u64,
+    pub offset: u64,
     pub minimal_stake: Uint128,
     pub unstake_times_limit: Uint128,
     pub next_unstake_index: Uint128,
@@ -114,7 +116,7 @@ pub enum ExecuteMsg {
         channel: String,
         pool_addr: String,
     },
-    EraBondActive {
+    EraActive {
         pool_addr: String,
     },
     StakeLSM {

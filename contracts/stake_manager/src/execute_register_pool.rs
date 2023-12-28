@@ -88,6 +88,7 @@ pub fn sudo_open_ack(
         )?;
         let pool_info = PoolInfo {
             need_withdraw: Uint128::zero(),
+            bond: Uint128::zero(),
             unbond: Uint128::zero(),
             active: Uint128::zero(),
             rtoken: Addr::unchecked(""),
@@ -106,6 +107,8 @@ pub fn sudo_open_ack(
             era_update_status: PoolBondState::ActiveReported,
             unbond_commission: Uint128::zero(),
             protocol_fee_receiver: Addr::unchecked(""),
+            era_seconds: 0,
+            offset: 0,
         };
         POOLS.save(deps.storage, parsed_version.address.clone(), &pool_info)?;
         return Ok(Response::default());

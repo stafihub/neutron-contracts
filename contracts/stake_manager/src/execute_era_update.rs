@@ -32,6 +32,28 @@ pub fn execute_era_update(
         return Ok(Response::new());
     }
 
+    if let Some(pool_era_shot) = POOL_ERA_SHOT.may_load(deps.storage, pool_addr.clone())? {
+        if
+            pool_era_shot.failed_tx.is_some() &&
+            pool_era_shot.failed_tx != Some(TxType::EraUpdateIbcSend)
+        {
+            return Ok(Response::new());
+        }
+    } else {
+        POOL_ERA_SHOT.save(
+            deps.storage,
+            pool_addr.clone(),
+            &(EraShot {
+                pool_addr: pool_addr.clone(),
+                era: pool_info.era,
+                bond: Uint128::zero(),
+                unbond: pool_info.unbond,
+                active: pool_info.active,
+                failed_tx: None,
+            })
+        )?;
+    }
+
     // See more info here: https://docs.neutron.org/neutron/feerefunder/overview
     let fee = crate::contract::min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
 
@@ -103,24 +125,6 @@ pub fn execute_era_update(
             need_withdraw
         ).as_str()
     );
-
-    POOL_ERA_SHOT.save(
-        deps.storage,
-        pool_addr.clone(),
-        &(EraShot {
-            pool_addr: pool_addr.clone(),
-            era: pool_info.era,
-            bond: Uint128::zero(), // todo: pool Adds bond parameters
-            unbond: pool_info.unbond,
-            active: pool_info.active,
-            stake_tx_num: 0,
-            unstake_tx_num: 0,
-            claim_tx_num: 0,
-            stake_complete_num: 0,
-            unstake_complete_num: 0,
-            claim_complete_num: 0,
-        })
-    )?;
 
     pool_info.need_withdraw = need_withdraw;
     POOLS.save(deps.storage, pool_addr, &pool_info)?;

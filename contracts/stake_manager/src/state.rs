@@ -3,7 +3,7 @@ use cw_storage_plus::{ Item, Map };
 use schemars::JsonSchema;
 use serde::{ Deserialize, Serialize };
 
-use crate::contract::SudoPayload;
+use crate::contract::{SudoPayload, TxType};
 
 pub const IBC_SUDO_ID_RANGE_START: u64 = 1_000_000_000;
 pub const IBC_SUDO_ID_RANGE_SIZE: u64 = 1_000;
@@ -33,6 +33,7 @@ pub const STATE: Item<State> = Item::new("state");
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct PoolInfo {
     pub need_withdraw: Uint128,
+    pub bond: Uint128,
     pub unbond: Uint128,
     pub active: Uint128,
     pub rtoken: Addr,
@@ -44,6 +45,8 @@ pub struct PoolInfo {
     pub validator_addrs: Vec<String>,
     pub era: u128,
     pub rate: Uint128,
+    pub era_seconds: u64,
+    pub offset: u64,
     pub minimal_stake: Uint128,
     pub unstake_times_limit: Uint128,
     pub next_unstake_index: Uint128,
@@ -62,12 +65,7 @@ pub struct EraShot {
     pub bond: Uint128,
     pub unbond: Uint128,
     pub active: Uint128,
-    pub stake_tx_num: u64,
-    pub unstake_tx_num: u64,
-    pub claim_tx_num: u64,
-    pub stake_complete_num: u64,
-    pub unstake_complete_num: u64,
-    pub claim_complete_num: u64,
+    pub failed_tx: Option<TxType>,
 }
 
 pub const POOL_ERA_SHOT: Map<String, EraShot> = Map::new("pool_era_shot");
