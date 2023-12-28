@@ -1,21 +1,16 @@
 use std::ops::Add;
 
-use cosmwasm_std::{coin, DepsMut, Env, Order, Response, StdResult, Uint128};
+use cosmwasm_std::{coin, DepsMut, Env, Order, Response, StdError, StdResult, Uint128};
+use neutron_sdk::{bindings::{msg::NeutronMsg, query::NeutronQuery}, NeutronError, NeutronResult, query::min_ibc_fee::query_min_ibc_fee, sudo::msg::RequestPacketTimeoutHeight};
 use neutron_sdk::interchain_txs::helpers::get_port_id;
-use neutron_sdk::{
-    bindings::{msg::NeutronMsg, query::NeutronQuery},
-    query::min_ibc_fee::query_min_ibc_fee,
-    sudo::msg::RequestPacketTimeoutHeight,
-    NeutronResult,
-};
 
-use crate::helper::min_ntrn_ibc_fee;
-use crate::state::PoolBondState::{ActiveReported, EraUpdated};
-use crate::state::{POOLS, POOL_ICA_MAP, UNSTAKES_OF_INDEX};
 use crate::{
-    contract::{msg_with_sudo_callback, SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS},
-    state::{EraShot, WithdrawStatus, POOL_ERA_SHOT},
+    contract::{msg_with_sudo_callback, SudoPayload, TxType},
+    state::{EraShot, POOL_ERA_SHOT, WithdrawStatus},
 };
+use crate::helper::min_ntrn_ibc_fee;
+use crate::state::{POOL_ICA_MAP, POOLS, UNSTAKES_OF_INDEX};
+use crate::state::PoolBondState::{ActiveReported, EraUpdated};
 
 pub fn execute_era_update(
     mut deps: DepsMut<NeutronQuery>,
@@ -30,7 +25,7 @@ pub fn execute_era_update(
         deps.as_ref()
             .api
             .debug(format!("WASMDEBUG: execute_era_update skip pool: {:?}", pool_addr).as_str());
-        return Ok(Response::new());
+        return Err(NeutronError::Std(StdError::generic_err("status not allow")));
     }
 
     if let Some(pool_era_shot) = POOL_ERA_SHOT.may_load(deps.storage, pool_addr.clone())? {
@@ -85,7 +80,7 @@ pub fn execute_era_update(
             revision_number: Some(2),
             revision_height: Some(crate::contract::DEFAULT_TIMEOUT_HEIGHT),
         },
-        timeout_timestamp: DEFAULT_TIMEOUT_SECONDS,
+        timeout_timestamp: 0,
         memo: "".to_string(),
         fee: fee.clone(),
     };

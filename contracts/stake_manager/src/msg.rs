@@ -120,7 +120,6 @@ pub enum ExecuteMsg {
         pool_addr: String,
     },
     EraCollectWithdraw {
-        channel: String,
         pool_addr: String,
     },
     EraActive {

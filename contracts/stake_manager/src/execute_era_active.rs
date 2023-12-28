@@ -2,17 +2,17 @@ use core::ops::{Mul, Sub};
 use std::ops::{Add, Div};
 
 use cosmwasm_std::{
-    to_json_binary, DepsMut, Env, QueryRequest, Response, Uint128, WasmMsg, WasmQuery, StdError,
+    DepsMut, Env, QueryRequest, Response, StdError, to_json_binary, Uint128, WasmMsg, WasmQuery,
 };
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
-    NeutronResult, NeutronError,
+    NeutronError, NeutronResult,
 };
 
+use crate::{query::query_delegation_by_addr, state::POOL_ERA_SHOT};
 use crate::state::PoolBondState;
 use crate::state::PoolBondState::WithdrawReported;
 use crate::state::POOLS;
-use crate::{query::query_delegation_by_addr, state::POOL_ERA_SHOT};
 
 pub fn execute_era_active(
     deps: DepsMut<NeutronQuery>,
@@ -56,7 +56,7 @@ pub fn execute_era_active(
     let pool_era_shot = POOL_ERA_SHOT.load(deps.storage, pool_addr.clone())?;
 
     let protocol_fee = if pool_info.active > pool_era_shot.active {
-        let reward = pool_era_shot.active.sub(pool_info.active);
+        let reward = pool_info.active.sub(pool_era_shot.active);
         reward.mul(pool_info.rate).div(Uint128::new(1_000_000))
     } else {
         Uint128::zero()
@@ -74,6 +74,8 @@ pub fn execute_era_active(
         .amount
         .div(token_info.total_supply.add(protocol_fee));
     pool_info.era_update_status = PoolBondState::ActiveReported;
+    pool_info.bond = Uint128::zero();
+    pool_info.unbond = Uint128::zero();
     pool_info.era += 1;
     POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
     POOL_ERA_SHOT.remove(deps.storage, pool_addr);

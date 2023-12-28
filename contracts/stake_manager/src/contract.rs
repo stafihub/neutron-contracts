@@ -1,36 +1,23 @@
 use std::vec;
 
-use cosmwasm_std::{Binary, CosmosMsg, Deps, DepsMut, entry_point, Env, from_json, MessageInfo, Reply, Response, StdError, StdResult, SubMsg, to_json_binary};
+use cosmwasm_std::{
+    entry_point, from_json, to_json_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo,
+    Reply, Response, StdError, StdResult, SubMsg,
+};
 use cw2::set_contract_version;
+use neutron_sdk::sudo::msg::SudoMsg;
 use neutron_sdk::{
     bindings::{
         msg::{MsgIbcTransferResponse, NeutronMsg},
         query::NeutronQuery,
     },
     interchain_queries::get_registered_query,
-    NeutronResult,
     sudo::msg::RequestPacket,
+    NeutronResult,
 };
-use neutron_sdk::sudo::msg::SudoMsg;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    execute_era_bond::sudo_era_bond_withdraw_callback,
-    execute_era_collect_withdraw::{
-        execute_era_collect_withdraw, sudo_era_collect_withdraw_callback,
-    },
-    execute_era_update::sudo_era_update_callback,
-    execute_init_pool::{execute_init_pool, sudo_init_pool_callback},
-};
-use crate::{
-    msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
-    state::{
-        LATEST_BALANCES_QUERY_ID, LATEST_DELEGATIONS_QUERY_ID, QUERY_BALANCES_REPLY_ID_RANGE_START, QUERY_DELEGATIONS_REPLY_ID_RANGE_START,
-        read_reply_payload, read_sudo_payload, save_reply_payload,
-        save_sudo_payload,
-    },
-};
 use crate::execute_config_pool::execute_config_pool;
 use crate::execute_era_active::execute_era_active;
 use crate::execute_era_bond::execute_era_bond;
@@ -51,8 +38,24 @@ use crate::query_callback::{
     write_balance_query_id_to_reply_id, write_delegation_query_id_to_reply_id,
 };
 use crate::state::{
-    IBC_SUDO_ID_RANGE_END, IBC_SUDO_ID_RANGE_START, POOL_ERA_SHOT, QUERY_BALANCES_REPLY_ID_END,
-    QUERY_DELEGATIONS_REPLY_ID_END, State, STATE,
+    State, IBC_SUDO_ID_RANGE_END, IBC_SUDO_ID_RANGE_START, POOL_ERA_SHOT,
+    QUERY_BALANCES_REPLY_ID_END, QUERY_DELEGATIONS_REPLY_ID_END, STATE,
+};
+use crate::{
+    execute_era_bond::sudo_era_bond_withdraw_callback,
+    execute_era_collect_withdraw::{
+        execute_era_collect_withdraw, sudo_era_collect_withdraw_callback,
+    },
+    execute_era_update::sudo_era_update_callback,
+    execute_init_pool::{execute_init_pool, sudo_init_pool_callback},
+};
+use crate::{
+    msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
+    state::{
+        read_reply_payload, read_sudo_payload, save_reply_payload, save_sudo_payload,
+        LATEST_BALANCES_QUERY_ID, LATEST_DELEGATIONS_QUERY_ID, QUERY_BALANCES_REPLY_ID_RANGE_START,
+        QUERY_DELEGATIONS_REPLY_ID_RANGE_START,
+    },
 };
 
 // Default timeout for IbcTransfer is 10000000 blocks
@@ -205,8 +208,8 @@ pub fn execute(
             execute_era_update(deps, env, channel, pool_addr)
         }
         ExecuteMsg::EraBond { pool_addr } => execute_era_bond(deps, env, pool_addr),
-        ExecuteMsg::EraCollectWithdraw { channel, pool_addr } => {
-            execute_era_collect_withdraw(deps, env, channel, pool_addr)
+        ExecuteMsg::EraCollectWithdraw { pool_addr } => {
+            execute_era_collect_withdraw(deps, env, pool_addr)
         }
         ExecuteMsg::EraActive { pool_addr } => execute_era_active(deps, env, pool_addr),
         ExecuteMsg::StakeLSM {} => execute_stake_lsm(deps, env, info),
@@ -298,11 +301,7 @@ pub fn msg_with_sudo_callback<C: Into<CosmosMsg<T>>, T>(
 // The method is used to extract sequence id and channel from SubmitTxResponse to process sudo payload defined in msg_with_sudo_callback later in Sudo handler.
 // Such flow msg_with_sudo_callback() -> reply() -> prepare_sudo_payload() -> sudo() allows you "attach" some payload to your Transfer message
 // and process this payload when an acknowledgement for the SubmitTx message is received in Sudo handler
-fn prepare_sudo_payload(
-    mut deps: DepsMut,
-    _env: Env,
-    msg: Reply,
-) -> StdResult<Response> {
+fn prepare_sudo_payload(mut deps: DepsMut, _env: Env, msg: Reply) -> StdResult<Response> {
     let payload = read_reply_payload(deps.storage, msg.id)?;
     let resp: MsgIbcTransferResponse = from_json(
         msg.result
@@ -349,18 +348,18 @@ fn sudo_timeout(deps: DepsMut, req: RequestPacket) -> StdResult<Response> {
         )
         .as_str(),
     );
-    
+
     let seq_id = req
         .sequence
         .ok_or_else(|| StdError::generic_err("sequence not found"))?;
     let channel_id = req
         .source_channel
         .ok_or_else(|| StdError::generic_err("channel_id not found"))?;
-    
+
     if let Ok(payload) = read_sudo_payload(deps.storage, channel_id, seq_id) {
         return sudo_err_callback(deps, payload);
     }
-    
+
     Ok(Response::new())
 }
 

@@ -40,7 +40,6 @@ pub fn execute_era_bond(
     pool_addr: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
-    let mut msgs = vec![];
     let pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
     // check era state
     if pool_info.era_update_status != EraUpdated {
@@ -50,140 +49,194 @@ pub fn execute_era_bond(
         return Err(NeutronError::Std(StdError::generic_err("status not allow")));
     }
 
+    let interchain_account_id = POOL_ICA_MAP.load(deps.storage, pool_addr.clone())?;
+
+    let mut msgs = vec![];
     // Check whether the delegator-validator needs to manually withdraw
     let mut op_validators = vec![];
 
-    let interchain_account_id = POOL_ICA_MAP.load(deps.storage, pool_addr.clone())?;
-    if pool_info.unbond > pool_info.active {
-        let unbond_amount = pool_info.unbond - pool_info.active;
+    match (
+        pool_info.unbond > pool_info.bond,
+        pool_info.bond > pool_info.unbond,
+    ) {
+        (true, _) => {
+            let unbond_amount = pool_info.unbond - pool_info.bond;
 
-        let delegations = query_delegation_by_addr(deps.as_ref(), pool_addr.clone())?;
-
-        let unbond_infos = allocate_unbond_amount(&delegations.delegations, unbond_amount);
-        for info in unbond_infos {
-            println!(
-                "Validator: {}, Delegation: {}, Unbond: {}",
-                info.validator, info.delegation_amount, info.unbond_amount
+            deps.as_ref().api.debug(
+                format!(
+                    "WASMDEBUG: execute_era_bond unbond_amount: {:?}",
+                    unbond_amount
+                )
+                .as_str(),
             );
 
-            op_validators.push(info.validator.clone());
+            let delegations = query_delegation_by_addr(deps.as_ref(), pool_addr.clone())?;
 
-            // add submessage to unstake
-            let delegate_msg = MsgUndelegate {
-                delegator_address: pool_addr.clone(),
-                validator_address: info.validator.clone(),
-                amount: Some(Coin {
-                    denom: pool_info.ibc_denom.clone(),
-                    amount: info.unbond_amount.to_string(),
-                }),
-            };
-            let mut buf = Vec::new();
-            buf.reserve(delegate_msg.encoded_len());
+            let unbond_infos = allocate_unbond_amount(&delegations.delegations, unbond_amount);
+            for info in unbond_infos {
+                deps.as_ref().api.debug(
+                    format!(
+                        "Validator: {}, Delegation: {}, Unbond: {}",
+                        info.validator, info.delegation_amount, info.unbond_amount
+                    )
+                    .as_str(),
+                );
 
-            if let Err(e) = delegate_msg.encode(&mut buf) {
-                return Err(NeutronError::Std(StdError::generic_err(format!(
-                    "Encode error: {}",
-                    e
-                ))));
+                op_validators.push(info.validator.clone());
+
+                // add submessage to unstake
+                let delegate_msg = MsgUndelegate {
+                    delegator_address: pool_addr.clone(),
+                    validator_address: info.validator.clone(),
+                    amount: Some(Coin {
+                        denom: pool_info.remote_denom.clone(),
+                        amount: info.unbond_amount.to_string(),
+                    }),
+                };
+                let mut buf = Vec::new();
+                buf.reserve(delegate_msg.encoded_len());
+
+                if let Err(e) = delegate_msg.encode(&mut buf) {
+                    return Err(NeutronError::Std(StdError::generic_err(format!(
+                        "Encode error: {}",
+                        e
+                    ))));
+                }
+
+                let any_msg = ProtobufAny {
+                    type_url: "/cosmos.staking.v1beta1.MsgUndelegate".to_string(),
+                    value: Binary::from(buf),
+                };
+
+                msgs.push(any_msg);
+            }
+        }
+        (_, true) => {
+            let stake_amount = pool_info.bond - pool_info.unbond;
+            let validator_count = pool_info.validator_addrs.len() as u128;
+
+            deps.as_ref().api.debug(
+                format!(
+                    "WASMDEBUG: execute_era_bond stake_amount: {}, validator_count is {}",
+                    stake_amount, validator_count
+                )
+                .as_str(),
+            );
+
+            if validator_count == 0 {
+                return Err(NeutronError::Std(StdError::generic_err(
+                    "validator_count is zero",
+                )));
             }
 
-            let any_msg = ProtobufAny {
-                type_url: "/cosmos.staking.v1beta1.MsgUndelegate".to_string(),
-                value: Binary::from(buf),
-            };
+            let amount_per_validator = stake_amount.div(Uint128::from(validator_count));
+            let remainder =
+                stake_amount.sub(amount_per_validator.mul(Uint128::new(validator_count)));
 
-            msgs.push(any_msg);
-        }
-    } else {
-        let stake_amount = pool_info.active;
+            deps.as_ref().api.debug(
+                format!(
+                    "WASMDEBUG: execute_era_bond amount_per_validator: {}, remainder is {}",
+                    amount_per_validator, remainder
+                )
+                .as_str(),
+            );
 
-        let validator_count = pool_info.validator_addrs.len() as u128;
+            for (index, validator_addr) in pool_info.validator_addrs.iter().enumerate() {
+                let mut amount_for_this_validator = amount_per_validator;
 
-        if validator_count == 0 {
-            return Err(NeutronError::Std(StdError::generic_err(
-                "validator_count is zero",
-            )));
-        }
+                // Add the remainder to the first validator
+                if index == 0 {
+                    amount_for_this_validator += remainder;
+                }
 
-        let amount_per_validator = stake_amount.div(Uint128::from(validator_count));
-        let remainder = stake_amount.sub(amount_per_validator.mul(amount_per_validator));
+                deps.as_ref().api.debug(
+                    format!(
+                        "Validator: {}, Bond: {}",
+                        validator_addr, amount_for_this_validator
+                    )
+                    .as_str(),
+                );
 
-        for (index, validator_addr) in pool_info.validator_addrs.iter().enumerate() {
-            let mut amount_for_this_validator = amount_per_validator;
+                op_validators.push(validator_addr.clone());
 
-            // Add the remainder to the first validator
-            if index == 0 {
-                amount_for_this_validator += remainder;
+                // add submessage to stake
+                let delegate_msg = MsgDelegate {
+                    delegator_address: pool_addr.clone(),
+                    validator_address: validator_addr.clone(),
+                    amount: Some(Coin {
+                        denom: pool_info.remote_denom.clone(),
+                        amount: amount_for_this_validator.to_string(),
+                    }),
+                };
+
+                // Serialize the Delegate message.
+                let mut buf = Vec::new();
+                buf.reserve(delegate_msg.encoded_len());
+
+                if let Err(e) = delegate_msg.encode(&mut buf) {
+                    return Err(NeutronError::Std(StdError::generic_err(format!(
+                        "Encode error: {}",
+                        e
+                    ))));
+                }
+
+                // Put the serialized Delegate message to a types.Any protobuf message.
+                let any_msg = ProtobufAny {
+                    type_url: "/cosmos.staking.v1beta1.MsgDelegate".to_string(),
+                    value: Binary::from(buf),
+                };
+
+                msgs.push(any_msg);
             }
-
-            op_validators.push(validator_addr.clone());
-
-            // add submessage to stake
-            let delegate_msg = MsgDelegate {
-                delegator_address: pool_addr.clone(),
-                validator_address: validator_addr.clone(),
-                amount: Some(Coin {
-                    denom: pool_info.ibc_denom.clone(),
-                    amount: amount_for_this_validator.to_string(),
-                }),
-            };
-
-            // Serialize the Delegate message.
-            let mut buf = Vec::new();
-            buf.reserve(delegate_msg.encoded_len());
-
-            if let Err(e) = delegate_msg.encode(&mut buf) {
-                return Err(NeutronError::Std(StdError::generic_err(format!(
-                    "Encode error: {}",
-                    e
-                ))));
-            }
-
-            // Put the serialized Delegate message to a types.Any protobuf message.
-            let any_msg = ProtobufAny {
-                type_url: "/cosmos.staking.v1beta1.MsgDelegate".to_string(),
-                value: Binary::from(buf),
-            };
-
-            msgs.push(any_msg);
         }
+        _ => {}
     }
 
-    // Find the difference between pool_info.validator_addrs and op_validators
-    let pool_validators: HashSet<_> = pool_info.validator_addrs.into_iter().collect();
-    let op_validators_set: HashSet<_> = op_validators.into_iter().collect();
+    if op_validators.len() != pool_info.validator_addrs.len() {
+        deps.as_ref().api.debug(
+            format!(
+                "WASMDEBUG: execute_era_bond op_validators: {:?}",
+                op_validators
+            )
+            .as_str(),
+        );
 
-    // Find the difference
-    let difference: HashSet<_> = pool_validators.difference(&op_validators_set).collect();
+        // Find the difference between pool_info.validator_addrs and op_validators
+        let pool_validators: HashSet<_> = pool_info.validator_addrs.into_iter().collect();
+        let op_validators_set: HashSet<_> = op_validators.into_iter().collect();
 
-    // Convert the difference back to Vec
-    let difference_vec: Vec<_> = difference.into_iter().collect();
-    for validator_addr in difference_vec {
-        // Create a MsgWithdrawDelegatorReward message
-        let withdraw_msg = MsgWithdrawDelegatorReward {
-            delegator_address: pool_addr.clone(),
-            validator_address: validator_addr.clone(),
-        };
+        // Find the difference
+        let difference: HashSet<_> = pool_validators.difference(&op_validators_set).collect();
 
-        // Serialize the MsgWithdrawDelegatorReward message
-        let mut buf = Vec::new();
-        buf.reserve(withdraw_msg.encoded_len());
+        // Convert the difference back to Vec
+        let difference_vec: Vec<_> = difference.into_iter().collect();
+        for validator_addr in difference_vec {
+            // Create a MsgWithdrawDelegatorReward message
+            let withdraw_msg = MsgWithdrawDelegatorReward {
+                delegator_address: pool_addr.clone(),
+                validator_address: validator_addr.clone(),
+            };
 
-        if let Err(e) = withdraw_msg.encode(&mut buf) {
-            return Err(NeutronError::Std(StdError::generic_err(format!(
-                "Encode error: {}",
-                e
-            ))));
+            // Serialize the MsgWithdrawDelegatorReward message
+            let mut buf = Vec::new();
+            buf.reserve(withdraw_msg.encoded_len());
+
+            if let Err(e) = withdraw_msg.encode(&mut buf) {
+                return Err(NeutronError::Std(StdError::generic_err(format!(
+                    "Encode error: {}",
+                    e
+                ))));
+            }
+
+            // Put the serialized MsgWithdrawDelegatorReward message to a types.Any protobuf message
+            let any_msg = ProtobufAny {
+                type_url: "/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward".to_string(),
+                value: Binary::from(buf),
+            };
+
+            // Form the neutron SubmitTx message containing the binary MsgWithdrawDelegatorReward message
+            msgs.push(any_msg);
         }
-
-        // Put the serialized MsgWithdrawDelegatorReward message to a types.Any protobuf message
-        let any_msg = ProtobufAny {
-            type_url: "/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward".to_string(),
-            value: Binary::from(buf),
-        };
-
-        // Form the neutron SubmitTx message containing the binary MsgWithdrawDelegatorReward message
-        msgs.push(any_msg);
     }
 
     let cosmos_msg = NeutronMsg::submit_tx(
