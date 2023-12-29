@@ -2,17 +2,17 @@ use core::ops::{Mul, Sub};
 use std::ops::{Add, Div};
 
 use cosmwasm_std::{
-    DepsMut, Env, QueryRequest, Response, StdError, to_json_binary, Uint128, WasmMsg, WasmQuery,
+    to_json_binary, DepsMut, Env, QueryRequest, Response, StdError, Uint128, WasmMsg, WasmQuery,
 };
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     NeutronError, NeutronResult,
 };
 
-use crate::{query::query_delegation_by_addr, state::POOL_ERA_SHOT};
 use crate::state::PoolBondState;
 use crate::state::PoolBondState::WithdrawReported;
 use crate::state::POOLS;
+use crate::{query::query_delegation_by_addr, state::POOL_ERA_SHOT};
 
 pub fn execute_era_active(
     deps: DepsMut<NeutronQuery>,
@@ -29,19 +29,42 @@ pub fn execute_era_active(
 
     let pool_era_shot = POOL_ERA_SHOT.load(deps.storage, pool_addr.clone())?;
 
-    let delegations = query_delegation_by_addr(deps.as_ref(), pool_addr.clone())?;
+    deps.as_ref().api.debug(
+        format!(
+            "WASMDEBUG: execute_era_active pool_era_shot: {:?}",
+            pool_era_shot
+        )
+        .as_str(),
+    );
 
-    if delegations.last_submitted_local_height <=  pool_era_shot.bond_height {
-        return Err(NeutronError::Std(StdError::generic_err("Delegation submission height is less than or equal to the bond height of the pool era, which is not allowed.")));
-    }
+    let delegations_result = query_delegation_by_addr(deps.as_ref(), pool_addr.clone());
 
     let mut total_amount = cosmwasm_std::Coin {
         denom: pool_info.remote_denom.clone(),
         amount: Uint128::zero(),
     };
 
-    for delegation in delegations.delegations {
-        total_amount.amount = total_amount.amount.add(delegation.amount.amount);
+    match delegations_result {
+        Ok(delegations_resp) => {
+            if delegations_resp.last_submitted_local_height <= pool_era_shot.bond_height {
+                return Err(NeutronError::Std(StdError::generic_err("Delegation submission height is less than or equal to the bond height of the pool era, which is not allowed.")));
+            }
+            for delegation in delegations_resp.delegations {
+                total_amount.amount = total_amount.amount.add(delegation.amount.amount);
+            }
+        }
+        Err(_) => {
+            // return Err(NeutronError::Std(StdError::generic_err(
+            //     "balance not exist",
+            // )));
+            deps.as_ref().api.debug(
+                format!(
+                    "WASMDEBUG: execute_era_active delegations_result: {:?}",
+                    delegations_result
+                )
+                .as_str(),
+            );
+        }
     }
 
     let token_info_msg = rtoken::msg::QueryMsg::TokenInfo {};
@@ -52,8 +75,6 @@ pub fn execute_era_active(
         }))?;
 
     // calculate protocol fee
-    let pool_era_shot = POOL_ERA_SHOT.load(deps.storage, pool_addr.clone())?;
-
     let protocol_fee = if pool_info.active > pool_era_shot.active {
         let reward = pool_info.active.sub(pool_era_shot.active);
         reward.mul(pool_info.rate).div(Uint128::new(1_000_000))
