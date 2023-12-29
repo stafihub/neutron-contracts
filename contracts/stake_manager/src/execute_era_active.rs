@@ -55,7 +55,7 @@ pub fn execute_era_active(
         }
         Err(_) => {
             // return Err(NeutronError::Std(StdError::generic_err(
-            //     "balance not exist",
+            //     "delegations not exist",
             // )));
             deps.as_ref().api.debug(
                 format!(

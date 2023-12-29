@@ -71,14 +71,11 @@ pub fn execute_era_collect_withdraw(
     }
 
     // leave gas
-    if withdraw_amount < Uint128::new(1000000) {
+    if withdraw_amount.is_zero() {
         pool_info.era_update_status = WithdrawReported;
         POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
         return Ok(Response::default());
     }
-    // Leave 0.4 atom for gas
-    // magic number can change it to a configuration item later
-    withdraw_amount = withdraw_amount.sub(Uint128::new(400000));
 
     deps.as_ref().api.debug(
         format!(
