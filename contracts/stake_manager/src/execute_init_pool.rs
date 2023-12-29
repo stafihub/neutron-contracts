@@ -13,13 +13,13 @@ use neutron_sdk::{
     NeutronError, NeutronResult,
 };
 
-use crate::contract::{
+use crate::{contract::{
     msg_with_sudo_callback, SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS, DEFAULT_UPDATE_PERIOD,
-};
+}, state::ADDR_DELEGATIONS_QUERY_ID};
 use crate::helper::{get_ica, min_ntrn_ibc_fee};
 use crate::msg::InitPoolParams;
 use crate::state::POOLS;
-use crate::state::{ADDR_QUERY_ID, LATEST_BALANCES_QUERY_ID, LATEST_DELEGATIONS_QUERY_ID};
+use crate::state::{ADDR_BALANCES_QUERY_ID, LATEST_BALANCES_QUERY_ID, LATEST_DELEGATIONS_QUERY_ID};
 
 // add execute to config the validator addrs and withdraw address on reply
 pub fn execute_init_pool(
@@ -91,6 +91,8 @@ pub fn execute_init_pool(
     let register_delegation_query_submsg =
         SubMsg::reply_on_success(register_delegation_query_msg, pool_delegation_query_id);
 
+    ADDR_DELEGATIONS_QUERY_ID.save(deps.storage, delegator.clone(), &pool_delegation_query_id)?;
+
     let register_balance_pool_msg = new_register_balance_query_msg(
         connection_id.clone(),
         delegator.clone(),
@@ -102,7 +104,7 @@ pub fn execute_init_pool(
     let register_balance_pool_submsg =
         SubMsg::reply_on_success(register_balance_pool_msg, pool_query_id);
 
-    ADDR_QUERY_ID.save(deps.storage, delegator.clone(), &pool_query_id)?;
+    ADDR_BALANCES_QUERY_ID.save(deps.storage, delegator.clone(), &pool_query_id)?;
 
     let register_balance_withdraw_msg = new_register_balance_query_msg(
         connection_id.clone(),
@@ -115,7 +117,7 @@ pub fn execute_init_pool(
     let register_balance_withdraw_submsg =
         SubMsg::reply_on_success(register_balance_withdraw_msg, withdraw_query_id);
 
-    ADDR_QUERY_ID.save(
+    ADDR_BALANCES_QUERY_ID.save(
         deps.storage,
         pool_info.withdraw_addr.clone(),
         &withdraw_query_id,

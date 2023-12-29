@@ -110,9 +110,9 @@ pub const ADDR_ICAID_MAP: Map<String, String> = Map::new("pool_ica_map");
 pub const CONNECTION_POOL_MAP: Map<String, Vec<String>> = Map::new("connection_pools");
 
 // key: ica address value: query id
-pub const ADDR_QUERY_ID: Map<String, u64> = Map::new("addr_query_id");
+pub const ADDR_BALANCES_QUERY_ID: Map<String, u64> = Map::new("addr_balances_query_id");
 
-pub const QUERY_ID_ADDR: Map<u64, String> = Map::new("query_id_addr");
+pub const ADDR_DELEGATIONS_QUERY_ID: Map<String, u64> = Map::new("addr_delegations_query_id");
 
 pub const LATEST_BALANCES_QUERY_ID: Item<u64> = Item::new("latest_balances_query_id");
 

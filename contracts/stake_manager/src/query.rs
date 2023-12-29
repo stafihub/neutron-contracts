@@ -1,6 +1,6 @@
 use std::vec;
 
-use crate::helper::get_ica;
+use crate::{helper::get_ica, state::ADDR_DELEGATIONS_QUERY_ID};
 use cosmwasm_std::{to_json_binary, Addr, Binary, Deps, Env};
 use neutron_sdk::{
     bindings::query::{NeutronQuery, QueryInterchainAccountAddressResponse},
@@ -16,7 +16,7 @@ use neutron_sdk::{
     interchain_txs::helpers::get_port_id,
 };
 
-use crate::state::{read_errors_from_queue, ACKNOWLEDGEMENT_RESULTS, ADDR_QUERY_ID};
+use crate::state::{read_errors_from_queue, ACKNOWLEDGEMENT_RESULTS, ADDR_BALANCES_QUERY_ID};
 use crate::state::{OWN_QUERY_ID_TO_ICQ_ID, POOLS, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX};
 
 pub fn query_user_unstake(
@@ -43,7 +43,7 @@ pub fn query_balance_by_addr(
     deps: Deps<NeutronQuery>,
     addr: String,
 ) -> NeutronResult<BalanceResponse> {
-    let contract_query_id = ADDR_QUERY_ID.load(deps.storage, addr)?;
+    let contract_query_id = ADDR_BALANCES_QUERY_ID.load(deps.storage, addr)?;
     let registered_query_id = OWN_QUERY_ID_TO_ICQ_ID.load(deps.storage, contract_query_id)?;
     // get info about the query
     let registered_query = get_registered_query(deps, registered_query_id)?;
@@ -73,7 +73,7 @@ pub fn query_delegation_by_addr(
     deps: Deps<NeutronQuery>,
     addr: String,
 ) -> NeutronResult<DelegatorDelegationsResponse> {
-    let contract_query_id = ADDR_QUERY_ID.load(deps.storage, addr)?;
+    let contract_query_id = ADDR_DELEGATIONS_QUERY_ID.load(deps.storage, addr)?;
     let registered_query_id = OWN_QUERY_ID_TO_ICQ_ID.load(deps.storage, contract_query_id)?;
     // get info about the query
     let registered_query = get_registered_query(deps, registered_query_id)?;

@@ -20,10 +20,10 @@ use neutron_sdk::{
 use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::interchain_txs::helpers::get_port_id;
 
-use crate::contract::{ DEFAULT_TIMEOUT_SECONDS, msg_with_sudo_callback, SudoPayload, TxType };
+use crate::{contract::{ DEFAULT_TIMEOUT_SECONDS, msg_with_sudo_callback, SudoPayload, TxType }, state::ADDR_DELEGATIONS_QUERY_ID};
 use crate::helper::min_ntrn_ibc_fee;
 use crate::state::{ ADDR_ICAID_MAP, POOLS };
-use crate::state::ADDR_QUERY_ID;
+use crate::state::ADDR_BALANCES_QUERY_ID;
 
 pub fn execute_rm_pool_validators(
     mut deps: DepsMut<NeutronQuery>,
@@ -35,7 +35,7 @@ pub fn execute_rm_pool_validators(
     let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
 
     // redelegate
-    let registered_query_id = ADDR_QUERY_ID.load(deps.storage, pool_addr.clone())?;
+    let registered_query_id = ADDR_DELEGATIONS_QUERY_ID.load(deps.storage, pool_addr.clone())?;
     let pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
     let interchain_account_id = ADDR_ICAID_MAP.load(deps.storage, pool_addr.clone())?;
     // get info about the query
