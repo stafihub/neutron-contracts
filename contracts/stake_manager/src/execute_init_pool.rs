@@ -46,17 +46,19 @@ pub fn execute_init_pool(
 
     let mut pool_info = POOLS.load(deps.as_ref().storage, delegator.clone())?;
 
-    deps.as_ref()
-        .api
-        .debug(format!("WASMDEBUG: execute_init_pool POOLS.load: {:?}", pool_info).as_str());
-
     pool_info.unbond = param.unbond;
     pool_info.active = param.active;
     pool_info.era = param.era;
     pool_info.rate = param.rate;
+    pool_info.ibc_denom = param.ibc_denom;
+    pool_info.remote_denom = param.remote_denom;
     pool_info.connection_id = connection_id.clone();
     pool_info.validator_addrs = param.validator_addrs.clone();
-    pool_info.withdraw_addr = delegator.clone();
+
+
+    deps.as_ref()
+        .api
+        .debug(format!("WASMDEBUG: execute_init_pool POOLS.load: {:?}", pool_info).as_str());
 
     POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
 
@@ -185,13 +187,4 @@ pub fn execute_init_pool(
         register_balance_withdraw_submsg,
         submsg_set_withdraw,
     ]))
-}
-
-pub fn sudo_init_pool_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
-    let delegator = payload.pool_addr;
-    let withdraw_addr = payload.message;
-    let mut pool_info = POOLS.load(deps.storage, delegator.clone())?;
-    pool_info.withdraw_addr = withdraw_addr;
-    POOLS.save(deps.storage, delegator, &pool_info)?;
-    Ok(Response::new())
 }

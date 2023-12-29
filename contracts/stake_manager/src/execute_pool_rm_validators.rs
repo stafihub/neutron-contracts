@@ -22,7 +22,7 @@ use neutron_sdk::interchain_txs::helpers::get_port_id;
 
 use crate::contract::{ DEFAULT_TIMEOUT_SECONDS, msg_with_sudo_callback, SudoPayload, TxType };
 use crate::helper::min_ntrn_ibc_fee;
-use crate::state::{ POOL_ICA_MAP, POOLS };
+use crate::state::{ ADDR_ICAID_MAP, POOLS };
 use crate::state::ADDR_QUERY_ID;
 
 pub fn execute_rm_pool_validators(
@@ -37,7 +37,7 @@ pub fn execute_rm_pool_validators(
     // redelegate
     let registered_query_id = ADDR_QUERY_ID.load(deps.storage, pool_addr.clone())?;
     let pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
-    let interchain_account_id = POOL_ICA_MAP.load(deps.storage, pool_addr.clone())?;
+    let interchain_account_id = ADDR_ICAID_MAP.load(deps.storage, pool_addr.clone())?;
     // get info about the query
     let registered_query = get_registered_query(deps.as_ref(), registered_query_id)?;
     // check that query type is KV

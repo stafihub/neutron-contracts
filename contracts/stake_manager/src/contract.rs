@@ -18,7 +18,6 @@ use neutron_sdk::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::execute_config_pool::execute_config_pool;
 use crate::execute_era_active::execute_era_active;
 use crate::execute_era_bond::execute_era_bond;
 use crate::execute_era_update::execute_era_update;
@@ -41,13 +40,14 @@ use crate::state::{
     State, IBC_SUDO_ID_RANGE_END, IBC_SUDO_ID_RANGE_START, POOL_ERA_SHOT,
     QUERY_BALANCES_REPLY_ID_END, QUERY_DELEGATIONS_REPLY_ID_END, STATE,
 };
+use crate::{execute_config_pool::execute_config_pool, query::query_balance_by_addr};
 use crate::{
     execute_era_bond::sudo_era_bond_withdraw_callback,
     execute_era_collect_withdraw::{
         execute_era_collect_withdraw, sudo_era_collect_withdraw_callback,
     },
     execute_era_update::sudo_era_update_callback,
-    execute_init_pool::{execute_init_pool, sudo_init_pool_callback},
+    execute_init_pool::execute_init_pool,
 };
 use crate::{
     msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
@@ -126,7 +126,9 @@ pub fn query(deps: Deps<NeutronQuery>, env: Env, msg: QueryMsg) -> NeutronResult
         QueryMsg::GetRegisteredQuery { query_id } => {
             Ok(to_json_binary(&get_registered_query(deps, query_id)?)?)
         }
-        QueryMsg::Balance { query_id } => query_balance(deps, env, query_id),
+        QueryMsg::Balance { ica_addr } => {
+            Ok(to_json_binary(&query_balance_by_addr(deps, ica_addr)?)?)
+        }
         QueryMsg::PoolInfo { pool_addr } => query_pool_info(deps, env, pool_addr),
         QueryMsg::InterchainAccountAddress {
             interchain_account_id,
@@ -211,7 +213,7 @@ pub fn execute(
         ExecuteMsg::EraCollectWithdraw { pool_addr } => {
             execute_era_collect_withdraw(deps, env, pool_addr)
         }
-        ExecuteMsg::EraActive { pool_addr } => execute_era_active(deps, env, pool_addr),
+        ExecuteMsg::EraActive { pool_addr } => execute_era_active(deps, pool_addr),
         ExecuteMsg::StakeLSM {} => execute_stake_lsm(deps, env, info),
     }
 }
@@ -270,7 +272,6 @@ pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> StdResult<Response> {
 
 fn sudo_callback(deps: DepsMut, env: Env, payload: SudoPayload) -> StdResult<Response> {
     match payload.tx_type {
-        TxType::SetWithdrawAddr => sudo_init_pool_callback(deps, payload),
         TxType::UserWithdraw => sudo_withdraw_callback(deps, payload),
         TxType::EraUpdateIbcSend => sudo_era_update_callback(deps, payload),
         TxType::EraUpdateWithdrawSend => sudo_era_collect_withdraw_callback(deps, payload),

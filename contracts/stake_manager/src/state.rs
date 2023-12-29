@@ -104,7 +104,7 @@ pub const INTERCHAIN_ACCOUNTS: Map<String, Option<(String, String)>> =
     Map::new("interchain_accounts");
 
 //  key: pool_addr value: interchain_account_id
-pub const POOL_ICA_MAP: Map<String, String> = Map::new("pool_ica_map");
+pub const ADDR_ICAID_MAP: Map<String, String> = Map::new("pool_ica_map");
 
 // key: connection_id value:pool_addr list
 pub const CONNECTION_POOL_MAP: Map<String, Vec<String>> = Map::new("connection_pools");

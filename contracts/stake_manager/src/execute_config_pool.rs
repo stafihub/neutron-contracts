@@ -17,8 +17,6 @@ pub fn execute_config_pool(
         .api
         .debug(format!("WASMDEBUG: execute_config_pool POOLS.load: {:?}", pool_info).as_str());
 
-    pool_info.ibc_denom = param.ibc_denom;
-    pool_info.remote_denom = param.remote_denom;
     pool_info.minimal_stake = param.minimal_stake;
     pool_info.rtoken = Addr::unchecked(param.rtoken);
     pool_info.next_unstake_index = param.next_unstake_index;

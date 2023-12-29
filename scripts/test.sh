@@ -99,9 +99,9 @@ if [[ "$code" -ne 0 ]]; then
     echo "Failed to register interchain account: $(echo "$tx_result" | jq '.raw_log')" && exit 1
 fi
 
-echo "Waiting 5 seconds for interchain account (sometimes it takes a lot of time)…"
+echo "Waiting 10 seconds for interchain account (sometimes it takes a lot of time)…"
 # shellcheck disable=SC2034
-for i in $(seq 5); do
+for i in $(seq 10); do
     sleep 1
     echo -n .
 done
@@ -110,6 +110,7 @@ echo " done"
 query='{"interchain_account_address_from_contract":{"interchain_account_id":"test1"}}'
 query_b64_urlenc="$(echo -n "$query" | base64 | tr -d '\n' | jq -sRr '@uri')"
 url="http://127.0.0.1:1317/wasm/contract/$contract_address/smart/$query_b64_urlenc?encoding=base64"
+echo "interchain_account_address_from_contract query url is: $url"
 ica_address=$(curl -s "$url" | jq -r '.result.smart' | base64 -d | jq -r '.[0]')
 echo "ICA address: $ica_address"
 
@@ -140,13 +141,20 @@ rtoken_contract_address=$(neutrond tx wasm instantiate "$code_id" "$instantiate_
     wait_tx | jq -r '.logs[0].events[] | select(.type == "instantiate").attributes[] | select(.key == "_contract_address").value')
 echo "Rtoken Contract address: $rtoken_contract_address"
 
+query="{\"pool_info\":{\"pool_addr\":\"$ica_address\"}}"
+query_b64_urlenc="$(echo -n "$query" | base64 | tr -d '\n' | jq -sRr '@uri')"
+url="http://127.0.0.1:1317/wasm/contract/$contract_address/smart/$query_b64_urlenc?encoding=base64"
+pool_info=$(curl -s "$url" | jq -r '.result.smart' | base64 -d | jq)
+echo "pool_info is: $pool_info"
+
 msg=$(printf '{
   "init_pool": {
     "interchain_account_id": "test1",
     "unbond": "0",
     "active": "0",
     "bond": "0",
-    "withdraw_addr": "cosmos10h9stc5v6ntgeygf5xf945njqq5h32r53uquvw",
+    "ibc_denom": "ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2",
+    "remote_denom": "uatom",
     "validator_addrs": ["cosmosvaloper18hl5c9xn5dze2g50uaw0l2mr02ew57zk0auktn"],
     "era": 1,
     "rate": "1000000"
@@ -179,8 +187,6 @@ msg=$(printf '{
     "pool_addr": "%s",
     "rtoken": "%s",
     "protocol_fee_receiver": "%s",
-    "ibc_denom": "ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2",
-    "remote_denom": "uatom",
     "minimal_stake": "1000",
     "unstake_times_limit": 10,
     "next_unstake_index": 1,
@@ -408,6 +414,12 @@ gaiad query staking delegations "$ica_address" | jq
 
 gaiad query bank balances "$ica_address" | jq
 
+query="{\"pool_info\":{\"pool_addr\":\"$ica_address\"}}"
+query_b64_urlenc="$(echo -n "$query" | base64 | tr -d '\n' | jq -sRr '@uri')"
+url="http://127.0.0.1:1317/wasm/contract/$contract_address/smart/$query_b64_urlenc?encoding=base64"
+pool_info=$(curl -s "$url" | jq -r '.result.smart' | base64 -d | jq)
+echo "pool_info is: $pool_info"
+
 era_collect_withdraw_msg=$(printf '{
   "era_collect_withdraw": {
     "pool_addr": "%s"
@@ -434,3 +446,34 @@ done
 echo " done"
 
 gaiad query bank balances "$ica_address" | jq
+
+era_active_msg=$(printf '{
+  "era_active": {
+    "pool_addr": "%s"
+  }
+}' "$ica_address")
+
+tx_result="$(neutrond tx wasm execute "$contract_address" "$era_active_msg" \
+    --amount 2000000untrn \
+    --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
+    --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \
+    --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"
+
+code="$(echo "$tx_result" | jq '.code')"
+if [[ "$code" -ne 0 ]]; then
+    echo "Failed to era_active_msg msg: $(echo "$tx_result" | jq '.raw_log')" && exit 1
+fi
+
+echo "Waiting 10 seconds for era_collect_withdraw_msg (sometimes it takes a lot of time)…"
+# shellcheck disable=SC2034
+for i in $(seq 10); do
+    sleep 1
+    echo -n .
+done
+echo " done"
+
+query="{\"pool_info\":{\"pool_addr\":\"$ica_address\"}}"
+query_b64_urlenc="$(echo -n "$query" | base64 | tr -d '\n' | jq -sRr '@uri')"
+url="http://127.0.0.1:1317/wasm/contract/$contract_address/smart/$query_b64_urlenc?encoding=base64"
+pool_info=$(curl -s "$url" | jq -r '.result.smart' | base64 -d | jq)
+echo "pool_info is: $pool_info"

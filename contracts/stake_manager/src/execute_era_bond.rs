@@ -20,7 +20,7 @@ use neutron_sdk::{
 
 use crate::helper::min_ntrn_ibc_fee;
 use crate::state::PoolBondState::{BondReported, EraUpdated};
-use crate::state::{POOLS, POOL_ICA_MAP};
+use crate::state::{POOLS, ADDR_ICAID_MAP};
 use crate::{
     contract::{msg_with_sudo_callback, SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS},
     query::query_delegation_by_addr,
@@ -49,7 +49,7 @@ pub fn execute_era_bond(
         return Err(NeutronError::Std(StdError::generic_err("status not allow")));
     }
 
-    let interchain_account_id = POOL_ICA_MAP.load(deps.storage, pool_addr.clone())?;
+    let interchain_account_id = ADDR_ICAID_MAP.load(deps.storage, pool_addr.clone())?;
 
     let mut msgs = vec![];
     // Check whether the delegator-validator needs to manually withdraw

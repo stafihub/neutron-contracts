@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     helper::get_ica,
-    state::{PoolBondState, PoolInfo, INTERCHAIN_ACCOUNTS, POOLS, POOL_ICA_MAP},
+    state::{PoolBondState, PoolInfo, ADDR_ICAID_MAP, INTERCHAIN_ACCOUNTS, POOLS},
 };
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -56,15 +56,19 @@ pub fn execute_register_pool(
 
     let key_withdraw = get_port_id(env.contract.address.as_str(), &withdraw_addr_inter_id);
 
-    deps.as_ref()
-        .api
-        .debug(format!("WASMDEBUG: register key is {:?}", key).as_str());
+    deps.as_ref().api.debug(
+        format!(
+            "WASMDEBUG: register key is {:?} key_withdraw is {:?} ",
+            key, key_withdraw
+        )
+        .as_str(),
+    );
 
     // we are saving empty data here because we handle response of registering ICA in sudo_open_ack method
     INTERCHAIN_ACCOUNTS.save(deps.storage, key, &None)?;
     INTERCHAIN_ACCOUNTS.save(deps.storage, key_withdraw, &None)?;
 
-    Ok(Response::default().add_messages(vec![register, register_withdraw]))
+    Ok(Response::default().add_messages(vec![register_withdraw, register]))
 }
 
 // handler register pool
@@ -102,7 +106,7 @@ pub fn sudo_open_ack(
             )),
         )?;
 
-        POOL_ICA_MAP.save(
+        ADDR_ICAID_MAP.save(
             deps.storage,
             parsed_version.address.clone(),
             &parts.get(1).unwrap(),
@@ -111,10 +115,16 @@ pub fn sudo_open_ack(
         if port_id.contains("withdraw_addr") {
             let ica_parts: Vec<String> =
                 parts.get(1).unwrap().split('-').map(String::from).collect();
+
             let (delegator, _) = get_ica(deps.as_ref(), &env, &ica_parts.first().unwrap().clone())?;
-            let mut pool_info = POOLS.load(deps.storage, delegator)?;
+
+            let mut pool_info = POOLS.load(deps.storage, delegator.clone())?;
+
+            deps.api
+                .debug(format!("WASMDEBUG: sudo_open_ack: pool_info: {:?}", pool_info).as_str());
+
             pool_info.withdraw_addr = parsed_version.address.clone();
-            POOLS.save(deps.storage, parsed_version.address.clone(), &pool_info)?;
+            POOLS.save(deps.storage, delegator, &pool_info)?;
         } else {
             let pool_info = PoolInfo {
                 bond: Uint128::zero(),

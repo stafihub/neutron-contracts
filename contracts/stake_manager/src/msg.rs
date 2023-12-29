@@ -12,7 +12,7 @@ pub enum QueryMsg {
         query_id: u64,
     },
     Balance {
-        query_id: u64,
+        ica_addr: String,
     },
     PoolInfo {
         pool_addr: String,
@@ -45,6 +45,8 @@ pub struct InitPoolParams {
     pub interchain_account_id: String,
     pub unbond: Uint128,
     pub active: Uint128,
+    pub ibc_denom: String,
+    pub remote_denom: String,
     pub bond: Uint128,
     pub validator_addrs: Vec<String>,
     pub era: u64,
@@ -57,8 +59,6 @@ pub struct ConfigPoolParams {
     pub pool_addr: String,
     pub rtoken: String,
     pub protocol_fee_receiver: String,
-    pub ibc_denom: String,
-    pub remote_denom: String,
     pub minimal_stake: Uint128,
     pub unstake_times_limit: u64,
     pub next_unstake_index: u64,

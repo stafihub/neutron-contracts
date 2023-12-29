@@ -99,7 +99,6 @@ pub fn query_delegation_by_addr(
     })
 }
 
-
 pub fn query_delegation(
     deps: Deps<NeutronQuery>,
     registered_query_id: u64,

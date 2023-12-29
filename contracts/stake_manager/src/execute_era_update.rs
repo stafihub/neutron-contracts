@@ -9,7 +9,7 @@ use crate::{
     state::{EraShot, POOL_ERA_SHOT, WithdrawStatus},
 };
 use crate::helper::min_ntrn_ibc_fee;
-use crate::state::{POOL_ICA_MAP, POOLS, UNSTAKES_OF_INDEX};
+use crate::state::{ADDR_ICAID_MAP, POOLS, UNSTAKES_OF_INDEX};
 use crate::state::PoolBondState::{ActiveReported, EraUpdated};
 
 pub fn execute_era_update(
@@ -89,7 +89,7 @@ pub fn execute_era_update(
         .api
         .debug(format!("WASMDEBUG: IbcTransfer msg: {:?}", msg).as_str());
 
-    let interchain_account_id = POOL_ICA_MAP.load(deps.storage, pool_addr.clone())?;
+    let interchain_account_id = ADDR_ICAID_MAP.load(deps.storage, pool_addr.clone())?;
 
     let submsg_pool_ibc_send = msg_with_sudo_callback(
         deps.branch(),
