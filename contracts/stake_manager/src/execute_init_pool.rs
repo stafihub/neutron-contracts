@@ -2,7 +2,7 @@ use std::vec;
 
 use cosmos_sdk_proto::cosmos::distribution::v1beta1::MsgSetWithdrawAddress;
 use cosmos_sdk_proto::prost::Message;
-use cosmwasm_std::{Binary, DepsMut, Env, Response, StdError, StdResult, SubMsg};
+use cosmwasm_std::{Binary, DepsMut, Env, Response, StdError, SubMsg};
 use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::interchain_queries::v045::new_register_balance_query_msg;
 use neutron_sdk::interchain_queries::v045::new_register_delegator_delegations_query_msg;

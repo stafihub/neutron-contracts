@@ -18,7 +18,7 @@ use neutron_sdk::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::execute_era_active::execute_era_active;
+use crate::{execute_era_active::execute_era_active, query::query_delegation_by_addr};
 use crate::execute_era_bond::execute_era_bond;
 use crate::execute_era_update::execute_era_update;
 use crate::execute_pool_add_validators::execute_add_pool_validators;
@@ -30,7 +30,7 @@ use crate::execute_stake_lsm::execute_stake_lsm;
 use crate::execute_unstake::execute_unstake;
 use crate::execute_withdraw::{execute_withdraw, sudo_withdraw_callback};
 use crate::query::{
-    query_acknowledgement_result, query_balance, query_errors_queue, query_interchain_address,
+    query_acknowledgement_result, query_errors_queue, query_interchain_address,
     query_interchain_address_contract, query_pool_info, query_user_unstake,
 };
 use crate::query_callback::{
@@ -128,6 +128,9 @@ pub fn query(deps: Deps<NeutronQuery>, env: Env, msg: QueryMsg) -> NeutronResult
         }
         QueryMsg::Balance { ica_addr } => {
             Ok(to_json_binary(&query_balance_by_addr(deps, ica_addr)?)?)
+        }
+        QueryMsg::Delegations { pool_addr } => {
+            Ok(to_json_binary(&query_delegation_by_addr(deps, pool_addr)?)?)
         }
         QueryMsg::PoolInfo { pool_addr } => query_pool_info(deps, env, pool_addr),
         QueryMsg::InterchainAccountAddress {

@@ -14,6 +14,9 @@ pub enum QueryMsg {
     Balance {
         ica_addr: String,
     },
+    Delegations {
+        pool_addr: String,
+    },
     PoolInfo {
         pool_addr: String,
     },

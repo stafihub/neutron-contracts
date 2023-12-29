@@ -76,7 +76,7 @@ pub fn query_delegation_by_addr(
     let contract_query_id = ADDR_DELEGATIONS_QUERY_ID.load(deps.storage, addr)?;
     let registered_query_id = OWN_QUERY_ID_TO_ICQ_ID.load(deps.storage, contract_query_id)?;
     // get info about the query
-    let registered_query = get_registered_query(deps, registered_query_id)?;
+    let registered_query: neutron_sdk::bindings::query::QueryRegisteredQueryResponse = get_registered_query(deps, registered_query_id)?;
     // check that query type is KV
     check_query_type(registered_query.registered_query.query_type, QueryType::KV)?;
     // reconstruct a nice Balances structure from raw KV-storage values

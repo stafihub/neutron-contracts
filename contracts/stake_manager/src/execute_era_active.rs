@@ -2,7 +2,7 @@ use core::ops::{Mul, Sub};
 use std::ops::{Add, Div};
 
 use cosmwasm_std::{
-    to_json_binary, DepsMut, Env, QueryRequest, Response, StdError, Uint128, WasmMsg, WasmQuery,
+    to_json_binary, DepsMut, QueryRequest, Response, StdError, Uint128, WasmMsg, WasmQuery,
 };
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},

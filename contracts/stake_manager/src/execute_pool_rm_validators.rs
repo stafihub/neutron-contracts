@@ -23,7 +23,6 @@ use neutron_sdk::interchain_txs::helpers::get_port_id;
 use crate::{contract::{ DEFAULT_TIMEOUT_SECONDS, msg_with_sudo_callback, SudoPayload, TxType }, state::ADDR_DELEGATIONS_QUERY_ID};
 use crate::helper::min_ntrn_ibc_fee;
 use crate::state::{ ADDR_ICAID_MAP, POOLS };
-use crate::state::ADDR_BALANCES_QUERY_ID;
 
 pub fn execute_rm_pool_validators(
     mut deps: DepsMut<NeutronQuery>,

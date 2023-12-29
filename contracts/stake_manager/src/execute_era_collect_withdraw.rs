@@ -6,7 +6,6 @@ use cosmwasm_std::{Binary, DepsMut, Env, Response, StdError, StdResult, Uint128}
 use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
-    interchain_queries::v045::types::Balances,
     interchain_txs::helpers::get_port_id,
     query::min_ibc_fee::query_min_ibc_fee,
     NeutronError, NeutronResult,
