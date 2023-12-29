@@ -7,7 +7,10 @@ use neutron_sdk::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::state::{PoolBondState, PoolInfo, INTERCHAIN_ACCOUNTS, POOLS, POOL_ICA_MAP};
+use crate::{
+    helper::get_ica,
+    state::{PoolBondState, PoolInfo, INTERCHAIN_ACCOUNTS, POOLS, POOL_ICA_MAP},
+};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -34,14 +37,24 @@ pub fn execute_register_pool(
     let register = NeutronMsg::register_interchain_account(
         connection_id.clone(),
         interchain_account_id.clone(),
-        Some(register_fee),
+        Some(register_fee.clone()),
     );
 
     deps.as_ref()
         .api
         .debug(format!("WASMDEBUG: register msg is {:?}", register).as_str());
 
+    let withdraw_addr_inter_id = format!("{}-withdraw_addr", interchain_account_id.clone());
+
     let key = get_port_id(env.contract.address.as_str(), &interchain_account_id);
+
+    let register_withdraw = NeutronMsg::register_interchain_account(
+        connection_id.clone(),
+        withdraw_addr_inter_id.clone(),
+        Some(register_fee),
+    );
+
+    let key_withdraw = get_port_id(env.contract.address.as_str(), &withdraw_addr_inter_id);
 
     deps.as_ref()
         .api
@@ -49,14 +62,15 @@ pub fn execute_register_pool(
 
     // we are saving empty data here because we handle response of registering ICA in sudo_open_ack method
     INTERCHAIN_ACCOUNTS.save(deps.storage, key, &None)?;
+    INTERCHAIN_ACCOUNTS.save(deps.storage, key_withdraw, &None)?;
 
-    Ok(Response::default().add_message(register))
+    Ok(Response::default().add_messages(vec![register, register_withdraw]))
 }
 
 // handler register pool
 pub fn sudo_open_ack(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     port_id: String,
     _channel_id: String,
     _counterparty_channel_id: String,
@@ -81,41 +95,53 @@ pub fn sudo_open_ack(
 
         INTERCHAIN_ACCOUNTS.save(
             deps.storage,
-            port_id,
+            port_id.clone(),
             &Some((
                 parsed_version.address.clone(),
                 parsed_version.controller_connection_id.clone(),
             )),
         )?;
+
         POOL_ICA_MAP.save(
             deps.storage,
             parsed_version.address.clone(),
             &parts.get(1).unwrap(),
         )?;
-        let pool_info = PoolInfo {
-            bond: Uint128::zero(),
-            unbond: Uint128::zero(),
-            active: Uint128::zero(),
-            rtoken: Addr::unchecked(""),
-            withdraw_addr: "".to_string(),
-            pool_addr: parsed_version.address.clone(),
-            ibc_denom: "".to_string(),
-            remote_denom: "".to_string(),
-            connection_id: parsed_version.host_connection_id,
-            validator_addrs: vec![],
-            era: 0,
-            rate: Uint128::zero(),
-            minimal_stake: Uint128::zero(),
-            unstake_times_limit: 0,
-            next_unstake_index: 0,
-            unbonding_period: 0,
-            era_update_status: PoolBondState::ActiveReported,
-            unbond_commission: Uint128::zero(),
-            protocol_fee_receiver: Addr::unchecked(""),
-            era_seconds: 0,
-            offset: 0,
-        };
-        POOLS.save(deps.storage, parsed_version.address.clone(), &pool_info)?;
+
+        if port_id.contains("withdraw_addr") {
+            let ica_parts: Vec<String> =
+                parts.get(1).unwrap().split('-').map(String::from).collect();
+            let (delegator, _) = get_ica(deps.as_ref(), &env, &ica_parts.first().unwrap().clone())?;
+            let mut pool_info = POOLS.load(deps.storage, delegator)?;
+            pool_info.withdraw_addr = parsed_version.address.clone();
+            POOLS.save(deps.storage, parsed_version.address.clone(), &pool_info)?;
+        } else {
+            let pool_info = PoolInfo {
+                bond: Uint128::zero(),
+                unbond: Uint128::zero(),
+                active: Uint128::zero(),
+                rtoken: Addr::unchecked(""),
+                withdraw_addr: "".to_string(),
+                pool_addr: parsed_version.address.clone(),
+                ibc_denom: "".to_string(),
+                remote_denom: "".to_string(),
+                connection_id: parsed_version.host_connection_id,
+                validator_addrs: vec![],
+                era: 0,
+                rate: Uint128::zero(),
+                minimal_stake: Uint128::zero(),
+                unstake_times_limit: 0,
+                next_unstake_index: 0,
+                unbonding_period: 0,
+                era_update_status: PoolBondState::ActiveReported,
+                unbond_commission: Uint128::zero(),
+                protocol_fee_receiver: Addr::unchecked(""),
+                era_seconds: 0,
+                offset: 0,
+            };
+            POOLS.save(deps.storage, parsed_version.address.clone(), &pool_info)?;
+        }
+
         return Ok(Response::default());
     }
     Err(StdError::generic_err("Can't parse counterparty_version"))

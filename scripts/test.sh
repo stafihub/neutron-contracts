@@ -322,6 +322,14 @@ url="http://127.0.0.1:1317/wasm/contract/$contract_address/smart/$query_b64_urle
 pool_info=$(curl -s "$url" | jq -r '.result.smart' | base64 -d | jq)
 echo "pool_info is: $pool_info"
 
+withdraw_addr=$(echo $pool_info | jq -r '.withdraw_addr')
+
+echo "withdraw_addr: $withdraw_addr"
+
+echo "DelegatorWithdrawAddress Query"
+grpcurl -plaintext -d "{\"delegator_address\":\"$ica_address\"}" localhost:9090 cosmos.distribution.v1beta1.Query/DelegatorWithdrawAddress | jq
+
+echo "contract_address balance Query"
 neutrond query bank balances "$contract_address" | jq
 
 era_update_msg=$(printf '{
@@ -399,7 +407,6 @@ echo " done"
 gaiad query staking delegations "$ica_address" | jq
 
 gaiad query bank balances "$ica_address" | jq
-gaiad query bank balances "$ADDRESS_2" | jq
 
 era_collect_withdraw_msg=$(printf '{
   "era_collect_withdraw": {
@@ -427,4 +434,3 @@ done
 echo " done"
 
 gaiad query bank balances "$ica_address" | jq
-gaiad query bank balances "$ADDRESS_2" | jq

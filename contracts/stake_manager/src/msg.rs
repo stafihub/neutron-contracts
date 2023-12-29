@@ -46,7 +46,6 @@ pub struct InitPoolParams {
     pub unbond: Uint128,
     pub active: Uint128,
     pub bond: Uint128,
-    pub withdraw_addr: String,
     pub validator_addrs: Vec<String>,
     pub era: u64,
     pub rate: Uint128,

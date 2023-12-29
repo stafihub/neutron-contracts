@@ -104,7 +104,7 @@ pub fn execute_init_pool(
 
     let register_balance_withdraw_msg = new_register_balance_query_msg(
         connection_id.clone(),
-        param.withdraw_addr.clone(),
+        pool_info.withdraw_addr.clone(),
         pool_info.remote_denom.clone(),
         DEFAULT_UPDATE_PERIOD,
     )?;
@@ -115,13 +115,13 @@ pub fn execute_init_pool(
 
     ADDR_QUERY_ID.save(
         deps.storage,
-        param.withdraw_addr.clone(),
+        pool_info.withdraw_addr.clone(),
         &withdraw_query_id,
     )?;
 
     let set_withdraw_msg = MsgSetWithdrawAddress {
         delegator_address: delegator.clone(),
-        withdraw_address: param.withdraw_addr.clone(),
+        withdraw_address: pool_info.withdraw_addr.clone(),
     };
     let mut buf = Vec::new();
     buf.reserve(set_withdraw_msg.encoded_len());
@@ -165,7 +165,7 @@ pub fn execute_init_pool(
                 env.contract.address.to_string(),
                 param.interchain_account_id,
             ),
-            message: param.withdraw_addr,
+            message: pool_info.withdraw_addr,
             pool_addr: pool_info.pool_addr.clone(),
             tx_type: TxType::SetWithdrawAddr,
         },
