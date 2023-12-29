@@ -1,13 +1,13 @@
 use cosmwasm_std::{Addr, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128};
+use neutron_sdk::interchain_txs::helpers::get_port_id;
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     NeutronResult,
 };
-use neutron_sdk::interchain_txs::helpers::get_port_id;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::state::{INTERCHAIN_ACCOUNTS, POOL_ICA_MAP, PoolBondState, PoolInfo, POOLS};
+use crate::state::{PoolBondState, PoolInfo, INTERCHAIN_ACCOUNTS, POOLS, POOL_ICA_MAP};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -62,9 +62,13 @@ pub fn sudo_open_ack(
     _counterparty_channel_id: String,
     counterparty_version: String,
 ) -> StdResult<Response> {
-
-    deps.api.debug(format!("WASMDEBUG: sudo_open_ack: sudo received: {:?} {}", port_id, counterparty_version).as_str());
-
+    deps.api.debug(
+        format!(
+            "WASMDEBUG: sudo_open_ack: sudo received: {:?} {}",
+            port_id, counterparty_version
+        )
+        .as_str(),
+    );
 
     // The version variable contains a JSON value with multiple fields,
     // including the generated account address.
@@ -73,6 +77,8 @@ pub fn sudo_open_ack(
 
     // Update the storage record associated with the interchain account.
     if let Ok(parsed_version) = parsed_version {
+        let parts: Vec<String> = port_id.split('.').map(String::from).collect();
+
         INTERCHAIN_ACCOUNTS.save(
             deps.storage,
             port_id,
@@ -84,7 +90,7 @@ pub fn sudo_open_ack(
         POOL_ICA_MAP.save(
             deps.storage,
             parsed_version.address.clone(),
-            &parsed_version.controller_connection_id,
+            &parts.get(1).unwrap(),
         )?;
         let pool_info = PoolInfo {
             bond: Uint128::zero(),
@@ -95,7 +101,7 @@ pub fn sudo_open_ack(
             pool_addr: parsed_version.address.clone(),
             ibc_denom: "".to_string(),
             remote_denom: "".to_string(),
-            connection_id: "".to_string(),
+            connection_id: parsed_version.host_connection_id,
             validator_addrs: vec![],
             era: 0,
             rate: Uint128::zero(),

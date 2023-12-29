@@ -192,15 +192,15 @@ pub fn execute_era_bond(
         _ => {}
     }
 
-    if op_validators.len() != pool_info.validator_addrs.len() {
-        deps.as_ref().api.debug(
-            format!(
-                "WASMDEBUG: execute_era_bond op_validators: {:?}",
-                op_validators
-            )
-            .as_str(),
-        );
+    deps.as_ref().api.debug(
+        format!(
+            "WASMDEBUG: execute_era_bond op_validators: {:?}",
+            op_validators
+        )
+        .as_str(),
+    );
 
+    if op_validators.len() != pool_info.validator_addrs.len() {
         // Find the difference between pool_info.validator_addrs and op_validators
         let pool_validators: HashSet<_> = pool_info.validator_addrs.into_iter().collect();
         let op_validators_set: HashSet<_> = op_validators.into_iter().collect();
@@ -245,8 +245,12 @@ pub fn execute_era_bond(
         msgs,
         "".to_string(),
         DEFAULT_TIMEOUT_SECONDS,
-        fee.clone(),
+        fee,
     );
+
+    deps.as_ref()
+        .api
+        .debug(format!("WASMDEBUG: execute_era_bond cosmos_msg: {:?}", cosmos_msg).as_str());
 
     let submsg = msg_with_sudo_callback(
         deps.branch(),
@@ -262,6 +266,10 @@ pub fn execute_era_bond(
             tx_type: TxType::EraBond,
         },
     )?;
+
+    deps.as_ref()
+        .api
+        .debug(format!("WASMDEBUG: execute_era_bond submsg: {:?}", submsg).as_str());
 
     Ok(Response::default().add_submessage(submsg))
 }

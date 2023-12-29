@@ -113,15 +113,6 @@ url="http://127.0.0.1:1317/wasm/contract/$contract_address/smart/$query_b64_urle
 ica_address=$(curl -s "$url" | jq -r '.result.smart' | base64 -d | jq -r '.[0]')
 echo "ICA address: $ica_address"
 
-# tx_result=$(gaiad tx bank send "$ADDRESS_2" "$ica_address" 50000uatom \
-#     --chain-id "$CHAIN_ID_2" --broadcast-mode=sync --gas-prices 0.0025uatom \
-#     -y --output json --keyring-backend=test --home "$HOME_2" --node "$GAIA_NODE" | wait_tx_gaia)
-# code="$(echo "$tx_result" | jq '.code')"
-# if [[ "$code" -ne 0 ]]; then
-#     echo "Failed to send money to ICA: $(echo "$tx_result" | jq '.raw_log')" && exit 1
-# fi
-# echo "Sent money to ICA"
-
 code_id="$(neutrond tx wasm store "$RTOKEN_CONTRACT_PATH" \
     --from "$ADDRESS_1" --gas 50000000 --chain-id "$CHAIN_ID_1" \
     --broadcast-mode=sync --gas-prices 0.0025untrn -y \
@@ -368,6 +359,17 @@ gaiad query bank balances "$ica_address" | jq
 # url="http://127.0.0.1:1317/wasm/contract/$contract_address/smart/$query_b64_urlenc?encoding=base64"
 # pool_info=$(curl -s "$url" | jq -r '.result.smart' | base64 -d | jq)
 # echo "pool_info is: $pool_info"
+
+tx_result=$(gaiad tx bank send "$ADDRESS_2" "$ica_address" 50000uatom \
+    --chain-id "$CHAIN_ID_2" --broadcast-mode=sync --gas-prices 0.0025uatom \
+    -y --output json --keyring-backend=test --home "$HOME_2" --node "$GAIA_NODE" | wait_tx_gaia)
+code="$(echo "$tx_result" | jq '.code')"
+if [[ "$code" -ne 0 ]]; then
+    echo "Failed to send money to ICA: $(echo "$tx_result" | jq '.raw_log')" && exit 1
+fi
+echo "Sent money to ICA"
+
+gaiad query bank balances "$ica_address" | jq
 
 bond_msg=$(printf '{
   "era_bond": {
