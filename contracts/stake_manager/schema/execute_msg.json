@@ -311,13 +311,9 @@
         "era_collect_withdraw": {
           "type": "object",
           "required": [
-            "channel",
             "pool_addr"
           ],
           "properties": {
-            "channel": {
-              "type": "string"
-            },
             "pool_addr": {
               "type": "string"
             }
@@ -383,13 +379,11 @@
       "type": "object",
       "required": [
         "era_seconds",
-        "ibc_denom",
         "minimal_stake",
         "next_unstake_index",
         "offset",
         "pool_addr",
         "protocol_fee_receiver",
-        "remote_denom",
         "rtoken",
         "unbond_commission",
         "unbonding_period",
@@ -400,9 +394,6 @@
           "type": "integer",
           "format": "uint64",
           "minimum": 0.0
-        },
-        "ibc_denom": {
-          "type": "string"
         },
         "minimal_stake": {
           "$ref": "#/definitions/Uint128"
@@ -421,9 +412,6 @@
           "type": "string"
         },
         "protocol_fee_receiver": {
-          "type": "string"
-        },
-        "remote_denom": {
           "type": "string"
         },
         "rtoken": {
@@ -450,11 +438,12 @@
         "active",
         "bond",
         "era",
+        "ibc_denom",
         "interchain_account_id",
         "rate",
+        "remote_denom",
         "unbond",
-        "validator_addrs",
-        "withdraw_addr"
+        "validator_addrs"
       ],
       "properties": {
         "active": {
@@ -468,11 +457,17 @@
           "format": "uint64",
           "minimum": 0.0
         },
+        "ibc_denom": {
+          "type": "string"
+        },
         "interchain_account_id": {
           "type": "string"
         },
         "rate": {
           "$ref": "#/definitions/Uint128"
+        },
+        "remote_denom": {
+          "type": "string"
         },
         "unbond": {
           "$ref": "#/definitions/Uint128"
@@ -482,9 +477,6 @@
           "items": {
             "type": "string"
           }
-        },
-        "withdraw_addr": {
-          "type": "string"
         }
       }
     },

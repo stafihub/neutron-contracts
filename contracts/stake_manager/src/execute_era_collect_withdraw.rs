@@ -1,5 +1,3 @@
-use core::ops::Sub;
-
 use cosmos_sdk_proto::cosmos::bank::v1beta1::MsgSend;
 use cosmos_sdk_proto::prost::Message;
 use cosmwasm_std::{Binary, DepsMut, Env, Response, StdError, StdResult, Uint128};

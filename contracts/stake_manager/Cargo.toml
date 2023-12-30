@@ -27,7 +27,8 @@ schemars = { workspace = true }
 serde = { workspace = true }
 serde-json-wasm = { workspace = true }
 cw-storage-plus = { workspace = true, features = ["iterator"] }
-neutron-sdk = { version = "0.8.0", default-features = false }
+# neutron-sdk = { git = "https://github.com:stafihub/neutron-sdk", branch = "hotfix/kv-delegations", default-features = false }
+neutron-sdk = { path = "../../packages/neutron-sdk", default-features = false }
 cosmos-sdk-proto = { workspace = true }
 rtoken = { path = "../rtoken", features = ["library"] }
 
