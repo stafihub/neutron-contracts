@@ -2,11 +2,11 @@ use std::ops::{Add, Div, Mul};
 use std::vec;
 
 use cosmwasm_std::{
-    CosmosMsg, DepsMut, Env, MessageInfo, Response, to_json_binary, Uint128, WasmMsg,
+    to_json_binary, CosmosMsg, DepsMut, Env, MessageInfo, Response, StdError, Uint128, WasmMsg,
 };
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
-    NeutronResult,
+    NeutronError, NeutronResult,
 };
 
 use crate::state::POOLS;
@@ -18,6 +18,13 @@ pub fn execute_stake(
     pool_addr: String,
     info: MessageInfo,
 ) -> NeutronResult<Response<NeutronMsg>> {
+    if info.funds.len() != 1 {
+        return Err(NeutronError::Std(StdError::generic_err(format!(
+            "Params error: {}",
+            "multi funds"
+        ))));
+    }
+
     let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
 
     let mut token_amount = 0;
@@ -30,11 +37,17 @@ pub fn execute_stake(
                 .unwrap_or(Uint128::zero()),
         );
     }
+    if token_amount < pool_info.minimal_stake.u128() {
+        return Err(NeutronError::Std(StdError::generic_err(format!(
+            "Params error: {}",
+            "less than minimal stake"
+        ))));
+    }
 
     pool_info.active = pool_info.active.add(Uint128::new(token_amount));
     pool_info.bond = pool_info.bond.add(Uint128::new(token_amount));
 
-    let rtoken_amount = token_amount.mul(pool_info.rate.u128()).div(1_000_000);
+    let rtoken_amount = token_amount.mul(1_000_000).div(pool_info.rate.u128());
 
     let msg = WasmMsg::Execute {
         contract_addr: pool_info.rtoken.to_string(),
