@@ -211,17 +211,8 @@ pub fn execute(
         ExecuteMsg::Withdraw {
             pool_addr,
             receiver,
-            interchain_account_id,
             unstake_index_list,
-        } => execute_withdraw(
-            deps,
-            env,
-            info,
-            pool_addr,
-            receiver,
-            interchain_account_id,
-            unstake_index_list,
-        ),
+        } => execute_withdraw(deps, env, info, pool_addr, receiver, unstake_index_list),
         ExecuteMsg::PoolRmValidator {
             pool_addr,
             validator_addrs,
@@ -234,7 +225,9 @@ pub fn execute(
             execute_era_update(deps, env, channel, pool_addr)
         }
         ExecuteMsg::EraBond { pool_addr } => execute_era_bond(deps, env, pool_addr),
-        ExecuteMsg::EraCollectWithdraw { pool_addr } => execute_era_collect_withdraw(deps, env, pool_addr),
+        ExecuteMsg::EraCollectWithdraw { pool_addr } => {
+            execute_era_collect_withdraw(deps, env, pool_addr)
+        }
         ExecuteMsg::EraRestake { pool_addr } => execute_era_restake(deps, env, pool_addr),
         ExecuteMsg::EraActive { pool_addr } => execute_era_active(deps, pool_addr),
         ExecuteMsg::StakeLSM {} => execute_stake_lsm(deps, env, info),

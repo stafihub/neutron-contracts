@@ -72,6 +72,7 @@ pub struct EraShot {
     pub bond: Uint128,
     pub unbond: Uint128,
     pub active: Uint128,
+    pub restake_amount: Uint128,
     pub bond_height: u64,
     pub failed_tx: Option<TxType>,
 }

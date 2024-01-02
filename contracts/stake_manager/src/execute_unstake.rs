@@ -33,12 +33,11 @@ pub fn execute_unstake(
         .api
         .debug(format!("WASMDEBUG: execute_unstake pool_info: {:?}", pool_info).as_str());
 
-    let unstake_count = match UNSTAKES_INDEX_FOR_USER
+    let mut unstakes_index_for_user = UNSTAKES_INDEX_FOR_USER
         .load(deps.storage, (info.sender.clone(), pool_addr.clone()))
-    {
-        Ok(unstakes) => unstakes.len() as u64,
-        Err(_) => 0u64,
-    };
+        .unwrap_or_else(|_| vec![]);
+
+    let unstake_count = unstakes_index_for_user.len() as u64;
 
     deps.as_ref().api.debug(
         format!(
@@ -127,8 +126,15 @@ pub fn execute_unstake(
         status: WithdrawStatus::Default,
     };
 
+    unstakes_index_for_user.push(will_use_unstake_index);
+
     UNSTAKES_OF_INDEX.save(deps.storage, will_use_unstake_index, &unstake_info)?;
     POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
+    UNSTAKES_INDEX_FOR_USER.save(
+        deps.storage,
+        (info.sender.clone(), pool_addr.clone()),
+        &unstakes_index_for_user,
+    )?;
 
     // send event
     Ok(Response::new()

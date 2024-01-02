@@ -14,7 +14,7 @@ use neutron_sdk::{
     NeutronError, NeutronResult,
 };
 
-use crate::contract::{msg_with_sudo_callback, SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS};
+use crate::{contract::{msg_with_sudo_callback, SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS}, state::ADDR_ICAID_MAP};
 use crate::helper::min_ntrn_ibc_fee;
 use crate::state::{WithdrawStatus, POOLS, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX};
 
@@ -24,10 +24,9 @@ pub fn execute_withdraw(
     info: MessageInfo,
     pool_addr: String,
     receiver: Addr,
-    interchain_account_id: String,
     unstake_index_list: Vec<u64>,
 ) -> NeutronResult<Response<NeutronMsg>> {
-    if unstake_index_list.len() == 0 {
+    if unstake_index_list.is_empty() {
         return Err(NeutronError::Std(StdError::generic_err(
             "Empty unstake list",
         )));
@@ -35,9 +34,12 @@ pub fn execute_withdraw(
 
     let pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
 
+    let interchain_account_id =
+        ADDR_ICAID_MAP.load(deps.storage, pool_addr.clone())?;
+
     let mut total_withdraw_amount = Uint128::zero();
     for unstake_index in unstake_index_list.clone() {
-        let mut unstake_info = UNSTAKES_OF_INDEX.load(deps.storage, unstake_index.clone())?;
+        let mut unstake_info = UNSTAKES_OF_INDEX.load(deps.storage, unstake_index)?;
 
         if unstake_info.pool_addr != pool_addr {
             return Err(NeutronError::Std(StdError::generic_err(format!(
@@ -46,7 +48,7 @@ pub fn execute_withdraw(
             ))));
         }
 
-        if unstake_info.unstaker != info.sender.to_string() {
+        if unstake_info.unstaker != info.sender {
             return Err(NeutronError::Std(StdError::generic_err(format!(
                 "Unstake index: {} unstaker not match",
                 unstake_index

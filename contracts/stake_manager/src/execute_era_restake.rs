@@ -15,7 +15,6 @@ use crate::state::POOLS;
 use crate::{contract::DEFAULT_TIMEOUT_SECONDS, state::POOL_ERA_SHOT};
 use crate::{
     contract::{msg_with_sudo_callback, SudoPayload, TxType},
-    query::query_balance_by_addr,
     state::ADDR_ICAID_MAP,
 };
 
@@ -33,39 +32,13 @@ pub fn execute_era_restake(
         return Err(NeutronError::Std(StdError::generic_err("status not allow")));
     }
 
-    // check withdraw address balance and send it to the pool
-    let pool_balances_result =
-        query_balance_by_addr(deps.as_ref(), pool_addr.clone());
+    let pool_era_shot = POOL_ERA_SHOT.load(deps.storage, pool_addr.clone())?;
 
-    let mut restake_amount = Uint128::zero();
-    match pool_balances_result {
-        Ok(balance_response) => {
-            let pool_era_shot = POOL_ERA_SHOT.load(deps.storage, pool_addr.clone())?;
-
-            if balance_response.last_submitted_local_height <= pool_era_shot.bond_height {
-                return Err(NeutronError::Std(StdError::generic_err("Pool Addr submission height is less than or equal to the bond height of the pool era, which is not allowed.")));
-            }
-
-            if !balance_response.balances.coins.is_empty() {
-                restake_amount = balance_response
-                    .balances
-                    .coins
-                    .iter()
-                    .find(|c| c.denom == pool_info.remote_denom.clone())
-                    .map(|c| c.amount)
-                    .unwrap_or(Uint128::zero());
-            }
-        }
-        Err(_) => {
-            deps.as_ref().api.debug(
-                format!(
-                    "WASMDEBUG: execute_era_restake restake_amount: {:?}",
-                    pool_balances_result
-                )
-                .as_str(),
-            );
-        }
+    if env.block.height <= pool_era_shot.bond_height {
+        return Err(NeutronError::Std(StdError::generic_err("Pool Addr submission height is less than or equal to the bond height of the pool era, which is not allowed.")));
     }
+
+    let restake_amount = pool_era_shot.restake_amount;
 
     // leave gas
     if restake_amount.is_zero() {

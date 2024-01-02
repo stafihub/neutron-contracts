@@ -49,6 +49,7 @@ pub fn execute_era_update(
                 active: pool_info.active,
                 bond_height: 0,
                 failed_tx: None,
+                restake_amount: Uint128::zero(),
             }),
         )?;
     }

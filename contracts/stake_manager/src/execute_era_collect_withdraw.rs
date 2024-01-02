@@ -2,23 +2,23 @@ use cosmos_sdk_proto::cosmos::bank::v1beta1::MsgSend;
 use cosmos_sdk_proto::prost::Message;
 use cosmwasm_std::{Binary, DepsMut, Env, Response, StdError, StdResult, Uint128};
 
+use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     interchain_txs::helpers::get_port_id,
-    NeutronError,
-    NeutronResult, query::min_ibc_fee::query_min_ibc_fee,
+    query::min_ibc_fee::query_min_ibc_fee,
+    NeutronError, NeutronResult,
 };
-use neutron_sdk::bindings::types::ProtobufAny;
 
+use crate::helper::min_ntrn_ibc_fee;
+use crate::state::PoolBondState::{BondReported, WithdrawReported};
+use crate::state::POOLS;
 use crate::{contract::DEFAULT_TIMEOUT_SECONDS, state::POOL_ERA_SHOT};
 use crate::{
     contract::{msg_with_sudo_callback, SudoPayload, TxType},
     query::query_balance_by_addr,
     state::ADDR_ICAID_MAP,
 };
-use crate::helper::min_ntrn_ibc_fee;
-use crate::state::PoolBondState::{BondReported, WithdrawReported};
-use crate::state::POOLS;
 
 pub fn execute_era_collect_withdraw(
     mut deps: DepsMut<NeutronQuery>,
@@ -42,11 +42,11 @@ pub fn execute_era_collect_withdraw(
     let withdraw_balances_result =
         query_balance_by_addr(deps.as_ref(), pool_info.withdraw_addr.clone());
 
+    let mut pool_era_shot = POOL_ERA_SHOT.load(deps.storage, pool_addr.clone())?;
+
     let mut withdraw_amount = Uint128::zero();
     match withdraw_balances_result {
         Ok(balance_response) => {
-            let pool_era_shot = POOL_ERA_SHOT.load(deps.storage, pool_addr.clone())?;
-
             if balance_response.last_submitted_local_height <= pool_era_shot.bond_height {
                 return Err(NeutronError::Std(StdError::generic_err("Withdraw Addr submission height is less than or equal to the bond height of the pool era, which is not allowed.")));
             }
@@ -94,21 +94,21 @@ pub fn execute_era_collect_withdraw(
 
     let interchain_account_id =
         ADDR_ICAID_MAP.load(deps.storage, pool_info.withdraw_addr.clone())?;
-    
+
     let tx_withdraw_coin = cosmos_sdk_proto::cosmos::base::v1beta1::Coin {
         denom: pool_info.remote_denom.clone(),
         amount: withdraw_amount.to_string(),
     };
-    
+
     let inter_send = MsgSend {
         from_address: pool_info.withdraw_addr.clone(),
         to_address: pool_addr.clone(),
         amount: vec![tx_withdraw_coin],
     };
-    
+
     let mut buf = Vec::new();
     buf.reserve(inter_send.encoded_len());
-    
+
     if let Err(e) = inter_send.encode(&mut buf) {
         return Err(NeutronError::Std(StdError::generic_err(format!(
             "Encode error: {}",
@@ -145,12 +145,14 @@ pub fn execute_era_collect_withdraw(
                 env.contract.address.to_string(),
                 interchain_account_id.clone(),
             ),
-            // the acknowledgement later
             message: "".to_string(),
             pool_addr: pool_addr.clone(),
             tx_type: TxType::EraUpdateWithdrawSend,
         },
     )?;
+
+    pool_era_shot.restake_amount = withdraw_amount;
+    POOL_ERA_SHOT.save(deps.storage, pool_addr, &pool_era_shot)?;
 
     Ok(Response::default().add_submessage(submsg))
 }
