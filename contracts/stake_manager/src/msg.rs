@@ -20,6 +20,9 @@ pub enum QueryMsg {
     PoolInfo {
         pool_addr: String,
     },
+    EraSnapShot {
+        pool_addr: String,
+    },
     /// this query goes to neutron and get stored ICA with a specific query
     InterchainAccountAddress {
         interchain_account_id: String,

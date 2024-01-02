@@ -135,6 +135,7 @@ pub fn query(deps: Deps<NeutronQuery>, env: Env, msg: QueryMsg) -> NeutronResult
             Ok(to_json_binary(&query_delegation_by_addr(deps, pool_addr)?)?)
         }
         QueryMsg::PoolInfo { pool_addr } => query_pool_info(deps, env, pool_addr),
+        QueryMsg::EraSnapShot { pool_addr } => query_pool_info(deps, env, pool_addr),
         QueryMsg::InterchainAccountAddress {
             interchain_account_id,
             connection_id,

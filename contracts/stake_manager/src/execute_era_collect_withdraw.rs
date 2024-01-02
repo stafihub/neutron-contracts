@@ -140,7 +140,7 @@ pub fn execute_era_collect_withdraw(
             // the acknowledgement later
             message: "".to_string(),
             pool_addr: pool_addr.clone(),
-            tx_type: TxType::EraBond,
+            tx_type: TxType::EraUpdateWithdrawSend,
         },
     )?;
 
