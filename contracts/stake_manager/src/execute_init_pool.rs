@@ -13,13 +13,19 @@ use neutron_sdk::{
     NeutronError, NeutronResult,
 };
 
-use crate::{contract::{
-    msg_with_sudo_callback, SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS, DEFAULT_UPDATE_PERIOD,
-}, state::ADDR_DELEGATIONS_QUERY_ID};
-use crate::helper::{get_ica, min_ntrn_ibc_fee};
 use crate::msg::InitPoolParams;
 use crate::state::POOLS;
 use crate::state::{ADDR_BALANCES_QUERY_ID, LATEST_BALANCES_QUERY_ID, LATEST_DELEGATIONS_QUERY_ID};
+use crate::{
+    contract::{
+        msg_with_sudo_callback, SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS, DEFAULT_UPDATE_PERIOD,
+    },
+    state::{PoolValidatorStatus, ADDR_DELEGATIONS_QUERY_ID, POOL_VALIDATOR_STATUS},
+};
+use crate::{
+    helper::{get_ica, min_ntrn_ibc_fee},
+    state::ValidatorUpdateStatus,
+};
 
 // add execute to config the validator addrs and withdraw address on reply
 pub fn execute_init_pool(
@@ -54,7 +60,6 @@ pub fn execute_init_pool(
     pool_info.remote_denom = param.remote_denom;
     pool_info.connection_id = connection_id.clone();
     pool_info.validator_addrs = param.validator_addrs.clone();
-
 
     deps.as_ref()
         .api
@@ -182,6 +187,14 @@ pub fn execute_init_pool(
         )
         .as_str(),
     );
+
+    POOL_VALIDATOR_STATUS.save(
+        deps.storage,
+        pool_info.pool_addr,
+        &PoolValidatorStatus {
+            status: ValidatorUpdateStatus::Success,
+        },
+    )?;
 
     Ok(Response::default().add_submessages(vec![
         register_delegation_query_submsg,

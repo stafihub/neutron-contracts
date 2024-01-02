@@ -18,9 +18,7 @@ use neutron_sdk::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::{execute_era_active::execute_era_active, query::query_delegation_by_addr};
-use crate::execute_era_bond::execute_era_bond;
-use crate::execute_era_update::execute_era_update;
+use crate::{execute_era_update::execute_era_update, execute_pool_rm_validators::sudo_rm_validator_failed_callback};
 use crate::execute_pool_add_validators::execute_add_pool_validators;
 use crate::execute_pool_rm_validators::execute_rm_pool_validators;
 use crate::execute_register_pool::{execute_register_pool, sudo_open_ack};
@@ -41,6 +39,10 @@ use crate::state::{
     QUERY_BALANCES_REPLY_ID_END, QUERY_DELEGATIONS_REPLY_ID_END, STATE,
 };
 use crate::{execute_config_pool::execute_config_pool, query::query_balance_by_addr};
+use crate::{execute_era_active::execute_era_active, query::query_delegation_by_addr};
+use crate::{
+    execute_era_bond::execute_era_bond, execute_pool_rm_validators::sudo_rm_validator_callback,
+};
 use crate::{
     execute_era_bond::sudo_era_bond_withdraw_callback,
     execute_era_collect_withdraw::{
@@ -279,16 +281,23 @@ fn sudo_callback(deps: DepsMut, env: Env, payload: SudoPayload) -> StdResult<Res
         TxType::EraUpdateIbcSend => sudo_era_update_callback(deps, payload),
         TxType::EraUpdateWithdrawSend => sudo_era_collect_withdraw_callback(deps, payload),
         TxType::EraBond => sudo_era_bond_withdraw_callback(deps, env, payload),
+        TxType::RmValidator => sudo_rm_validator_callback(deps, payload),
 
         _ => Ok(Response::new()),
     }
 }
 
 fn sudo_err_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
-    let mut pool_era_shot = POOL_ERA_SHOT.load(deps.storage, payload.message.clone())?;
-    pool_era_shot.failed_tx = Option::from(payload.tx_type);
-    POOL_ERA_SHOT.save(deps.storage, payload.message, &pool_era_shot)?;
-    Ok(Response::new())
+    match payload.tx_type {
+        TxType::RmValidator => sudo_rm_validator_failed_callback(deps, payload),
+
+        _ => {
+            let mut pool_era_shot = POOL_ERA_SHOT.load(deps.storage, payload.message.clone())?;
+            pool_era_shot.failed_tx = Option::from(payload.tx_type);
+            POOL_ERA_SHOT.save(deps.storage, payload.message, &pool_era_shot)?;
+            Ok(Response::new())
+        }
+    }
 }
 
 // saves payload to process later to the storage and returns a SubmitTX Cosmos SubMsg with necessary reply id

@@ -31,6 +31,13 @@ pub struct State {
 pub const STATE: Item<State> = Item::new("state");
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct PoolValidatorStatus{
+    pub status: ValidatorUpdateStatus
+}
+
+pub const POOL_VALIDATOR_STATUS: Map<String, PoolValidatorStatus> = Map::new("pool_validator_status");
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct PoolInfo {
     pub bond: Uint128,
     pub unbond: Uint128,
@@ -76,6 +83,13 @@ pub enum PoolBondState {
     BondReported,
     WithdrawReported,
     ActiveReported,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub enum ValidatorUpdateStatus {
+    Pending,
+    Success,
+    Failed,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
