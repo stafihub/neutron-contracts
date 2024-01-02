@@ -4,8 +4,8 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-CONTRACT_PATH="artifacts/stake_manager.wasm"
-RTOKEN_CONTRACT_PATH="artifacts/rtoken.wasm"
+CONTRACT_PATH="artifacts/stake_manager-aarch64.wasm"
+RTOKEN_CONTRACT_PATH="artifacts/rtoken-aarch64.wasm"
 CHAIN_ID_1="test-1"
 CHAIN_ID_2="test-2"
 #NEUTRON_DIR="${NEUTRON_DIR:-/var/lib/docker/volumes/neutron-testing-data/_data}"
@@ -367,24 +367,6 @@ echo " done"
 echo "query ica atom balance"
 gaiad query bank balances "$ica_address" | jq
 
-# echo "---------------------------------------------------------------"
-# query="{\"pool_info\":{\"pool_addr\":\"$ica_address\"}}"
-# query_b64_urlenc="$(echo -n "$query" | base64 | tr -d '\n' | jq -sRr '@uri')"
-# url="http://127.0.0.1:1317/wasm/contract/$contract_address/smart/$query_b64_urlenc?encoding=base64"
-# pool_info=$(curl -s "$url" | jq -r '.result.smart' | base64 -d | jq)
-# echo "pool_info is: $pool_info"
-
-tx_result=$(gaiad tx bank send "$ADDRESS_2" "$ica_address" 50000uatom \
-    --chain-id "$CHAIN_ID_2" --broadcast-mode=sync --gas-prices 0.0025uatom \
-    -y --output json --keyring-backend=test --home "$HOME_2" --node "$GAIA_NODE" | wait_tx_gaia)
-code="$(echo "$tx_result" | jq '.code')"
-if [[ "$code" -ne 0 ]]; then
-    echo "Failed to send money to ICA: $(echo "$tx_result" | jq '.raw_log')" && exit 1
-fi
-echo "Sent money to ICA"
-
-gaiad query bank balances "$ica_address" | jq
-
 bond_msg=$(printf '{
   "era_bond": {
     "pool_addr": "%s"
@@ -402,9 +384,9 @@ if [[ "$code" -ne 0 ]]; then
     echo "Failed to era_bond msg: $(echo "$tx_result" | jq '.raw_log')" && exit 1
 fi
 
-echo "Waiting 20 seconds for era_bond (sometimes it takes a lot of time)…"
+echo "Waiting 120 seconds for era_bond (sometimes it takes a lot of time)…"
 # shellcheck disable=SC2034
-for i in $(seq 20); do
+for i in $(seq 120); do
     sleep 1
     echo -n .
 done
@@ -464,6 +446,128 @@ if [[ "$code" -ne 0 ]]; then
     echo "Failed to era_active_msg msg: $(echo "$tx_result" | jq '.raw_log')" && exit 1
 fi
 
+echo "Waiting 10 seconds for era_active_msg (sometimes it takes a lot of time)…"
+# shellcheck disable=SC2034
+for i in $(seq 10); do
+    sleep 1
+    echo -n .
+done
+echo " done"
+
+query="{\"pool_info\":{\"pool_addr\":\"$ica_address\"}}"
+query_b64_urlenc="$(echo -n "$query" | base64 | tr -d '\n' | jq -sRr '@uri')"
+url="http://127.0.0.1:1317/wasm/contract/$contract_address/smart/$query_b64_urlenc?encoding=base64"
+pool_info=$(curl -s "$url" | jq -r '.result.smart' | base64 -d | jq)
+echo "pool_info is: $pool_info"
+
+era_update_msg=$(printf '{
+  "era_update": {
+    "channel": "channel-0",
+    "pool_addr": "%s"
+  }
+}' "$ica_address")
+
+tx_result="$(neutrond tx wasm execute "$contract_address" "$era_update_msg" \
+    --amount 2000000untrn \
+    --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
+    --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \
+    --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"
+
+code="$(echo "$tx_result" | jq '.code')"
+if [[ "$code" -ne 0 ]]; then
+    echo "Failed to era_update msg: $(echo "$tx_result" | jq '.raw_log')" && exit 1
+fi
+
+echo "Waiting 10 seconds for era_update (sometimes it takes a lot of time)…"
+# shellcheck disable=SC2034
+for i in $(seq 10); do
+    sleep 1
+    echo -n .
+done
+echo " done"
+
+echo "query ica atom balance"
+gaiad query bank balances "$ica_address" | jq
+
+bond_msg=$(printf '{
+  "era_bond": {
+    "pool_addr": "%s"
+  }
+}' "$ica_address")
+
+tx_result="$(neutrond tx wasm execute "$contract_address" "$bond_msg" \
+    --amount 2000000untrn \
+    --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
+    --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \
+    --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"
+
+code="$(echo "$tx_result" | jq '.code')"
+if [[ "$code" -ne 0 ]]; then
+    echo "Failed to era_bond msg: $(echo "$tx_result" | jq '.raw_log')" && exit 1
+fi
+
+echo "Waiting 100 seconds for era_bond (sometimes it takes a lot of time)…"
+# shellcheck disable=SC2034
+for i in $(seq 100); do
+    sleep 1
+    echo -n .
+done
+echo " done"
+
+gaiad query staking delegations "$ica_address" | jq
+
+gaiad query bank balances "$ica_address" | jq
+
+query="{\"pool_info\":{\"pool_addr\":\"$ica_address\"}}"
+query_b64_urlenc="$(echo -n "$query" | base64 | tr -d '\n' | jq -sRr '@uri')"
+url="http://127.0.0.1:1317/wasm/contract/$contract_address/smart/$query_b64_urlenc?encoding=base64"
+pool_info=$(curl -s "$url" | jq -r '.result.smart' | base64 -d | jq)
+echo "pool_info is: $pool_info"
+
+era_collect_withdraw_msg=$(printf '{
+  "era_collect_withdraw": {
+    "pool_addr": "%s"
+  }
+}' "$ica_address")
+
+tx_result="$(neutrond tx wasm execute "$contract_address" "$era_collect_withdraw_msg" \
+    --amount 2000000untrn \
+    --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
+    --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \
+    --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"
+
+code="$(echo "$tx_result" | jq '.code')"
+if [[ "$code" -ne 0 ]]; then
+    echo "Failed to era_collect_withdraw_msg msg: $(echo "$tx_result" | jq '.raw_log')" && exit 1
+fi
+
+echo "Waiting 30 seconds for era_collect_withdraw_msg (sometimes it takes a lot of time)…"
+# shellcheck disable=SC2034
+for i in $(seq 30); do
+    sleep 1
+    echo -n .
+done
+echo " done"
+
+gaiad query bank balances "$ica_address" | jq
+
+era_active_msg=$(printf '{
+  "era_active": {
+    "pool_addr": "%s"
+  }
+}' "$ica_address")
+
+tx_result="$(neutrond tx wasm execute "$contract_address" "$era_active_msg" \
+    --amount 2000000untrn \
+    --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
+    --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \
+    --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"
+
+code="$(echo "$tx_result" | jq '.code')"
+if [[ "$code" -ne 0 ]]; then
+    echo "Failed to era_active_msg msg: $(echo "$tx_result" | jq '.raw_log')" && exit 1
+fi
+
 echo "Waiting 10 seconds for era_collect_withdraw_msg (sometimes it takes a lot of time)…"
 # shellcheck disable=SC2034
 for i in $(seq 10); do
@@ -477,3 +581,6 @@ query_b64_urlenc="$(echo -n "$query" | base64 | tr -d '\n' | jq -sRr '@uri')"
 url="http://127.0.0.1:1317/wasm/contract/$contract_address/smart/$query_b64_urlenc?encoding=base64"
 pool_info=$(curl -s "$url" | jq -r '.result.smart' | base64 -d | jq)
 echo "pool_info is: $pool_info"
+
+# create stake-manager contract -> create rtoken contract --> send gas to stake manager -> test stake -> test unstake -> test new era -> test new era +1
+# -> test withdraw

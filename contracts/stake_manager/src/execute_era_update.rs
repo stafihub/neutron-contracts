@@ -1,16 +1,19 @@
-use std::ops::Add;
-
-use cosmwasm_std::{coin, DepsMut, Env, Order, Response, StdError, StdResult, Uint128};
-use neutron_sdk::{bindings::{msg::NeutronMsg, query::NeutronQuery}, NeutronError, NeutronResult, query::min_ibc_fee::query_min_ibc_fee, sudo::msg::RequestPacketTimeoutHeight};
+use cosmwasm_std::{coin, DepsMut, Env, Response, StdError, StdResult, Uint128};
 use neutron_sdk::interchain_txs::helpers::get_port_id;
+use neutron_sdk::{
+    bindings::{msg::NeutronMsg, query::NeutronQuery},
+    query::min_ibc_fee::query_min_ibc_fee,
+    sudo::msg::RequestPacketTimeoutHeight,
+    NeutronError, NeutronResult,
+};
 
+use crate::helper::min_ntrn_ibc_fee;
+use crate::state::PoolBondState::{ActiveReported, EraUpdated};
+use crate::state::{ADDR_ICAID_MAP, POOLS};
 use crate::{
     contract::{msg_with_sudo_callback, SudoPayload, TxType},
-    state::{EraShot, POOL_ERA_SHOT, WithdrawStatus},
+    state::{EraShot, POOL_ERA_SHOT},
 };
-use crate::helper::min_ntrn_ibc_fee;
-use crate::state::{ADDR_ICAID_MAP, POOLS, UNSTAKES_OF_INDEX};
-use crate::state::PoolBondState::{ActiveReported, EraUpdated};
 
 pub fn execute_era_update(
     mut deps: DepsMut<NeutronQuery>,
@@ -18,7 +21,7 @@ pub fn execute_era_update(
     channel: String,
     pool_addr: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
-    let pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
+    let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
 
     // check era state
     if pool_info.era_update_status != ActiveReported {
@@ -48,6 +51,12 @@ pub fn execute_era_update(
                 failed_tx: None,
             }),
         )?;
+    }
+
+    if pool_info.bond.is_zero() {
+        pool_info.era_update_status = EraUpdated;
+        POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
+        return Ok(Response::default());
     }
 
     // See more info here: https://docs.neutron.org/neutron/feerefunder/overview
@@ -104,33 +113,11 @@ pub fn execute_era_update(
             tx_type: TxType::EraUpdateIbcSend,
         },
     )?;
+
     deps.as_ref().api.debug(
         format!(
             "WASMDEBUG: execute_send: sent submsg: {:?}",
             submsg_pool_ibc_send
-        )
-        .as_str(),
-    );
-
-    let mut unstaks = Vec::new();
-    let mut need_withdraw = Uint128::zero();
-
-    let unstakes_iter = UNSTAKES_OF_INDEX.range(deps.storage, None, None, Order::Ascending);
-    for unstake_result in unstakes_iter {
-        let (_, unstake_info) = unstake_result?;
-        if unstake_info.pool_addr == pool_addr
-            && unstake_info.status == WithdrawStatus::Default
-            && unstake_info.era + pool_info.unbonding_period > pool_info.era
-        {
-            unstaks.push(unstake_info.clone()); // todo: After debugging is complete, can delete this sentence and the following log
-            need_withdraw = need_withdraw.add(unstake_info.amount);
-        }
-    }
-
-    deps.as_ref().api.debug(
-        format!(
-            "WASMDEBUG: execute_era_update unstaks is {:?},need_withdraw is:{}",
-            unstaks, need_withdraw
         )
         .as_str(),
     );

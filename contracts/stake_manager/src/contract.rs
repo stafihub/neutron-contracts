@@ -18,7 +18,6 @@ use neutron_sdk::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::{execute_era_update::execute_era_update, execute_pool_rm_validators::sudo_rm_validator_failed_callback};
 use crate::execute_pool_add_validators::execute_add_pool_validators;
 use crate::execute_pool_rm_validators::execute_rm_pool_validators;
 use crate::execute_register_pool::{execute_register_pool, sudo_open_ack};
@@ -50,6 +49,10 @@ use crate::{
     },
     execute_era_update::sudo_era_update_callback,
     execute_init_pool::execute_init_pool,
+};
+use crate::{
+    execute_era_update::execute_era_update,
+    execute_pool_rm_validators::sudo_rm_validator_failed_callback,
 };
 use crate::{
     msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
@@ -135,6 +138,7 @@ pub fn query(deps: Deps<NeutronQuery>, env: Env, msg: QueryMsg) -> NeutronResult
             Ok(to_json_binary(&query_delegation_by_addr(deps, pool_addr)?)?)
         }
         QueryMsg::PoolInfo { pool_addr } => query_pool_info(deps, env, pool_addr),
+        QueryMsg::EraSnapShot { pool_addr } => query_pool_info(deps, env, pool_addr),
         QueryMsg::InterchainAccountAddress {
             interchain_account_id,
             connection_id,
@@ -279,7 +283,7 @@ fn sudo_callback(deps: DepsMut, env: Env, payload: SudoPayload) -> StdResult<Res
     match payload.tx_type {
         TxType::UserWithdraw => sudo_withdraw_callback(deps, payload),
         TxType::EraUpdateIbcSend => sudo_era_update_callback(deps, payload),
-        TxType::EraUpdateWithdrawSend => sudo_era_collect_withdraw_callback(deps, payload),
+        TxType::EraUpdateWithdrawSend => sudo_era_collect_withdraw_callback(deps, env, payload),
         TxType::EraBond => sudo_era_bond_withdraw_callback(deps, env, payload),
         TxType::RmValidator => sudo_rm_validator_callback(deps, payload),
 

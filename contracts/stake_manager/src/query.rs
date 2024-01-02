@@ -1,6 +1,6 @@
 use std::vec;
 
-use crate::{helper::get_ica, state::ADDR_DELEGATIONS_QUERY_ID};
+use crate::{helper::get_ica, state::{ADDR_DELEGATIONS_QUERY_ID, POOL_ERA_SHOT}};
 use cosmwasm_std::{to_json_binary, Addr, Binary, Deps, Env};
 use neutron_sdk::{
     bindings::query::{NeutronQuery, QueryInterchainAccountAddressResponse},
@@ -161,6 +161,16 @@ pub fn query_pool_info(
     let pool_info = POOLS.load(deps.storage, pool_addr)?;
 
     Ok(to_json_binary(&pool_info)?)
+}
+
+pub fn query_era_snapshot(
+    deps: Deps<NeutronQuery>,
+    _env: Env,
+    pool_addr: String,
+) -> NeutronResult<Binary> {
+    let result = POOL_ERA_SHOT.load(deps.storage, pool_addr)?;
+
+    Ok(to_json_binary(&result)?)
 }
 
 // returns ICA address from Neutron ICA SDK module

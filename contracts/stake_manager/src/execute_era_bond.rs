@@ -4,12 +4,13 @@ use std::{
     ops::{Div, Mul, Sub},
 };
 
-use cosmos_sdk_proto::cosmos::staking::v1beta1::{MsgDelegate, MsgUndelegate};
+use cosmos_sdk_proto::cosmos::staking::v1beta1::MsgUndelegate;
 use cosmos_sdk_proto::cosmos::{
     base::v1beta1::Coin, distribution::v1beta1::MsgWithdrawDelegatorReward,
 };
 use cosmos_sdk_proto::prost::Message;
 use cosmwasm_std::{Binary, Delegation, DepsMut, Env, Response, StdError, StdResult, Uint128};
+
 use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::interchain_txs::helpers::get_port_id;
 use neutron_sdk::{
@@ -18,9 +19,9 @@ use neutron_sdk::{
     NeutronError, NeutronResult,
 };
 
-use crate::helper::min_ntrn_ibc_fee;
+use crate::helper::{gen_delegation_txs, min_ntrn_ibc_fee};
 use crate::state::PoolBondState::{BondReported, EraUpdated};
-use crate::state::{POOLS, ADDR_ICAID_MAP};
+use crate::state::{ADDR_ICAID_MAP, POOLS};
 use crate::{
     contract::{msg_with_sudo_callback, SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS},
     query::query_delegation_by_addr,
@@ -159,32 +160,12 @@ pub fn execute_era_bond(
 
                 op_validators.push(validator_addr.clone());
 
-                // add submessage to stake
-                let delegate_msg = MsgDelegate {
-                    delegator_address: pool_addr.clone(),
-                    validator_address: validator_addr.clone(),
-                    amount: Some(Coin {
-                        denom: pool_info.remote_denom.clone(),
-                        amount: amount_for_this_validator.to_string(),
-                    }),
-                };
-
-                // Serialize the Delegate message.
-                let mut buf = Vec::new();
-                buf.reserve(delegate_msg.encoded_len());
-
-                if let Err(e) = delegate_msg.encode(&mut buf) {
-                    return Err(NeutronError::Std(StdError::generic_err(format!(
-                        "Encode error: {}",
-                        e
-                    ))));
-                }
-
-                // Put the serialized Delegate message to a types.Any protobuf message.
-                let any_msg = ProtobufAny {
-                    type_url: "/cosmos.staking.v1beta1.MsgDelegate".to_string(),
-                    value: Binary::from(buf),
-                };
+                let any_msg = gen_delegation_txs(
+                    pool_addr.clone(),
+                    validator_addr.clone(),
+                    pool_info.remote_denom.clone(),
+                    amount_for_this_validator,
+                );
 
                 msgs.push(any_msg);
             }

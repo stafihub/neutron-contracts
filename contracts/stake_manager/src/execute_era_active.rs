@@ -47,7 +47,7 @@ pub fn execute_era_active(
     match delegations_result {
         Ok(delegations_resp) => {
             if delegations_resp.last_submitted_local_height <= pool_era_shot.bond_height {
-                return Err(NeutronError::Std(StdError::generic_err("Delegation submission height is less than or equal to the bond height of the pool era, which is not allowed.")));
+                return Err(NeutronError::Std(StdError::generic_err("Delegation submission height is less than or equal to the bond/withdraw collect height of the pool era, which is not allowed.")));
             }
             for delegation in delegations_resp.delegations {
                 total_amount.amount = total_amount.amount.add(delegation.amount.amount);
@@ -84,15 +84,18 @@ pub fn execute_era_active(
 
     deps.as_ref().api.debug(
         format!(
-            "WASMDEBUG: execute_era_active protocol_fee is: {:?}",
-            protocol_fee
+            "WASMDEBUG: execute_era_active protocol_fee is: {:?}, total_amount is: {:?}, token_info is: {:?}",
+            protocol_fee,total_amount,token_info
         )
         .as_str(),
     );
 
-    pool_info.rate = total_amount
+    let scale_factor = Uint128::new(1_000_000);
+    let scaled_total_amount = total_amount
         .amount
-        .div(token_info.total_supply.add(protocol_fee));
+        .multiply_ratio(scale_factor, Uint128::one());
+    pool_info.rate = scaled_total_amount.div(token_info.total_supply.add(protocol_fee));
+
     pool_info.era_update_status = PoolBondState::ActiveReported;
     pool_info.bond = Uint128::zero();
     pool_info.unbond = Uint128::zero();
