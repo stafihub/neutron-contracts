@@ -47,7 +47,7 @@ pub fn execute_era_active(
     match delegations_result {
         Ok(delegations_resp) => {
             if delegations_resp.last_submitted_local_height <= pool_era_shot.bond_height {
-                return Err(NeutronError::Std(StdError::generic_err("Delegation submission height is less than or equal to the bond height of the pool era, which is not allowed.")));
+                return Err(NeutronError::Std(StdError::generic_err("Delegation submission height is less than or equal to the bond/withdraw collect height of the pool era, which is not allowed.")));
             }
             for delegation in delegations_resp.delegations {
                 total_amount.amount = total_amount.amount.add(delegation.amount.amount);
