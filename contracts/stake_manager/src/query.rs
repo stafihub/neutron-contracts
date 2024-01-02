@@ -26,11 +26,10 @@ pub fn query_user_unstake(
 ) -> NeutronResult<Binary> {
     let mut results = vec![];
 
-    if let Some(unstakes) = UNSTAKES_INDEX_FOR_USER.may_load(deps.storage, &user_neutron_addr)? {
-        for (unstake_pool, unstake_index) in unstakes.into_iter().flatten() {
-            if unstake_pool != pool_addr {
-                continue;
-            }
+    if let Some(unstakes) =
+        UNSTAKES_INDEX_FOR_USER.may_load(deps.storage, (user_neutron_addr, pool_addr))?
+    {
+        for unstake_index in unstakes {
             let unstake_info = UNSTAKES_OF_INDEX.load(deps.storage, unstake_index)?;
             results.push(unstake_info);
         }
@@ -76,7 +75,8 @@ pub fn query_delegation_by_addr(
     let contract_query_id = ADDR_DELEGATIONS_QUERY_ID.load(deps.storage, addr)?;
     let registered_query_id = OWN_QUERY_ID_TO_ICQ_ID.load(deps.storage, contract_query_id)?;
     // get info about the query
-    let registered_query: neutron_sdk::bindings::query::QueryRegisteredQueryResponse = get_registered_query(deps, registered_query_id)?;
+    let registered_query: neutron_sdk::bindings::query::QueryRegisteredQueryResponse =
+        get_registered_query(deps, registered_query_id)?;
     // check that query type is KV
     check_query_type(registered_query.registered_query.query_type, QueryType::KV)?;
     // reconstruct a nice Balances structure from raw KV-storage values

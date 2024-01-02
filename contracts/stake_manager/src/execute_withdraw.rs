@@ -6,17 +6,17 @@ use cosmos_sdk_proto::prost::Message;
 use cosmwasm_std::{
     Addr, Binary, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128,
 };
-use neutron_sdk::{
-    bindings::{msg::NeutronMsg, query::NeutronQuery},
-    NeutronError,
-    NeutronResult, query::min_ibc_fee::query_min_ibc_fee,
-};
 use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::interchain_txs::helpers::get_port_id;
+use neutron_sdk::{
+    bindings::{msg::NeutronMsg, query::NeutronQuery},
+    query::min_ibc_fee::query_min_ibc_fee,
+    NeutronError, NeutronResult,
+};
 
-use crate::contract::{DEFAULT_TIMEOUT_SECONDS, msg_with_sudo_callback, SudoPayload, TxType};
+use crate::contract::{msg_with_sudo_callback, SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS};
 use crate::helper::min_ntrn_ibc_fee;
-use crate::state::{POOLS, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX, WithdrawStatus};
+use crate::state::{WithdrawStatus, POOLS, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX};
 
 pub fn execute_withdraw(
     mut deps: DepsMut<NeutronQuery>,
@@ -32,11 +32,10 @@ pub fn execute_withdraw(
 
     let pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
 
-    if let Some(unstakes) = UNSTAKES_INDEX_FOR_USER.may_load(deps.storage, &info.sender)? {
-        for (unstake_pool, unstake_index) in unstakes.into_iter().flatten() {
-            if unstake_pool != pool_addr {
-                continue;
-            }
+    if let Some(unstakes) =
+        UNSTAKES_INDEX_FOR_USER.may_load(deps.storage, (info.sender.clone(), pool_addr.clone()))?
+    {
+        for unstake_index in unstakes {
             let mut unstake_info = UNSTAKES_OF_INDEX.load(deps.storage, unstake_index.clone())?;
             if unstake_info.status == WithdrawStatus::Pending {
                 continue;
@@ -127,22 +126,23 @@ pub fn sudo_withdraw_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<
     let parts: Vec<String> = payload.message.split('_').map(String::from).collect();
     let user_addr = Addr::unchecked(parts.first().unwrap_or(&String::new()));
 
-    if let Some(mut unstakes) = UNSTAKES_INDEX_FOR_USER.may_load(deps.storage, &user_addr)? {
+    if let Some(mut unstakes) = UNSTAKES_INDEX_FOR_USER
+        .may_load(deps.storage, (user_addr.clone(), payload.pool_addr.clone()))?
+    {
         deps.api.debug(
             format!(
                 "WASMDEBUG: sudo_callback: UserWithdraw before unstakes: {:?}",
                 unstakes
             )
-                .as_str(),
+            .as_str(),
         );
 
-        unstakes.retain(|unstake| {
-            if let Some((_, unstake_index)) = unstake {
-                if parts.contains(unstake_index) {
-                    UNSTAKES_OF_INDEX.remove(deps.storage, unstake_index.to_string());
-                    return false;
-                }
+        unstakes.retain(|unstake_index| {
+            if parts.contains(&format!("{}", unstake_index)) {
+                UNSTAKES_OF_INDEX.remove(deps.storage, *unstake_index);
+                return false;
             }
+
             true
         });
 
@@ -151,10 +151,10 @@ pub fn sudo_withdraw_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<
                 "WASMDEBUG: sudo_callback: UserWithdraw after unstakes: {:?}",
                 unstakes
             )
-                .as_str(),
+            .as_str(),
         );
 
-        UNSTAKES_INDEX_FOR_USER.save(deps.storage, &user_addr, &unstakes)?;
+        UNSTAKES_INDEX_FOR_USER.save(deps.storage, (user_addr, payload.pool_addr), &unstakes)?;
     }
     Ok(Response::new())
 }

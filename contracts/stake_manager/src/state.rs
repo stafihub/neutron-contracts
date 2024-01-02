@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr, Binary, from_json, Order, StdResult, Storage, to_json_vec, Uint128};
+use cosmwasm_std::{from_json, to_json_vec, Addr, Binary, Order, StdResult, Storage, Uint128};
 use cw_storage_plus::{Item, Map};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -31,11 +31,12 @@ pub struct State {
 pub const STATE: Item<State> = Item::new("state");
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct PoolValidatorStatus{
-    pub status: ValidatorUpdateStatus
+pub struct PoolValidatorStatus {
+    pub status: ValidatorUpdateStatus,
 }
 
-pub const POOL_VALIDATOR_STATUS: Map<String, PoolValidatorStatus> = Map::new("pool_validator_status");
+pub const POOL_VALIDATOR_STATUS: Map<String, PoolValidatorStatus> =
+    Map::new("pool_validator_status");
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct PoolInfo {
@@ -101,16 +102,15 @@ pub enum WithdrawStatus {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct UnstakeInfo {
     pub era: u64,
-    pub index: String,
     pub pool_addr: String,
     pub amount: Uint128,
     pub status: WithdrawStatus,
 }
 
-pub const UNSTAKES_OF_INDEX: Map<String, UnstakeInfo> = Map::new("unstakes_of_index");
+pub const UNSTAKES_OF_INDEX: Map<u64, UnstakeInfo> = Map::new("unstakes_of_index");
 
-// Option<(String, String) 1-pool_addr 2-String-> index -> pool_addr+"-"+will_unstake_index
-pub const UNSTAKES_INDEX_FOR_USER: Map<&Addr, Vec<Option<(String, String)>>> =
+// (userAddress,poolAddress) => []unstakeIndex
+pub const UNSTAKES_INDEX_FOR_USER: Map<(Addr, String), Vec<u64>> =
     Map::new("unstakes_index_for_user");
 
 //  key: port_id value: Option<pool_addr,interchain_connection_id>

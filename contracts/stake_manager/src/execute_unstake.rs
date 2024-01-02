@@ -2,7 +2,7 @@ use std::ops::{Add, Div, Mul, Sub};
 use std::vec;
 
 use cosmwasm_std::{
-    CosmosMsg, DepsMut, MessageInfo, Response, StdError, to_json_binary, Uint128, WasmMsg,
+    to_json_binary, CosmosMsg, DepsMut, MessageInfo, Response, StdError, Uint128, WasmMsg,
 };
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
@@ -10,7 +10,7 @@ use neutron_sdk::{
 };
 
 use crate::state::{
-    POOLS, UnstakeInfo, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX, WithdrawStatus,
+    UnstakeInfo, WithdrawStatus, POOLS, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX,
 };
 
 // Before this step, need the user to authorize burn from
@@ -33,17 +33,10 @@ pub fn execute_unstake(
         .api
         .debug(format!("WASMDEBUG: execute_unstake pool_info: {:?}", pool_info).as_str());
 
-    let unstake_count = match UNSTAKES_INDEX_FOR_USER.load(deps.storage, &info.sender) {
-        Ok(unstakes) => {
-            let mut count = 0u64;
-            for unstake in unstakes {
-                let (unstake_pool_addr, _) = unstake.unwrap();
-                if pool_addr == unstake_pool_addr {
-                    count += 1;
-                }
-            }
-            count
-        }
+    let unstake_count = match UNSTAKES_INDEX_FOR_USER
+        .load(deps.storage, (info.sender.clone(), pool_addr.clone()))
+    {
+        Ok(unstakes) => unstakes.len() as u64,
         Err(_) => 0u64,
     };
 
@@ -67,11 +60,15 @@ pub fn execute_unstake(
     let token_amount = rtoken_amount
         .mul(Uint128::new(1_000_000))
         .div(pool_info.rate);
-    
-    deps.as_ref()
-        .api
-        .debug(format!("WASMDEBUG: execute_unstake token_amount: {:?}", token_amount).as_str());
-    
+
+    deps.as_ref().api.debug(
+        format!(
+            "WASMDEBUG: execute_unstake token_amount: {:?}",
+            token_amount
+        )
+        .as_str(),
+    );
+
     // update pool info
     pool_info.next_unstake_index += 1;
     pool_info.unbond = pool_info.unbond.add(token_amount);
@@ -119,16 +116,14 @@ pub fn execute_unstake(
 
     // update unstake info
     let will_use_unstake_index = pool_info.next_unstake_index;
-    let index = format!("{}-{}", pool_info.pool_addr, will_use_unstake_index);
     let unstake_info = UnstakeInfo {
         era: pool_info.era,
-        index: index.clone(),
         pool_addr: pool_addr.clone(),
         amount: token_amount,
         status: WithdrawStatus::Default,
     };
 
-    UNSTAKES_OF_INDEX.save(deps.storage, index, &unstake_info)?;
+    UNSTAKES_OF_INDEX.save(deps.storage, will_use_unstake_index, &unstake_info)?;
     POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
 
     // send event
