@@ -5,6 +5,9 @@ use cosmwasm_std::{
     Reply, Response, StdError, StdResult, SubMsg,
 };
 use cw2::set_contract_version;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
 use neutron_sdk::sudo::msg::SudoMsg;
 use neutron_sdk::{
     bindings::{
@@ -15,10 +18,8 @@ use neutron_sdk::{
     sudo::msg::RequestPacket,
     NeutronResult,
 };
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 
-use crate::execute_pool_add_validators::execute_add_pool_validators;
+use crate::execute_era_restake::sudo_era_restake_callback;
 use crate::execute_pool_rm_validators::execute_rm_pool_validators;
 use crate::execute_register_pool::{execute_register_pool, sudo_open_ack};
 use crate::execute_register_query::{register_balance_query, register_delegations_query};
@@ -49,6 +50,10 @@ use crate::{
     },
     execute_era_update::sudo_era_update_callback,
     execute_init_pool::execute_init_pool,
+};
+use crate::{
+    execute_era_restake::execute_era_restake,
+    execute_pool_add_validators::execute_add_pool_validators, query::query_era_snapshot,
 };
 use crate::{
     execute_era_update::execute_era_update,
@@ -87,6 +92,7 @@ pub enum TxType {
     EraUpdateIbcSend,
     EraBond,
     EraUpdateWithdrawSend,
+    EraRestake,
     EraActive,
 }
 
@@ -138,7 +144,7 @@ pub fn query(deps: Deps<NeutronQuery>, env: Env, msg: QueryMsg) -> NeutronResult
             Ok(to_json_binary(&query_delegation_by_addr(deps, pool_addr)?)?)
         }
         QueryMsg::PoolInfo { pool_addr } => query_pool_info(deps, env, pool_addr),
-        QueryMsg::EraSnapShot { pool_addr } => query_pool_info(deps, env, pool_addr),
+        QueryMsg::EraSnapshot { pool_addr } => query_era_snapshot(deps, env, pool_addr),
         QueryMsg::InterchainAccountAddress {
             interchain_account_id,
             connection_id,
@@ -169,7 +175,7 @@ pub fn execute(
 ) -> NeutronResult<Response<NeutronMsg>> {
     deps.as_ref()
         .api
-        .debug(format!("WASMDEBUG: execute msg is {:?}", msg).as_str());
+        .debug(format!("WASMDEBUG: execute msg is {:?},info is:{:?}", msg, info).as_str());
     match msg {
         ExecuteMsg::RegisterPool {
             connection_id,
@@ -219,9 +225,8 @@ pub fn execute(
             execute_era_update(deps, env, channel, pool_addr)
         }
         ExecuteMsg::EraBond { pool_addr } => execute_era_bond(deps, env, pool_addr),
-        ExecuteMsg::EraCollectWithdraw { pool_addr } => {
-            execute_era_collect_withdraw(deps, env, pool_addr)
-        }
+        ExecuteMsg::EraCollectWithdraw { pool_addr } => execute_era_collect_withdraw(deps, env, pool_addr),
+        ExecuteMsg::EraRestake { pool_addr } => execute_era_restake(deps, env, pool_addr),
         ExecuteMsg::EraActive { pool_addr } => execute_era_active(deps, pool_addr),
         ExecuteMsg::StakeLSM {} => execute_stake_lsm(deps, env, info),
     }
@@ -283,8 +288,9 @@ fn sudo_callback(deps: DepsMut, env: Env, payload: SudoPayload) -> StdResult<Res
     match payload.tx_type {
         TxType::UserWithdraw => sudo_withdraw_callback(deps, payload),
         TxType::EraUpdateIbcSend => sudo_era_update_callback(deps, payload),
-        TxType::EraUpdateWithdrawSend => sudo_era_collect_withdraw_callback(deps, env, payload),
         TxType::EraBond => sudo_era_bond_withdraw_callback(deps, env, payload),
+        TxType::EraUpdateWithdrawSend => sudo_era_collect_withdraw_callback(deps, env, payload),
+        TxType::EraRestake => sudo_era_restake_callback(deps, env, payload),
         TxType::RmValidator => sudo_rm_validator_callback(deps, payload),
 
         _ => Ok(Response::new()),

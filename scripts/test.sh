@@ -4,6 +4,9 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+# create stake-manager contract -> create rtoken contract --> send gas to stake manager -> test stake -> test unstake -> test new era -> test new era +1
+# todo -> test withdraw
+
 CONTRACT_PATH="artifacts/stake_manager-aarch64.wasm"
 RTOKEN_CONTRACT_PATH="artifacts/rtoken-aarch64.wasm"
 CHAIN_ID_1="test-1"
@@ -17,6 +20,7 @@ NEUTRON_NODE="tcp://127.0.0.1:26657"
 GAIA_NODE="tcp://127.0.0.1:16657"
 ADDRESS_1="neutron1m9l358xunhhwds0568za49mzhvuxx9ux8xafx2"
 ADDRESS_2="cosmos10h9stc5v6ntgeygf5xf945njqq5h32r53uquvw"
+# ADDRESS_2="cosmos1tn7wpug7hq2xxmcr00g4jrewna5rmhtkaeu3k6" # neutron1tn7wpug7hq2xxmcr00g4jrewna5rmhtkex4nva
 ADMIN="neutron1m9l358xunhhwds0568za49mzhvuxx9ux8xafx2"
 # VALIDATOR="cosmosvaloper18hl5c9xn5dze2g50uaw0l2mr02ew57zk0auktn"
 # rtoken_address="neutron1kt4604x3kn48dulhvjzyxekn9xg3xnv8a5f48syr0vtrf3j3nyss50n028"
@@ -242,7 +246,7 @@ EOF
 )
 
 tx_result=$(gaiad tx ibc-transfer transfer transfer channel-0 \
-    "$contract_address" 969999970000uatom \
+    "$contract_address" 405550000uatom \
     --memo "$msg" \
     --gas auto --gas-adjustment 1.4 \
     --fees 1000uatom --from $ADDRESS_2 \
@@ -294,7 +298,7 @@ echo " done"
 
 unstake_msg=$(printf '{
   "unstake": {
-    "amount": "9999950000",
+    "amount": "5550000",
     "pool_addr": "%s"
   }
 }' "$ica_address")
@@ -338,6 +342,7 @@ grpcurl -plaintext -d "{\"delegator_address\":\"$ica_address\"}" localhost:9090 
 echo "contract_address balance Query"
 neutrond query bank balances "$contract_address" | jq
 
+# era_update round 1
 era_update_msg=$(printf '{
   "era_update": {
     "channel": "channel-0",
@@ -367,6 +372,7 @@ echo " done"
 echo "query ica atom balance"
 gaiad query bank balances "$ica_address" | jq
 
+# era_bond round 1
 bond_msg=$(printf '{
   "era_bond": {
     "pool_addr": "%s"
@@ -402,6 +408,7 @@ url="http://127.0.0.1:1317/wasm/contract/$contract_address/smart/$query_b64_urle
 pool_info=$(curl -s "$url" | jq -r '.result.smart' | base64 -d | jq)
 echo "pool_info is: $pool_info"
 
+# era_collect_withdraw_msg round 1
 era_collect_withdraw_msg=$(printf '{
   "era_collect_withdraw": {
     "pool_addr": "%s"
@@ -427,8 +434,34 @@ for i in $(seq 10); do
 done
 echo " done"
 
+era_restake_msg=$(printf '{
+  "era_restake": {
+    "pool_addr": "%s"
+  }
+}' "$ica_address")
+
+tx_result="$(neutrond tx wasm execute "$contract_address" "$era_restake_msg" \
+    --amount 2000000untrn \
+    --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
+    --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \
+    --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"
+
+code="$(echo "$tx_result" | jq '.code')"
+if [[ "$code" -ne 0 ]]; then
+    echo "Failed to era_restake_msg msg: $(echo "$tx_result" | jq '.raw_log')" && exit 1
+fi
+
+echo "Waiting 20 seconds for era_restake_msg (sometimes it takes a lot of time)…"
+# shellcheck disable=SC2034
+for i in $(seq 20); do
+    sleep 1
+    echo -n .
+done
+echo " done"
+
 gaiad query bank balances "$ica_address" | jq
 
+# era_active_msg round 1
 era_active_msg=$(printf '{
   "era_active": {
     "pool_addr": "%s"
@@ -460,6 +493,7 @@ url="http://127.0.0.1:1317/wasm/contract/$contract_address/smart/$query_b64_urle
 pool_info=$(curl -s "$url" | jq -r '.result.smart' | base64 -d | jq)
 echo "pool_info is: $pool_info"
 
+# era_update_msg round 2
 era_update_msg=$(printf '{
   "era_update": {
     "channel": "channel-0",
@@ -489,6 +523,7 @@ echo " done"
 echo "query ica atom balance"
 gaiad query bank balances "$ica_address" | jq
 
+# bond_msg round 2
 bond_msg=$(printf '{
   "era_bond": {
     "pool_addr": "%s"
@@ -524,6 +559,7 @@ url="http://127.0.0.1:1317/wasm/contract/$contract_address/smart/$query_b64_urle
 pool_info=$(curl -s "$url" | jq -r '.result.smart' | base64 -d | jq)
 echo "pool_info is: $pool_info"
 
+# era_collect_withdraw round 2
 era_collect_withdraw_msg=$(printf '{
   "era_collect_withdraw": {
     "pool_addr": "%s"
@@ -541,9 +577,34 @@ if [[ "$code" -ne 0 ]]; then
     echo "Failed to era_collect_withdraw_msg msg: $(echo "$tx_result" | jq '.raw_log')" && exit 1
 fi
 
-echo "Waiting 30 seconds for era_collect_withdraw_msg (sometimes it takes a lot of time)…"
+echo "Waiting 20 seconds for era_collect_withdraw_msg (sometimes it takes a lot of time)…"
 # shellcheck disable=SC2034
-for i in $(seq 30); do
+for i in $(seq 20); do
+    sleep 1
+    echo -n .
+done
+echo " done"
+
+era_restake_msg=$(printf '{
+  "era_restake": {
+    "pool_addr": "%s"
+  }
+}' "$ica_address")
+
+tx_result="$(neutrond tx wasm execute "$contract_address" "$era_restake_msg" \
+    --amount 2000000untrn \
+    --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
+    --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \
+    --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"
+
+code="$(echo "$tx_result" | jq '.code')"
+if [[ "$code" -ne 0 ]]; then
+    echo "Failed to era_restake_msg msg: $(echo "$tx_result" | jq '.raw_log')" && exit 1
+fi
+
+echo "Waiting 20 seconds for era_restake_msg (sometimes it takes a lot of time)…"
+# shellcheck disable=SC2034
+for i in $(seq 20); do
     sleep 1
     echo -n .
 done
@@ -551,6 +612,7 @@ echo " done"
 
 gaiad query bank balances "$ica_address" | jq
 
+# era_active_msg round2
 era_active_msg=$(printf '{
   "era_active": {
     "pool_addr": "%s"
@@ -568,7 +630,7 @@ if [[ "$code" -ne 0 ]]; then
     echo "Failed to era_active_msg msg: $(echo "$tx_result" | jq '.raw_log')" && exit 1
 fi
 
-echo "Waiting 10 seconds for era_collect_withdraw_msg (sometimes it takes a lot of time)…"
+echo "Waiting 10 seconds for era_active_msg (sometimes it takes a lot of time)…"
 # shellcheck disable=SC2034
 for i in $(seq 10); do
     sleep 1
@@ -581,6 +643,3 @@ query_b64_urlenc="$(echo -n "$query" | base64 | tr -d '\n' | jq -sRr '@uri')"
 url="http://127.0.0.1:1317/wasm/contract/$contract_address/smart/$query_b64_urlenc?encoding=base64"
 pool_info=$(curl -s "$url" | jq -r '.result.smart' | base64 -d | jq)
 echo "pool_info is: $pool_info"
-
-# create stake-manager contract -> create rtoken contract --> send gas to stake manager -> test stake -> test unstake -> test new era -> test new era +1
-# -> test withdraw

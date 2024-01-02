@@ -83,6 +83,7 @@ pub enum PoolBondState {
     EraUpdated,
     BondReported,
     WithdrawReported,
+    RestakeReported,
     ActiveReported,
 }
 
