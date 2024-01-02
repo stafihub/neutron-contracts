@@ -25,32 +25,52 @@ pub fn execute_withdraw(
     pool_addr: String,
     receiver: Addr,
     interchain_account_id: String,
+    unstake_index_list: Vec<u64>,
 ) -> NeutronResult<Response<NeutronMsg>> {
-    let mut total_withdraw_amount = Uint128::zero();
-
-    let mut emit_unstake_index_list = vec![];
+    if unstake_index_list.len() == 0 {
+        return Err(NeutronError::Std(StdError::generic_err(
+            "Empty unstake list",
+        )));
+    }
 
     let pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
 
-    if let Some(unstakes) =
-        UNSTAKES_INDEX_FOR_USER.may_load(deps.storage, (info.sender.clone(), pool_addr.clone()))?
-    {
-        for unstake_index in unstakes {
-            let mut unstake_info = UNSTAKES_OF_INDEX.load(deps.storage, unstake_index.clone())?;
-            if unstake_info.status == WithdrawStatus::Pending {
-                continue;
-            }
-            if unstake_info.era + pool_info.unbonding_period > pool_info.era {
-                continue;
-            }
+    let mut total_withdraw_amount = Uint128::zero();
+    for unstake_index in unstake_index_list.clone() {
+        let mut unstake_info = UNSTAKES_OF_INDEX.load(deps.storage, unstake_index.clone())?;
 
-            // Remove the unstake index element of info.sender from UNSTAKES_INDEX_FOR_USER
-            total_withdraw_amount += unstake_info.amount;
-            emit_unstake_index_list.push(unstake_index.clone());
-
-            unstake_info.status = WithdrawStatus::Pending;
-            UNSTAKES_OF_INDEX.save(deps.storage, unstake_index, &unstake_info)?;
+        if unstake_info.pool_addr != pool_addr {
+            return Err(NeutronError::Std(StdError::generic_err(format!(
+                "Unstake index: {} pool not match",
+                unstake_index
+            ))));
         }
+
+        if unstake_info.unstaker != info.sender.to_string() {
+            return Err(NeutronError::Std(StdError::generic_err(format!(
+                "Unstake index: {} unstaker not match",
+                unstake_index
+            ))));
+        }
+
+        if unstake_info.status == WithdrawStatus::Pending {
+            return Err(NeutronError::Std(StdError::generic_err(format!(
+                "Unstake index: {} status not match",
+                unstake_index
+            ))));
+        }
+        if unstake_info.era + pool_info.unbonding_period > pool_info.era {
+            return Err(NeutronError::Std(StdError::generic_err(format!(
+                "Unstake index: {} not withdrawable",
+                unstake_index
+            ))));
+        }
+
+        // Remove the unstake index element of info.sender from UNSTAKES_INDEX_FOR_USER
+        total_withdraw_amount += unstake_info.amount;
+
+        unstake_info.status = WithdrawStatus::Pending;
+        UNSTAKES_OF_INDEX.save(deps.storage, unstake_index, &unstake_info)?;
     }
 
     if total_withdraw_amount.is_zero() {
@@ -60,7 +80,7 @@ pub fn execute_withdraw(
         ))));
     }
 
-    let unstake_index_list_str = emit_unstake_index_list
+    let unstake_index_list_str = unstake_index_list
         .iter()
         .map(|index| index.to_string())
         .collect::<Vec<String>>()
@@ -138,7 +158,7 @@ pub fn sudo_withdraw_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<
         );
 
         unstakes.retain(|unstake_index| {
-            if parts.contains(&format!("{}", unstake_index)) {
+            if parts.contains(&unstake_index.to_string()) {
                 UNSTAKES_OF_INDEX.remove(deps.storage, *unstake_index);
                 return false;
             }

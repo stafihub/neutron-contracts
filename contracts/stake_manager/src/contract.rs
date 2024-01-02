@@ -206,7 +206,16 @@ pub fn execute(
             pool_addr,
             receiver,
             interchain_account_id,
-        } => execute_withdraw(deps, env, info, pool_addr, receiver, interchain_account_id),
+            unstake_index_list,
+        } => execute_withdraw(
+            deps,
+            env,
+            info,
+            pool_addr,
+            receiver,
+            interchain_account_id,
+            unstake_index_list,
+        ),
         ExecuteMsg::PoolRmValidator {
             pool_addr,
             validator_addrs,

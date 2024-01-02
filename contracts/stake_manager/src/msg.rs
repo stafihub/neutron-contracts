@@ -108,6 +108,7 @@ pub enum ExecuteMsg {
         pool_addr: String,
         receiver: Addr,
         interchain_account_id: String,
+        unstake_index_list: Vec<u64>,
     },
     PoolRmValidator {
         pool_addr: String,

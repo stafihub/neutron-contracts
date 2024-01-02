@@ -122,6 +122,7 @@ pub fn execute_unstake(
     let unstake_info = UnstakeInfo {
         era: pool_info.era,
         pool_addr: pool_addr.clone(),
+        unstaker: info.sender.to_string(),
         amount: token_amount,
         status: WithdrawStatus::Default,
     };
@@ -133,7 +134,7 @@ pub fn execute_unstake(
     Ok(Response::new()
         .add_message(CosmosMsg::Wasm(burn_msg))
         .add_attribute("action", "unstake")
-        .add_attribute("from", info.sender)
+        .add_attribute("from", info.sender.to_string())
         .add_attribute("token_amount", token_amount.to_string())
         .add_attribute("rtoken_amount", rtoken_amount.to_string())
         .add_attribute("unstake_index", will_use_unstake_index.to_string()))

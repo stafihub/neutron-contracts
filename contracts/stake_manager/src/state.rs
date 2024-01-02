@@ -103,6 +103,7 @@ pub enum WithdrawStatus {
 pub struct UnstakeInfo {
     pub era: u64,
     pub pool_addr: String,
+    pub unstaker: String,
     pub amount: Uint128,
     pub status: WithdrawStatus,
 }
