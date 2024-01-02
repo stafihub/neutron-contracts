@@ -17,7 +17,7 @@ use crate::state::{
 pub fn execute_unstake(
     deps: DepsMut<NeutronQuery>,
     info: MessageInfo,
-    mut rtoken_amount: Uint128,
+    rtoken_amount: Uint128,
     pool_addr: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
     if rtoken_amount == Uint128::zero() {
@@ -56,10 +56,41 @@ pub fn execute_unstake(
         ))));
     }
 
+    // cal fee
+    let mut will_burn_rtoken_amount = rtoken_amount;
+    if pool_info.unbond_commission > Uint128::zero() {
+        let cms_fee = rtoken_amount
+            .mul(pool_info.unbond_commission)
+            .div(Uint128::new(1_000_000));
+        will_burn_rtoken_amount = rtoken_amount.sub(cms_fee);
+
+        if cms_fee.u128() > 0 {
+            WasmMsg::Execute {
+                contract_addr: pool_info.rtoken.to_string(),
+                msg: to_json_binary(
+                    &(rtoken::msg::ExecuteMsg::TransferFrom {
+                        owner: info.sender.to_string(),
+                        recipient: pool_info.protocol_fee_receiver.to_string(),
+                        amount: cms_fee,
+                    }),
+                )?,
+                funds: vec![],
+            };
+        }
+
+        deps.as_ref().api.debug(
+            format!(
+                "WASMDEBUG: execute_unstake cms_fee: {:?} rtoken_amount: {:?}",
+                cms_fee, rtoken_amount
+            )
+            .as_str(),
+        );
+    }
+
     // Calculate the number of tokens(atom)
-    let token_amount = rtoken_amount
-        .mul(Uint128::new(1_000_000))
-        .div(pool_info.rate);
+    let token_amount = will_burn_rtoken_amount
+        .mul(pool_info.rate)
+        .div(Uint128::new(1_000_000));
 
     deps.as_ref().api.debug(
         format!(
@@ -74,41 +105,13 @@ pub fn execute_unstake(
     pool_info.unbond = pool_info.unbond.add(token_amount);
     pool_info.active = pool_info.active.sub(token_amount);
 
-    // cal fee
-    let mut cms_fee = Uint128::zero();
-    if pool_info.unbond_commission > Uint128::zero() {
-        cms_fee = rtoken_amount
-            .mul(pool_info.unbond_commission)
-            .div(Uint128::new(1_000_000));
-        rtoken_amount = rtoken_amount.sub(cms_fee);
-    }
-    deps.as_ref().api.debug(
-        format!(
-            "WASMDEBUG: execute_unstake cms_fee: {:?} rtoken_amount: {:?}",
-            cms_fee, rtoken_amount
-        )
-        .as_str(),
-    );
-
     // burn
     let burn_msg = WasmMsg::Execute {
         contract_addr: pool_info.rtoken.to_string(),
         msg: to_json_binary(
             &(rtoken::msg::ExecuteMsg::BurnFrom {
                 owner: info.sender.to_string(),
-                amount: rtoken_amount,
-            }),
-        )?,
-        funds: vec![],
-    };
-
-    let send_fee = WasmMsg::Execute {
-        contract_addr: pool_info.rtoken.to_string(),
-        msg: to_json_binary(
-            &(rtoken::msg::ExecuteMsg::TransferFrom {
-                owner: info.sender.to_string(),
-                recipient: pool_info.protocol_fee_receiver.to_string(),
-                amount: cms_fee,
+                amount: will_burn_rtoken_amount,
             }),
         )?,
         funds: vec![],
@@ -129,7 +132,6 @@ pub fn execute_unstake(
     // send event
     Ok(Response::new()
         .add_message(CosmosMsg::Wasm(burn_msg))
-        .add_message(CosmosMsg::Wasm(send_fee))
         .add_attribute("action", "unstake")
         .add_attribute("from", info.sender)
         .add_attribute("token_amount", token_amount.to_string())
