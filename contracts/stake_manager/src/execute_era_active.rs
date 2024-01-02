@@ -84,15 +84,18 @@ pub fn execute_era_active(
 
     deps.as_ref().api.debug(
         format!(
-            "WASMDEBUG: execute_era_active protocol_fee is: {:?}",
-            protocol_fee
+            "WASMDEBUG: execute_era_active protocol_fee is: {:?}, total_amount is: {:?}, token_info is: {:?}",
+            protocol_fee,total_amount,token_info
         )
         .as_str(),
     );
 
-    pool_info.rate = total_amount
+    let scale_factor = Uint128::new(1_000_000);
+    let scaled_total_amount = total_amount
         .amount
-        .div(token_info.total_supply.add(protocol_fee));
+        .multiply_ratio(scale_factor, Uint128::one());
+    pool_info.rate = scaled_total_amount.div(token_info.total_supply.add(protocol_fee));
+
     pool_info.era_update_status = PoolBondState::ActiveReported;
     pool_info.bond = Uint128::zero();
     pool_info.unbond = Uint128::zero();
