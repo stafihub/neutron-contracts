@@ -8,6 +8,7 @@ pub mod execute_init_pool;
 pub mod execute_era_active;
 pub mod execute_era_bond;
 pub mod execute_era_collect_withdraw;
+pub mod execute_era_restake;
 pub mod execute_era_update;
 pub mod execute_pool_add_validators;
 pub mod execute_pool_rm_validators;

@@ -20,7 +20,7 @@ pub enum QueryMsg {
     PoolInfo {
         pool_addr: String,
     },
-    EraSnapShot {
+    EraSnapshot {
         pool_addr: String,
     },
     /// this query goes to neutron and get stored ICA with a specific query
@@ -126,6 +126,9 @@ pub enum ExecuteMsg {
         pool_addr: String,
     },
     EraCollectWithdraw {
+        pool_addr: String,
+    },
+    EraRestake {
         pool_addr: String,
     },
     EraActive {
