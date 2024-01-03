@@ -1,43 +1,25 @@
 use std::vec;
 
 use cosmwasm_std::{
-    entry_point, from_json, to_json_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo,
-    Reply, Response, StdError, StdResult, SubMsg,
+    Binary, CosmosMsg, Deps, DepsMut, entry_point, Env, from_json, MessageInfo, Reply,
+    Response, StdError, StdResult, SubMsg, to_json_binary,
 };
 use cw2::set_contract_version;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use neutron_sdk::sudo::msg::SudoMsg;
 use neutron_sdk::{
     bindings::{
         msg::{MsgIbcTransferResponse, NeutronMsg},
         query::NeutronQuery,
     },
     interchain_queries::get_registered_query,
-    sudo::msg::RequestPacket,
     NeutronResult,
+    sudo::msg::RequestPacket,
 };
+use neutron_sdk::sudo::msg::SudoMsg;
 
-use crate::{execute_era_restake::sudo_era_restake_callback, query::query_user_unstake_index};
-use crate::execute_pool_rm_validators::execute_rm_pool_validators;
-use crate::execute_register_pool::{execute_register_pool, sudo_open_ack};
-use crate::execute_register_query::{register_balance_query, register_delegations_query};
-use crate::execute_stake::execute_stake;
-use crate::execute_stake_lsm::execute_stake_lsm;
-use crate::execute_unstake::execute_unstake;
-use crate::execute_withdraw::{execute_withdraw, sudo_withdraw_callback};
-use crate::query::{
-    query_acknowledgement_result, query_errors_queue, query_interchain_address,
-    query_interchain_address_contract, query_pool_info, query_user_unstake,
-};
-use crate::query_callback::{
-    write_balance_query_id_to_reply_id, write_delegation_query_id_to_reply_id,
-};
-use crate::state::{
-    State, IBC_SUDO_ID_RANGE_END, IBC_SUDO_ID_RANGE_START, POOL_ERA_SHOT,
-    QUERY_BALANCES_REPLY_ID_END, QUERY_DELEGATIONS_REPLY_ID_END, STATE,
-};
+use crate::{execute_pool_rm_validators::execute_rm_pool_validators, state::QueryKind};
 use crate::{execute_config_pool::execute_config_pool, query::query_balance_by_addr};
 use crate::{execute_era_active::execute_era_active, query::query_delegation_by_addr};
 use crate::{
@@ -55,6 +37,7 @@ use crate::{
     execute_era_restake::execute_era_restake,
     execute_pool_add_validators::execute_add_pool_validators, query::query_era_snapshot,
 };
+use crate::{execute_era_restake::sudo_era_restake_callback, query::query_user_unstake_index};
 use crate::{
     execute_era_update::execute_era_update,
     execute_pool_rm_validators::sudo_rm_validator_failed_callback,
@@ -62,10 +45,27 @@ use crate::{
 use crate::{
     msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
     state::{
-        read_reply_payload, read_sudo_payload, save_reply_payload, save_sudo_payload,
-        LATEST_BALANCES_QUERY_ID, LATEST_DELEGATIONS_QUERY_ID, QUERY_BALANCES_REPLY_ID_RANGE_START,
-        QUERY_DELEGATIONS_REPLY_ID_RANGE_START,
+        LATEST_BALANCES_REPLY_ID, LATEST_DELEGATIONS_REPLY_ID, QUERY_BALANCES_REPLY_ID_RANGE_START, QUERY_DELEGATIONS_REPLY_ID_RANGE_START,
+        read_reply_payload, read_sudo_payload, save_reply_payload,
+        save_sudo_payload,
     },
+};
+use crate::execute_register_pool::{execute_register_pool, sudo_open_ack};
+use crate::execute_register_query::{register_balance_query, register_delegations_query};
+use crate::execute_stake::execute_stake;
+use crate::execute_stake_lsm::execute_stake_lsm;
+use crate::execute_unstake::execute_unstake;
+use crate::execute_withdraw::{execute_withdraw, sudo_withdraw_callback};
+use crate::query::{
+    query_acknowledgement_result, query_errors_queue, query_interchain_address,
+    query_interchain_address_contract, query_pool_info, query_user_unstake,
+};
+use crate::query_callback::{
+    write_balance_query_id_to_reply_id, write_delegation_query_id_to_reply_id,
+};
+use crate::state::{
+    IBC_SUDO_ID_RANGE_END, IBC_SUDO_ID_RANGE_START, POOL_ERA_SHOT, QUERY_BALANCES_REPLY_ID_END, QUERY_DELEGATIONS_REPLY_ID_END,
+    save_icq_reply_payload, State, STATE,
 };
 
 // Default timeout for IbcTransfer is 10000000 blocks
@@ -88,6 +88,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub enum TxType {
     SetWithdrawAddr,
     RmValidator,
+    AddValidator,
     UserWithdraw,
     EraUpdateIbcSend,
     EraBond,
@@ -116,8 +117,8 @@ pub fn instantiate(
 
     STATE.save(deps.storage, &(State { owner: info.sender }))?;
 
-    LATEST_BALANCES_QUERY_ID.save(deps.storage, &QUERY_BALANCES_REPLY_ID_RANGE_START)?;
-    LATEST_DELEGATIONS_QUERY_ID.save(deps.storage, &QUERY_DELEGATIONS_REPLY_ID_RANGE_START)?;
+    LATEST_BALANCES_REPLY_ID.save(deps.storage, &QUERY_BALANCES_REPLY_ID_RANGE_START)?;
+    LATEST_DELEGATIONS_REPLY_ID.save(deps.storage, &QUERY_DELEGATIONS_REPLY_ID_RANGE_START)?;
 
     Ok(Response::new())
 }
@@ -125,6 +126,7 @@ pub fn instantiate(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
     deps.api.debug("WASMDEBUG: migrate");
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     Ok(Response::default())
 }
 
@@ -193,8 +195,8 @@ pub fn execute(
             interchain_account_id,
             register_fee,
         ),
-        ExecuteMsg::InitPool(params) => execute_init_pool(deps, env, *params),
-        ExecuteMsg::ConfigPool(params) => execute_config_pool(deps, *params),
+        ExecuteMsg::InitPool(params) => execute_init_pool(deps, env, info, *params),
+        ExecuteMsg::ConfigPool(params) => execute_config_pool(deps, info, *params),
         ExecuteMsg::RegisterBalanceQuery {
             connection_id,
             addr,
@@ -224,7 +226,7 @@ pub fn execute(
         ExecuteMsg::PoolAddValidator {
             pool_addr,
             validator_addrs,
-        } => execute_add_pool_validators(deps, pool_addr, validator_addrs),
+        } => execute_add_pool_validators(deps, env, info, pool_addr, validator_addrs),
         ExecuteMsg::EraUpdate { channel, pool_addr } => {
             execute_era_update(deps, env, channel, pool_addr)
         }
@@ -326,12 +328,23 @@ pub fn msg_with_sudo_callback<C: Into<CosmosMsg<T>>, T>(
     Ok(SubMsg::reply_on_success(msg, id))
 }
 
+pub fn msg_icq_with_reply<C: Into<CosmosMsg<T>>, T>(
+    deps: DepsMut<NeutronQuery>,
+    msg: C,
+    payload: SudoPayload,
+    query_kind: QueryKind,
+) -> StdResult<SubMsg<T>> {
+    let id = save_icq_reply_payload(deps.storage, payload, query_kind)?;
+    Ok(SubMsg::reply_on_success(msg, id))
+}
+
 // prepare_sudo_payload is called from reply handler
 // The method is used to extract sequence id and channel from SubmitTxResponse to process sudo payload defined in msg_with_sudo_callback later in Sudo handler.
 // Such flow msg_with_sudo_callback() -> reply() -> prepare_sudo_payload() -> sudo() allows you "attach" some payload to your Transfer message
 // and process this payload when an acknowledgement for the SubmitTx message is received in Sudo handler
 fn prepare_sudo_payload(mut deps: DepsMut, _env: Env, msg: Reply) -> StdResult<Response> {
     let payload = read_reply_payload(deps.storage, msg.id)?;
+
     let resp: MsgIbcTransferResponse = from_json(
         msg.result
             .into_result()
@@ -340,6 +353,7 @@ fn prepare_sudo_payload(mut deps: DepsMut, _env: Env, msg: Reply) -> StdResult<R
             .ok_or_else(|| StdError::generic_err("no result"))?,
     )
     .map_err(|e| StdError::generic_err(format!("failed to parse response: {:?}", e)))?;
+
     let seq_id = resp.sequence_id;
     let channel_id = resp.channel;
     save_sudo_payload(deps.branch().storage, channel_id, seq_id, payload)?;

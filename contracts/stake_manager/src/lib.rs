@@ -23,3 +23,4 @@ pub mod execute_config_pool;
 pub mod helper;
 pub mod query;
 pub mod query_callback;
+mod error_conversion;
