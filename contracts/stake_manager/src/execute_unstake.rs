@@ -128,7 +128,11 @@ pub fn execute_unstake(
 
     unstakes_index_for_user.push(will_use_unstake_index);
 
-    UNSTAKES_OF_INDEX.save(deps.storage, will_use_unstake_index, &unstake_info)?;
+    UNSTAKES_OF_INDEX.save(
+        deps.storage,
+        (pool_addr.clone(), will_use_unstake_index),
+        &unstake_info,
+    )?;
     POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
     UNSTAKES_INDEX_FOR_USER.save(
         deps.storage,

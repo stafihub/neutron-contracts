@@ -41,6 +41,10 @@ pub enum QueryMsg {
         pool_addr: String,
         user_neutron_addr: Addr,
     },
+    UserUnstakeIndex {
+        pool_addr: String,
+        user_neutron_addr: Addr,
+    },
     // this query returns non-critical errors list
     ErrorsQueue {},
 }

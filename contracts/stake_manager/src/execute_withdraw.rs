@@ -14,9 +14,12 @@ use neutron_sdk::{
     NeutronError, NeutronResult,
 };
 
-use crate::{contract::{msg_with_sudo_callback, SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS}, state::ADDR_ICAID_MAP};
 use crate::helper::min_ntrn_ibc_fee;
 use crate::state::{WithdrawStatus, POOLS, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX};
+use crate::{
+    contract::{msg_with_sudo_callback, SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS},
+    state::ADDR_ICAID_MAP,
+};
 
 pub fn execute_withdraw(
     mut deps: DepsMut<NeutronQuery>,
@@ -34,12 +37,12 @@ pub fn execute_withdraw(
 
     let pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
 
-    let interchain_account_id =
-        ADDR_ICAID_MAP.load(deps.storage, pool_addr.clone())?;
+    let interchain_account_id = ADDR_ICAID_MAP.load(deps.storage, pool_addr.clone())?;
 
     let mut total_withdraw_amount = Uint128::zero();
     for unstake_index in unstake_index_list.clone() {
-        let mut unstake_info = UNSTAKES_OF_INDEX.load(deps.storage, unstake_index)?;
+        let mut unstake_info =
+            UNSTAKES_OF_INDEX.load(deps.storage, (pool_addr.clone(), unstake_index))?;
 
         if unstake_info.pool_addr != pool_addr {
             return Err(NeutronError::Std(StdError::generic_err(format!(
@@ -72,7 +75,11 @@ pub fn execute_withdraw(
         total_withdraw_amount += unstake_info.amount;
 
         unstake_info.status = WithdrawStatus::Pending;
-        UNSTAKES_OF_INDEX.save(deps.storage, unstake_index, &unstake_info)?;
+        UNSTAKES_OF_INDEX.save(
+            deps.storage,
+            (pool_addr.clone(), unstake_index),
+            &unstake_info,
+        )?;
     }
 
     if total_withdraw_amount.is_zero() {
@@ -161,7 +168,7 @@ pub fn sudo_withdraw_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<
 
         unstakes.retain(|unstake_index| {
             if parts.contains(&unstake_index.to_string()) {
-                UNSTAKES_OF_INDEX.remove(deps.storage, *unstake_index);
+                UNSTAKES_OF_INDEX.remove(deps.storage, (payload.pool_addr.clone(), *unstake_index));
                 return false;
             }
 

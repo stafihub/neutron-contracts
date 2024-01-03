@@ -19,7 +19,7 @@ use neutron_sdk::{
     NeutronResult,
 };
 
-use crate::execute_era_restake::sudo_era_restake_callback;
+use crate::{execute_era_restake::sudo_era_restake_callback, query::query_user_unstake_index};
 use crate::execute_pool_rm_validators::execute_rm_pool_validators;
 use crate::execute_register_pool::{execute_register_pool, sudo_open_ack};
 use crate::execute_register_query::{register_balance_query, register_delegations_query};
@@ -160,6 +160,10 @@ pub fn query(deps: Deps<NeutronQuery>, env: Env, msg: QueryMsg) -> NeutronResult
             pool_addr,
             user_neutron_addr,
         } => query_user_unstake(deps, pool_addr, user_neutron_addr),
+        QueryMsg::UserUnstakeIndex {
+            pool_addr,
+            user_neutron_addr,
+        } => query_user_unstake_index(deps, pool_addr, user_neutron_addr),
         QueryMsg::ErrorsQueue {} => query_errors_queue(deps),
     }
 }

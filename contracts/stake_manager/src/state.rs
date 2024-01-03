@@ -110,7 +110,8 @@ pub struct UnstakeInfo {
     pub status: WithdrawStatus,
 }
 
-pub const UNSTAKES_OF_INDEX: Map<u64, UnstakeInfo> = Map::new("unstakes_of_index");
+// (poolAddress,unstakeIndex)
+pub const UNSTAKES_OF_INDEX: Map<(String, u64), UnstakeInfo> = Map::new("unstakes_of_index");
 
 // (userAddress,poolAddress) => []unstakeIndex
 pub const UNSTAKES_INDEX_FOR_USER: Map<(Addr, String), Vec<u64>> =

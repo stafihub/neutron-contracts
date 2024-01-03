@@ -1,6 +1,9 @@
 use std::vec;
 
-use crate::{helper::get_ica, state::{ADDR_DELEGATIONS_QUERY_ID, POOL_ERA_SHOT}};
+use crate::{
+    helper::get_ica,
+    state::{ADDR_DELEGATIONS_QUERY_ID, POOL_ERA_SHOT},
+};
 use cosmwasm_std::{to_json_binary, Addr, Binary, Deps, Env};
 use neutron_sdk::{
     bindings::query::{NeutronQuery, QueryInterchainAccountAddressResponse},
@@ -27,15 +30,26 @@ pub fn query_user_unstake(
     let mut results = vec![];
 
     if let Some(unstakes) =
-        UNSTAKES_INDEX_FOR_USER.may_load(deps.storage, (user_neutron_addr, pool_addr))?
+        UNSTAKES_INDEX_FOR_USER.may_load(deps.storage, (user_neutron_addr, pool_addr.clone()))?
     {
         for unstake_index in unstakes {
-            let unstake_info = UNSTAKES_OF_INDEX.load(deps.storage, unstake_index)?;
+            let unstake_info =
+                UNSTAKES_OF_INDEX.load(deps.storage, (pool_addr.clone(), unstake_index))?;
             results.push(unstake_info);
         }
     }
 
     Ok(to_json_binary(&results)?)
+}
+
+pub fn query_user_unstake_index(
+    deps: Deps<NeutronQuery>,
+    pool_addr: String,
+    user_neutron_addr: Addr,
+) -> NeutronResult<Binary> {
+    Ok(to_json_binary(
+        &UNSTAKES_INDEX_FOR_USER.may_load(deps.storage, (user_neutron_addr, pool_addr))?,
+    )?)
 }
 
 pub fn query_balance_by_addr(
