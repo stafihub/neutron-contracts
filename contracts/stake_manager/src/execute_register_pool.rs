@@ -1,11 +1,12 @@
 use cosmwasm_std::{Addr, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
 use neutron_sdk::interchain_txs::helpers::get_port_id;
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     NeutronResult,
 };
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 
 use crate::{
     helper::get_ica,
@@ -146,6 +147,7 @@ pub fn sudo_open_ack(
                 era_process_status: EraProcessStatus::ActiveEnded,
                 unbond_commission: Uint128::zero(),
                 protocol_fee_receiver: Addr::unchecked(""),
+                admin: Addr::unchecked(""),
                 era_seconds: 0,
                 offset: 0,
             };

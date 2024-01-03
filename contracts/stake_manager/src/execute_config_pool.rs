@@ -1,17 +1,23 @@
-use cosmwasm_std::{Addr, DepsMut, Response};
+use cosmwasm_std::{Addr, DepsMut, MessageInfo, Response};
+
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     NeutronResult,
 };
 
-use crate::msg::ConfigPoolParams;
 use crate::state::POOLS;
+use crate::{error_conversion::ContractError, msg::ConfigPoolParams};
 
 pub fn execute_config_pool(
     deps: DepsMut<NeutronQuery>,
+    info: MessageInfo,
     param: ConfigPoolParams,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.as_ref().storage, param.pool_addr.clone())?;
+
+    if info.sender != pool_info.admin {
+        return Err(ContractError::Unauthorized {}.into());
+    }
 
     deps.as_ref()
         .api

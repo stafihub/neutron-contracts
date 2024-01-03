@@ -1,4 +1,4 @@
-use cosmwasm_std::{from_json, to_json_vec, Addr, Binary, Order, StdResult, Storage, Uint128};
+use cosmwasm_std::{Addr, Binary, from_json, Order, StdResult, Storage, to_json_vec, Uint128};
 use cw_storage_plus::{Item, Map};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -61,6 +61,7 @@ pub struct PoolInfo {
     pub era_process_status: EraProcessStatus,
     pub unbond_commission: Uint128,
     pub protocol_fee_receiver: Addr,
+    pub admin: Addr,
 }
 
 pub const POOLS: Map<String, PoolInfo> = Map::new("pools");
@@ -129,18 +130,18 @@ pub const ADDR_ICAID_MAP: Map<String, String> = Map::new("pool_ica_map");
 // key: connection_id value:pool_addr list
 pub const CONNECTION_POOL_MAP: Map<String, Vec<String>> = Map::new("connection_pools");
 
-// key: ica address value: query id
-pub const ADDR_BALANCES_QUERY_ID: Map<String, u64> = Map::new("addr_balances_query_id");
+// key: ica address value: query reply id
+pub const ADDR_BALANCES_REPLY_ID: Map<String, u64> = Map::new("addr_balances_reply_id");
 
-pub const ADDR_DELEGATIONS_QUERY_ID: Map<String, u64> = Map::new("addr_delegations_query_id");
+pub const ADDR_DELEGATIONS_REPLY_ID: Map<String, u64> = Map::new("addr_delegations_reply_id");
 
-pub const LATEST_BALANCES_QUERY_ID: Item<u64> = Item::new("latest_balances_query_id");
+pub const LATEST_BALANCES_REPLY_ID: Item<u64> = Item::new("latest_balances_reply_id");
 
-pub const LATEST_DELEGATIONS_QUERY_ID: Item<u64> = Item::new("latest_delegations_query_id");
+pub const LATEST_DELEGATIONS_REPLY_ID: Item<u64> = Item::new("latest_delegations_reply_id");
 
 pub const KV_QUERY_ID_TO_CALLBACKS: Map<u64, QueryKind> = Map::new("kv_query_id_to_callbacks");
 
-pub const OWN_QUERY_ID_TO_ICQ_ID: Map<u64, u64> = Map::new("own_query_id_to_icq_id");
+pub const REPLY_ID_TO_QUERY_ID: Map<u64, u64> = Map::new("reply_id_to_query_id");
 
 // contains query kinds that we expect to handle in `sudo_kv_query_result`
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
@@ -190,6 +191,27 @@ pub fn get_next_id(store: &mut dyn Storage) -> StdResult<u64> {
     Ok(id)
 }
 
+pub fn get_next_icq_reply_id(store: &mut dyn Storage, query_kind: QueryKind) -> StdResult<u64> {
+    match query_kind {
+        QueryKind::Balances => {
+            let mut id = LATEST_BALANCES_REPLY_ID.may_load(store)?.unwrap_or(QUERY_BALANCES_REPLY_ID_RANGE_START);
+            if id > QUERY_BALANCES_REPLY_ID_END {
+                id = QUERY_BALANCES_REPLY_ID_RANGE_START;
+            }
+            LATEST_BALANCES_REPLY_ID.save(store, &(id + 1))?;
+            Ok(id)
+        }
+        QueryKind::Delegations => {
+            let mut id = LATEST_DELEGATIONS_REPLY_ID.may_load(store)?.unwrap_or(QUERY_DELEGATIONS_REPLY_ID_RANGE_START);
+            if id > QUERY_DELEGATIONS_REPLY_ID_END {
+                id = QUERY_DELEGATIONS_REPLY_ID_RANGE_START;
+            }
+            LATEST_DELEGATIONS_REPLY_ID.save(store, &(id + 1))?;
+            Ok(id)
+        }
+    }
+}
+
 pub fn save_reply_payload(store: &mut dyn Storage, payload: SudoPayload) -> StdResult<u64> {
     let id = get_next_id(store)?;
     REPLY_QUEUE_ID.save(store, id, &to_json_vec(&payload)?)?;
@@ -199,6 +221,12 @@ pub fn save_reply_payload(store: &mut dyn Storage, payload: SudoPayload) -> StdR
 pub fn read_reply_payload(store: &dyn Storage, id: u64) -> StdResult<SudoPayload> {
     let data = REPLY_QUEUE_ID.load(store, id)?;
     from_json(Binary(data))
+}
+
+pub fn save_icq_reply_payload(store: &mut dyn Storage, payload: SudoPayload, query_kind: QueryKind) -> StdResult<u64> {
+    let id = get_next_icq_reply_id(store, query_kind)?;
+    REPLY_QUEUE_ID.save(store, id, &to_json_vec(&payload)?)?;
+    Ok(id)
 }
 
 /// SUDO_PAYLOAD - tmp storage for sudo handler payloads

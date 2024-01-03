@@ -2,35 +2,37 @@ use std::vec;
 
 use cosmos_sdk_proto::cosmos::distribution::v1beta1::MsgSetWithdrawAddress;
 use cosmos_sdk_proto::prost::Message;
-use cosmwasm_std::{Binary, DepsMut, Env, Response, StdError, SubMsg};
+use cosmwasm_std::{Binary, DepsMut, Env, MessageInfo, Response, StdError, SubMsg};
+
+use neutron_sdk::{
+    bindings::{msg::NeutronMsg, query::NeutronQuery},
+    NeutronError,
+    NeutronResult, query::min_ibc_fee::query_min_ibc_fee,
+};
 use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::interchain_queries::v045::new_register_balance_query_msg;
 use neutron_sdk::interchain_queries::v045::new_register_delegator_delegations_query_msg;
 use neutron_sdk::interchain_txs::helpers::get_port_id;
-use neutron_sdk::{
-    bindings::{msg::NeutronMsg, query::NeutronQuery},
-    query::min_ibc_fee::query_min_ibc_fee,
-    NeutronError, NeutronResult,
-};
 
-use crate::msg::InitPoolParams;
-use crate::state::POOLS;
-use crate::state::{ADDR_BALANCES_QUERY_ID, LATEST_BALANCES_QUERY_ID, LATEST_DELEGATIONS_QUERY_ID};
 use crate::{
     contract::{
-        msg_with_sudo_callback, SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS, DEFAULT_UPDATE_PERIOD,
+        DEFAULT_TIMEOUT_SECONDS, DEFAULT_UPDATE_PERIOD, msg_with_sudo_callback, SudoPayload, TxType,
     },
-    state::{PoolValidatorStatus, ADDR_DELEGATIONS_QUERY_ID, POOL_VALIDATOR_STATUS},
+    state::{ADDR_DELEGATIONS_REPLY_ID, POOL_VALIDATOR_STATUS, PoolValidatorStatus},
 };
 use crate::{
     helper::{get_ica, min_ntrn_ibc_fee},
     state::ValidatorUpdateStatus,
 };
+use crate::msg::InitPoolParams;
+use crate::state::{ADDR_BALANCES_REPLY_ID, LATEST_BALANCES_REPLY_ID, LATEST_DELEGATIONS_REPLY_ID};
+use crate::state::POOLS;
 
 // add execute to config the validator addrs and withdraw address on reply
 pub fn execute_init_pool(
     mut deps: DepsMut<NeutronQuery>,
     env: Env,
+    info: MessageInfo,
     param: InitPoolParams,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
@@ -60,6 +62,7 @@ pub fn execute_init_pool(
     pool_info.remote_denom = param.remote_denom;
     pool_info.connection_id = connection_id.clone();
     pool_info.validator_addrs = param.validator_addrs.clone();
+    pool_info.admin = info.sender;
 
     deps.as_ref()
         .api
@@ -67,8 +70,8 @@ pub fn execute_init_pool(
 
     POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
 
-    let latest_balance_query_id = LATEST_BALANCES_QUERY_ID.load(deps.as_ref().storage)?;
-    let latest_delegation_query_id = LATEST_DELEGATIONS_QUERY_ID.load(deps.as_ref().storage)?;
+    let latest_balance_query_id = LATEST_BALANCES_REPLY_ID.load(deps.as_ref().storage)?;
+    let latest_delegation_query_id = LATEST_DELEGATIONS_REPLY_ID.load(deps.as_ref().storage)?;
 
     deps.as_ref().api.debug(
         format!(
@@ -82,8 +85,8 @@ pub fn execute_init_pool(
     let pool_query_id = latest_balance_query_id + 1;
     let withdraw_query_id = latest_balance_query_id + 2;
 
-    LATEST_BALANCES_QUERY_ID.save(deps.storage, &(withdraw_query_id + 1))?;
-    LATEST_DELEGATIONS_QUERY_ID.save(deps.storage, &(pool_delegation_query_id + 1))?;
+    LATEST_BALANCES_REPLY_ID.save(deps.storage, &(withdraw_query_id + 1))?;
+    LATEST_DELEGATIONS_REPLY_ID.save(deps.storage, &(pool_delegation_query_id + 1))?;
 
     let register_delegation_query_msg = new_register_delegator_delegations_query_msg(
         connection_id.clone(),
@@ -96,7 +99,7 @@ pub fn execute_init_pool(
     let register_delegation_query_submsg =
         SubMsg::reply_on_success(register_delegation_query_msg, pool_delegation_query_id);
 
-    ADDR_DELEGATIONS_QUERY_ID.save(deps.storage, delegator.clone(), &pool_delegation_query_id)?;
+    ADDR_DELEGATIONS_REPLY_ID.save(deps.storage, delegator.clone(), &pool_delegation_query_id)?;
 
     let register_balance_pool_msg = new_register_balance_query_msg(
         connection_id.clone(),
@@ -109,7 +112,7 @@ pub fn execute_init_pool(
     let register_balance_pool_submsg =
         SubMsg::reply_on_success(register_balance_pool_msg, pool_query_id);
 
-    ADDR_BALANCES_QUERY_ID.save(deps.storage, delegator.clone(), &pool_query_id)?;
+    ADDR_BALANCES_REPLY_ID.save(deps.storage, delegator.clone(), &pool_query_id)?;
 
     let register_balance_withdraw_msg = new_register_balance_query_msg(
         connection_id.clone(),
@@ -122,7 +125,7 @@ pub fn execute_init_pool(
     let register_balance_withdraw_submsg =
         SubMsg::reply_on_success(register_balance_withdraw_msg, withdraw_query_id);
 
-    ADDR_BALANCES_QUERY_ID.save(
+    ADDR_BALANCES_REPLY_ID.save(
         deps.storage,
         pool_info.withdraw_addr.clone(),
         &withdraw_query_id,
