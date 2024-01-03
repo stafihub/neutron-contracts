@@ -187,3 +187,23 @@ pub fn sudo_withdraw_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<
     }
     Ok(Response::new())
 }
+
+pub fn sudo_withdraw_failed_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
+    let parts: Vec<String> = payload.message.split('_').map(String::from).collect();
+
+    if let Some((_, index_list)) = parts.split_first() {
+        for index_str in index_list {
+            let index = index_str.parse::<u64>().unwrap();
+            let mut unstake_info =
+                UNSTAKES_OF_INDEX.load(deps.storage, (payload.pool_addr.clone(), index))?;
+            unstake_info.status = WithdrawStatus::Default;
+            UNSTAKES_OF_INDEX.save(
+                deps.storage,
+                (payload.pool_addr.clone(), index),
+                &unstake_info,
+            )?;
+        }
+    }
+
+    Ok(Response::new())
+}

@@ -52,13 +52,11 @@ pub fn execute_era_update(
         deps.storage,
         pool_addr.clone(),
         &(EraShot {
-            pool_addr: pool_addr.clone(),
             era: pool_info.era,
             bond: pool_info.bond,
             unbond: pool_info.unbond,
             active: pool_info.active,
             bond_height: 0,
-            failed_tx: None,
             restake_amount: Uint128::zero(),
         }),
     )?;
@@ -151,6 +149,8 @@ pub fn sudo_era_update_failed_callback(deps: DepsMut, payload: SudoPayload) -> S
     pool_info.era = pool_info.era.sub(1);
     pool_info.era_process_status = ActiveEnded;
     POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
+
+    POOL_ERA_SHOT.remove(deps.storage, pool_info.pool_addr);
 
     Ok(Response::new())
 }

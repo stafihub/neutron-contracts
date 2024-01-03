@@ -3,7 +3,7 @@ use cw_storage_plus::{Item, Map};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::contract::{SudoPayload, TxType};
+use crate::contract::SudoPayload;
 
 pub const IBC_SUDO_ID_RANGE_START: u64 = 1_000_000_000;
 pub const IBC_SUDO_ID_RANGE_SIZE: u64 = 1_000;
@@ -67,14 +67,12 @@ pub const POOLS: Map<String, PoolInfo> = Map::new("pools");
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct EraShot {
-    pub pool_addr: String,
     pub era: u64,
     pub bond: Uint128,
     pub unbond: Uint128,
     pub active: Uint128,
     pub restake_amount: Uint128,
     pub bond_height: u64,
-    pub failed_tx: Option<TxType>,
 }
 
 pub const POOL_ERA_SHOT: Map<String, EraShot> = Map::new("pool_era_shot");

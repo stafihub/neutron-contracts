@@ -55,6 +55,7 @@ pub fn execute_unstake(
         ))));
     }
 
+    let mut rsp = Response::new();
     // cal fee
     let mut will_burn_rtoken_amount = rtoken_amount;
     if pool_info.unbond_commission > Uint128::zero() {
@@ -64,7 +65,7 @@ pub fn execute_unstake(
         will_burn_rtoken_amount = rtoken_amount.sub(cms_fee);
 
         if cms_fee.u128() > 0 {
-            WasmMsg::Execute {
+            let mint_msg = WasmMsg::Execute {
                 contract_addr: pool_info.rtoken.to_string(),
                 msg: to_json_binary(
                     &(rtoken::msg::ExecuteMsg::TransferFrom {
@@ -75,6 +76,8 @@ pub fn execute_unstake(
                 )?,
                 funds: vec![],
             };
+
+            rsp = rsp.add_message(mint_msg);
         }
 
         deps.as_ref().api.debug(
@@ -84,6 +87,11 @@ pub fn execute_unstake(
             )
             .as_str(),
         );
+    }
+    if will_burn_rtoken_amount.is_zero() {
+        return Err(NeutronError::Std(StdError::generic_err(
+            "Burn rtoken amount is zero",
+        )));
     }
 
     // Calculate the number of tokens(atom)
@@ -141,7 +149,7 @@ pub fn execute_unstake(
     )?;
 
     // send event
-    Ok(Response::new()
+    Ok(rsp
         .add_message(CosmosMsg::Wasm(burn_msg))
         .add_attribute("action", "unstake")
         .add_attribute("from", info.sender.to_string())

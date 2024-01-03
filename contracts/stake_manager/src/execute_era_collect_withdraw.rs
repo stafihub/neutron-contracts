@@ -169,7 +169,7 @@ pub fn sudo_era_collect_withdraw_callback(
     POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
 
     let mut pool_era_shot = POOL_ERA_SHOT.load(deps.storage, payload.pool_addr.clone())?;
-    pool_era_shot.bond_height = env.block.height; //todo check height
+    pool_era_shot.bond_height = env.block.height; 
     POOL_ERA_SHOT.save(deps.storage, payload.pool_addr, &pool_era_shot)?;
 
     Ok(Response::new())

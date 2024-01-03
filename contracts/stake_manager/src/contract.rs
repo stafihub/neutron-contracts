@@ -25,7 +25,9 @@ use crate::execute_register_query::{register_balance_query, register_delegations
 use crate::execute_stake::execute_stake;
 use crate::execute_stake_lsm::execute_stake_lsm;
 use crate::execute_unstake::execute_unstake;
-use crate::execute_withdraw::{execute_withdraw, sudo_withdraw_callback};
+use crate::execute_withdraw::{
+    execute_withdraw, sudo_withdraw_callback, sudo_withdraw_failed_callback,
+};
 use crate::query::{
     query_acknowledgement_result, query_errors_queue, query_interchain_address,
     query_interchain_address_contract, query_pool_info, query_user_unstake,
@@ -34,8 +36,8 @@ use crate::query_callback::{
     write_balance_query_id_to_reply_id, write_delegation_query_id_to_reply_id,
 };
 use crate::state::{
-    State, IBC_SUDO_ID_RANGE_END, IBC_SUDO_ID_RANGE_START, POOL_ERA_SHOT,
-    QUERY_BALANCES_REPLY_ID_END, QUERY_DELEGATIONS_REPLY_ID_END, STATE,
+    State, IBC_SUDO_ID_RANGE_END, IBC_SUDO_ID_RANGE_START, QUERY_BALANCES_REPLY_ID_END,
+    QUERY_DELEGATIONS_REPLY_ID_END, STATE,
 };
 use crate::{execute_config_pool::execute_config_pool, query::query_balance_by_addr};
 use crate::{execute_era_active::execute_era_active, query::query_delegation_by_addr};
@@ -99,7 +101,6 @@ pub enum TxType {
     EraBond,
     EraCollectWithdraw,
     EraRestake,
-    EraActive,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
@@ -315,13 +316,9 @@ fn sudo_err_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response>
         TxType::EraBond => sudo_era_bond_failed_callback(deps, payload),
         TxType::EraCollectWithdraw => sudo_era_collect_withdraw_failed_callback(deps, payload),
         TxType::EraRestake => sudo_era_restake_failed_callback(deps, payload),
+        TxType::UserWithdraw => sudo_withdraw_failed_callback(deps, payload),
         TxType::RmValidator => sudo_rm_validator_failed_callback(deps, payload),
-        _ => {
-            let mut pool_era_shot = POOL_ERA_SHOT.load(deps.storage, payload.message.clone())?;
-            pool_era_shot.failed_tx = Option::from(payload.tx_type);
-            POOL_ERA_SHOT.save(deps.storage, payload.message, &pool_era_shot)?;
-            Ok(Response::new())
-        }
+        _ => Ok(Response::new()),
     }
 }
 

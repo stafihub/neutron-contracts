@@ -46,16 +46,14 @@ pub fn execute_era_active(
     match delegations_result {
         Ok(delegations_resp) => {
             if delegations_resp.last_submitted_local_height <= pool_era_shot.bond_height {
-                return Err(NeutronError::Std(StdError::generic_err("Delegation submission height is less than or equal to the bond/withdraw collect height of the pool era, which is not allowed.")));
+                return Err(NeutronError::Std(StdError::generic_err("Delegation submission height is less than 
+                or equal to the bond/withdraw collect height of the pool era, which is not allowed.")));
             }
             for delegation in delegations_resp.delegations {
                 total_amount.amount = total_amount.amount.add(delegation.amount.amount);
             }
         }
         Err(_) => {
-            // return Err(NeutronError::Std(StdError::generic_err(
-            //     "delegations not exist",
-            // )));
             deps.as_ref().api.debug(
                 format!(
                     "WASMDEBUG: execute_era_active delegations_result: {:?}",
@@ -63,6 +61,10 @@ pub fn execute_era_active(
                 )
                 .as_str(),
             );
+
+            return Err(NeutronError::Std(StdError::generic_err(
+                "delegations not exist",
+            )));
         }
     }
 
@@ -74,9 +76,9 @@ pub fn execute_era_active(
         }))?;
 
     // calculate protocol fee
-    let protocol_fee = if pool_info.active > pool_era_shot.active {
-        let reward = pool_info.active.sub(pool_era_shot.active);
-        reward.mul(pool_info.rate).div(Uint128::new(1_000_000))
+    let protocol_fee = if total_amount.amount > pool_era_shot.active {
+        let reward = total_amount.amount.sub(pool_era_shot.active);
+        reward.mul(Uint128::new(1_000_000)).div(pool_info.rate)
     } else {
         Uint128::zero()
     };
@@ -89,16 +91,28 @@ pub fn execute_era_active(
         .as_str(),
     );
 
-    let scale_factor = Uint128::new(1_000_000);
-    let scaled_total_amount = total_amount
-        .amount
-        .multiply_ratio(scale_factor, Uint128::one());
-    pool_info.rate = scaled_total_amount.div(token_info.total_supply.add(protocol_fee));
+    let cal_temp = pool_info.active.add(total_amount.amount);
+    let new_active = if cal_temp > pool_era_shot.active {
+        cal_temp.sub(pool_era_shot.active)
+    } else {
+        Uint128::zero()
+    };
 
+    let total_rtoken_amount = token_info.total_supply.add(protocol_fee);
+    let new_rate = if total_rtoken_amount.u128() > 0 {
+        new_active
+            .mul(Uint128::new(1_000_000))
+            .div(total_rtoken_amount)
+    } else {
+        Uint128::new(1_000_000)
+    };
+
+    pool_info.rate = new_rate;
     pool_info.era_process_status = ActiveEnded;
     pool_info.bond = Uint128::zero();
     pool_info.unbond = Uint128::zero();
-    pool_info.era += 1;
+    pool_info.active = new_active;
+
     POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
     POOL_ERA_SHOT.remove(deps.storage, pool_addr);
 
