@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     helper::get_ica,
-    state::{PoolBondState, PoolInfo, ADDR_ICAID_MAP, INTERCHAIN_ACCOUNTS, POOLS},
+    state::{EraProcessStatus, PoolInfo, ADDR_ICAID_MAP, INTERCHAIN_ACCOUNTS, POOLS},
 };
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -143,7 +143,7 @@ pub fn sudo_open_ack(
                 unstake_times_limit: 0,
                 next_unstake_index: 0,
                 unbonding_period: 0,
-                era_update_status: PoolBondState::ActiveReported,
+                era_process_status: EraProcessStatus::ActiveEnded,
                 unbond_commission: Uint128::zero(),
                 protocol_fee_receiver: Addr::unchecked(""),
                 era_seconds: 0,

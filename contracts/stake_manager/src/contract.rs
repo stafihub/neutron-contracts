@@ -19,7 +19,6 @@ use neutron_sdk::{
     NeutronResult,
 };
 
-use crate::{execute_era_restake::sudo_era_restake_callback, query::query_user_unstake_index};
 use crate::execute_pool_rm_validators::execute_rm_pool_validators;
 use crate::execute_register_pool::{execute_register_pool, sudo_open_ack};
 use crate::execute_register_query::{register_balance_query, register_delegations_query};
@@ -44,16 +43,23 @@ use crate::{
     execute_era_bond::execute_era_bond, execute_pool_rm_validators::sudo_rm_validator_callback,
 };
 use crate::{
-    execute_era_bond::sudo_era_bond_withdraw_callback,
+    execute_era_bond::sudo_era_bond_callback,
+    execute_era_bond::sudo_era_bond_failed_callback,
     execute_era_collect_withdraw::{
         execute_era_collect_withdraw, sudo_era_collect_withdraw_callback,
+        sudo_era_collect_withdraw_failed_callback,
     },
     execute_era_update::sudo_era_update_callback,
+    execute_era_update::sudo_era_update_failed_callback,
     execute_init_pool::execute_init_pool,
 };
 use crate::{
     execute_era_restake::execute_era_restake,
     execute_pool_add_validators::execute_add_pool_validators, query::query_era_snapshot,
+};
+use crate::{
+    execute_era_restake::sudo_era_restake_callback,
+    execute_era_restake::sudo_era_restake_failed_callback, query::query_user_unstake_index,
 };
 use crate::{
     execute_era_update::execute_era_update,
@@ -89,9 +95,9 @@ pub enum TxType {
     SetWithdrawAddr,
     RmValidator,
     UserWithdraw,
-    EraUpdateIbcSend,
+    EraUpdate,
     EraBond,
-    EraUpdateWithdrawSend,
+    EraCollectWithdraw,
     EraRestake,
     EraActive,
 }
@@ -292,11 +298,11 @@ pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> StdResult<Response> {
 
 fn sudo_callback(deps: DepsMut, env: Env, payload: SudoPayload) -> StdResult<Response> {
     match payload.tx_type {
-        TxType::UserWithdraw => sudo_withdraw_callback(deps, payload),
-        TxType::EraUpdateIbcSend => sudo_era_update_callback(deps, payload),
-        TxType::EraBond => sudo_era_bond_withdraw_callback(deps, env, payload),
-        TxType::EraUpdateWithdrawSend => sudo_era_collect_withdraw_callback(deps, env, payload),
+        TxType::EraUpdate => sudo_era_update_callback(deps, payload),
+        TxType::EraBond => sudo_era_bond_callback(deps, env, payload),
+        TxType::EraCollectWithdraw => sudo_era_collect_withdraw_callback(deps, env, payload),
         TxType::EraRestake => sudo_era_restake_callback(deps, env, payload),
+        TxType::UserWithdraw => sudo_withdraw_callback(deps, payload),
         TxType::RmValidator => sudo_rm_validator_callback(deps, payload),
 
         _ => Ok(Response::new()),
@@ -305,8 +311,11 @@ fn sudo_callback(deps: DepsMut, env: Env, payload: SudoPayload) -> StdResult<Res
 
 fn sudo_err_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
     match payload.tx_type {
+        TxType::EraUpdate => sudo_era_update_failed_callback(deps, payload),
+        TxType::EraBond => sudo_era_bond_failed_callback(deps, payload),
+        TxType::EraCollectWithdraw => sudo_era_collect_withdraw_failed_callback(deps, payload),
+        TxType::EraRestake => sudo_era_restake_failed_callback(deps, payload),
         TxType::RmValidator => sudo_rm_validator_failed_callback(deps, payload),
-
         _ => {
             let mut pool_era_shot = POOL_ERA_SHOT.load(deps.storage, payload.message.clone())?;
             pool_era_shot.failed_tx = Option::from(payload.tx_type);

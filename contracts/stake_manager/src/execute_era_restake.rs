@@ -10,7 +10,7 @@ use neutron_sdk::{
 };
 
 use crate::helper::{gen_delegation_txs, min_ntrn_ibc_fee};
-use crate::state::PoolBondState::{RestakeReported, WithdrawReported};
+use crate::state::EraProcessStatus::{RestakeEnded, RestakeStarted, WithdrawEnded};
 use crate::state::POOLS;
 use crate::{contract::DEFAULT_TIMEOUT_SECONDS, state::POOL_ERA_SHOT};
 use crate::{
@@ -24,13 +24,15 @@ pub fn execute_era_restake(
     pool_addr: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
+
     // check era state
-    if pool_info.era_update_status != WithdrawReported {
+    if pool_info.era_process_status != WithdrawEnded {
         deps.as_ref()
             .api
             .debug(format!("WASMDEBUG: execute_era_restake skip pool: {:?}", pool_addr).as_str());
         return Err(NeutronError::Std(StdError::generic_err("status not allow")));
     }
+    pool_info.era_process_status = RestakeStarted;
 
     let pool_era_shot = POOL_ERA_SHOT.load(deps.storage, pool_addr.clone())?;
 
@@ -42,7 +44,7 @@ pub fn execute_era_restake(
 
     // leave gas
     if restake_amount.is_zero() {
-        pool_info.era_update_status = RestakeReported;
+        pool_info.era_process_status = RestakeEnded;
         POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
         return Ok(Response::default());
     }
@@ -152,12 +154,23 @@ pub fn sudo_era_restake_callback(
     payload: SudoPayload,
 ) -> StdResult<Response> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
-    pool_info.era_update_status = RestakeReported;
+    pool_info.era_process_status = RestakeEnded;
     POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
 
     let mut pool_era_shot = POOL_ERA_SHOT.load(deps.storage, payload.pool_addr.clone())?;
     pool_era_shot.bond_height = env.block.height;
     POOL_ERA_SHOT.save(deps.storage, payload.pool_addr, &pool_era_shot)?;
+
+    Ok(Response::new())
+}
+
+pub fn sudo_era_restake_failed_callback(
+    deps: DepsMut,
+    payload: SudoPayload,
+) -> StdResult<Response> {
+    let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
+    pool_info.era_process_status = WithdrawEnded;
+    POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
 
     Ok(Response::new())
 }

@@ -58,7 +58,7 @@ pub struct PoolInfo {
     pub unstake_times_limit: u64,
     pub next_unstake_index: u64,
     pub unbonding_period: u64,
-    pub era_update_status: PoolBondState,
+    pub era_process_status: EraProcessStatus,
     pub unbond_commission: Uint128,
     pub protocol_fee_receiver: Addr,
 }
@@ -80,12 +80,16 @@ pub struct EraShot {
 pub const POOL_ERA_SHOT: Map<String, EraShot> = Map::new("pool_era_shot");
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub enum PoolBondState {
-    EraUpdated,
-    BondReported,
-    WithdrawReported,
-    RestakeReported,
-    ActiveReported,
+pub enum EraProcessStatus {
+    EraUpdateStarted,
+    EraUpdateEnded,
+    BondStarted,
+    BondEnded,
+    WithdrawStarted,
+    WithdrawEnded,
+    RestakeStarted,
+    RestakeEnded,
+    ActiveEnded,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]

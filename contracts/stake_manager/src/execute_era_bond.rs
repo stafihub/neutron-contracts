@@ -20,7 +20,7 @@ use neutron_sdk::{
 };
 
 use crate::helper::{gen_delegation_txs, min_ntrn_ibc_fee};
-use crate::state::PoolBondState::{BondReported, EraUpdated};
+use crate::state::EraProcessStatus::{BondEnded, BondStarted, EraUpdateEnded};
 use crate::state::{ADDR_ICAID_MAP, POOLS};
 use crate::{
     contract::{msg_with_sudo_callback, SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS},
@@ -40,28 +40,32 @@ pub fn execute_era_bond(
     env: Env,
     pool_addr: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
-    let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
-    let pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
+    let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
+
     // check era state
-    if pool_info.era_update_status != EraUpdated {
+    if pool_info.era_process_status != EraUpdateEnded {
         deps.as_ref()
             .api
             .debug(format!("WASMDEBUG: execute_era_bond skip pool: {:?}", pool_addr).as_str());
         return Err(NeutronError::Std(StdError::generic_err("status not allow")));
     }
 
+    pool_info.era_process_status = BondStarted;
+    POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
+
     let interchain_account_id = ADDR_ICAID_MAP.load(deps.storage, pool_addr.clone())?;
+    let pool_era_shot = POOL_ERA_SHOT.load(deps.storage, pool_addr.clone())?;
 
     let mut msgs = vec![];
     // Check whether the delegator-validator needs to manually withdraw
     let mut op_validators = vec![];
 
     match (
-        pool_info.unbond > pool_info.bond,
-        pool_info.bond > pool_info.unbond,
+        pool_era_shot.unbond > pool_era_shot.bond,
+        pool_era_shot.bond > pool_era_shot.unbond,
     ) {
-        (true, _) => {
-            let unbond_amount = pool_info.unbond - pool_info.bond;
+        (true, false) => {
+            let unbond_amount = pool_era_shot.unbond - pool_era_shot.bond;
 
             deps.as_ref().api.debug(
                 format!(
@@ -112,8 +116,8 @@ pub fn execute_era_bond(
                 msgs.push(any_msg);
             }
         }
-        (_, true) => {
-            let stake_amount = pool_info.bond - pool_info.unbond;
+        (false, true) => {
+            let stake_amount = pool_era_shot.bond - pool_era_shot.unbond;
             let validator_count = pool_info.validator_addrs.len() as u128;
 
             deps.as_ref().api.debug(
@@ -220,6 +224,7 @@ pub fn execute_era_bond(
         }
     }
 
+    let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
     let cosmos_msg = NeutronMsg::submit_tx(
         pool_info.connection_id.clone(),
         interchain_account_id.clone(),
@@ -290,17 +295,26 @@ fn allocate_unbond_amount(
     unbond_infos
 }
 
-pub fn sudo_era_bond_withdraw_callback(
+pub fn sudo_era_bond_callback(
     deps: DepsMut,
     env: Env,
     payload: SudoPayload,
 ) -> StdResult<Response> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
-    pool_info.era_update_status = BondReported;
+    pool_info.era_process_status = BondEnded;
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
 
     let mut pool_era_shot = POOL_ERA_SHOT.load(deps.storage, payload.pool_addr.clone())?;
-    pool_era_shot.bond_height = env.block.height;
+    pool_era_shot.bond_height = env.block.height; //todo check height
     POOL_ERA_SHOT.save(deps.storage, payload.pool_addr, &pool_era_shot)?;
+
+    Ok(Response::new())
+}
+
+pub fn sudo_era_bond_failed_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
+    let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
+    pool_info.era_process_status = EraUpdateEnded;
+    POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
+
     Ok(Response::new())
 }

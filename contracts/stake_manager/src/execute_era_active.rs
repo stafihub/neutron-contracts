@@ -9,8 +9,7 @@ use neutron_sdk::{
     NeutronError, NeutronResult,
 };
 
-use crate::state::PoolBondState;
-use crate::state::PoolBondState::RestakeReported;
+use crate::state::EraProcessStatus::{ActiveEnded, RestakeEnded};
 use crate::state::POOLS;
 use crate::{query::query_delegation_by_addr, state::POOL_ERA_SHOT};
 
@@ -20,7 +19,7 @@ pub fn execute_era_active(
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
     // check era state
-    if pool_info.era_update_status != RestakeReported {
+    if pool_info.era_process_status != RestakeEnded {
         deps.as_ref()
             .api
             .debug(format!("WASMDEBUG: execute_era_active skip pool: {:?}", pool_addr).as_str());
@@ -96,7 +95,7 @@ pub fn execute_era_active(
         .multiply_ratio(scale_factor, Uint128::one());
     pool_info.rate = scaled_total_amount.div(token_info.total_supply.add(protocol_fee));
 
-    pool_info.era_update_status = PoolBondState::ActiveReported;
+    pool_info.era_process_status = ActiveEnded;
     pool_info.bond = Uint128::zero();
     pool_info.unbond = Uint128::zero();
     pool_info.era += 1;

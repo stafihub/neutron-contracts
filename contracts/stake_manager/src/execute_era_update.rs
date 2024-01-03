@@ -1,3 +1,5 @@
+use std::ops::{Add, Div, Sub};
+
 use cosmwasm_std::{coin, DepsMut, Env, Response, StdError, StdResult, Uint128};
 use neutron_sdk::interchain_txs::helpers::get_port_id;
 use neutron_sdk::{
@@ -8,7 +10,7 @@ use neutron_sdk::{
 };
 
 use crate::helper::min_ntrn_ibc_fee;
-use crate::state::PoolBondState::{ActiveReported, EraUpdated};
+use crate::state::EraProcessStatus::{ActiveEnded, EraUpdateEnded, EraUpdateStarted};
 use crate::state::{ADDR_ICAID_MAP, POOLS};
 use crate::{
     contract::{msg_with_sudo_callback, SudoPayload, TxType},
@@ -24,48 +26,51 @@ pub fn execute_era_update(
     let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
 
     // check era state
-    if pool_info.era_update_status != ActiveReported {
+    if pool_info.era_process_status != ActiveEnded {
         deps.as_ref()
             .api
             .debug(format!("WASMDEBUG: execute_era_update skip pool: {:?}", pool_addr).as_str());
         return Err(NeutronError::Std(StdError::generic_err("status not allow")));
     }
+    let current_era = env
+        .block
+        .time
+        .seconds()
+        .div(pool_info.era_seconds)
+        .add(pool_info.offset);
 
-    if let Some(pool_era_shot) = POOL_ERA_SHOT.may_load(deps.storage, pool_addr.clone())? {
-        if pool_era_shot.failed_tx.is_some()
-            && pool_era_shot.failed_tx != Some(TxType::EraUpdateIbcSend)
-        {
-            return Ok(Response::new());
-        }
-    } else {
-        POOL_ERA_SHOT.save(
-            deps.storage,
-            pool_addr.clone(),
-            &(EraShot {
-                pool_addr: pool_addr.clone(),
-                era: pool_info.era,
-                bond: pool_info.bond,
-                unbond: pool_info.unbond,
-                active: pool_info.active,
-                bond_height: 0,
-                failed_tx: None,
-                restake_amount: Uint128::zero(),
-            }),
-        )?;
+    if current_era <= pool_info.era {
+        return Err(NeutronError::Std(StdError::generic_err(
+            "already latest era",
+        )));
     }
 
+    pool_info.era_process_status = EraUpdateStarted;
+    pool_info.era = pool_info.era.add(1);
+
+    POOL_ERA_SHOT.save(
+        deps.storage,
+        pool_addr.clone(),
+        &(EraShot {
+            pool_addr: pool_addr.clone(),
+            era: pool_info.era,
+            bond: pool_info.bond,
+            unbond: pool_info.unbond,
+            active: pool_info.active,
+            bond_height: 0,
+            failed_tx: None,
+            restake_amount: Uint128::zero(),
+        }),
+    )?;
+
     if pool_info.bond.is_zero() {
-        pool_info.era_update_status = EraUpdated;
+        pool_info.era_process_status = EraUpdateEnded;
         POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
         return Ok(Response::default());
     }
 
-    // See more info here: https://docs.neutron.org/neutron/feerefunder/overview
-    let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
-
-    let balance = deps.querier.query_all_balances(&env.contract.address)?;
-
     // funds use contract funds
+    let balance = deps.querier.query_all_balances(&env.contract.address)?;
     let mut amount = 0;
     if !balance.is_empty() {
         amount = u128::from(
@@ -77,8 +82,15 @@ pub fn execute_era_update(
         );
     }
 
-    let tx_coin = coin(amount, pool_info.ibc_denom.clone());
+    if amount == 0 {
+        pool_info.era_process_status = EraUpdateEnded;
+        POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
+        return Ok(Response::default());
+    }
 
+    let tx_coin = coin(amount, pool_info.ibc_denom.clone());
+    // See more info here: https://docs.neutron.org/neutron/feerefunder/overview
+    let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
     let msg: NeutronMsg = NeutronMsg::IbcTransfer {
         source_port: "transfer".to_string(),
         source_channel: channel.clone(),
@@ -111,7 +123,7 @@ pub fn execute_era_update(
             ),
             pool_addr: pool_addr.clone(),
             message: "".to_string(),
-            tx_type: TxType::EraUpdateIbcSend,
+            tx_type: TxType::EraUpdate,
         },
     )?;
 
@@ -128,7 +140,17 @@ pub fn execute_era_update(
 
 pub fn sudo_era_update_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr)?;
-    pool_info.era_update_status = EraUpdated;
+    pool_info.era_process_status = EraUpdateEnded;
     POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
+
+    Ok(Response::new())
+}
+
+pub fn sudo_era_update_failed_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
+    let mut pool_info = POOLS.load(deps.storage, payload.pool_addr)?;
+    pool_info.era = pool_info.era.sub(1);
+    pool_info.era_process_status = ActiveEnded;
+    POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
+
     Ok(Response::new())
 }
