@@ -9,8 +9,11 @@ use neutron_sdk::{
     NeutronError, NeutronResult,
 };
 
-use crate::state::EraProcessStatus::{ActiveEnded, RestakeEnded};
 use crate::state::POOLS;
+use crate::state::{
+    EraProcessStatus::{ActiveEnded, RestakeEnded},
+    PLATFORM_INFO,
+};
 use crate::{query::query_delegation_by_addr, state::POOL_ERA_SHOT};
 
 pub fn execute_era_active(
@@ -75,12 +78,18 @@ pub fn execute_era_active(
             msg: to_json_binary(&token_info_msg)?,
         }))?;
 
+    let platform_info = PLATFORM_INFO.load(deps.storage)?;
     // calculate protocol fee
-    let protocol_fee = if total_amount.amount > pool_era_shot.active {
+    let (protocol_fee, platform_fee) = if total_amount.amount > pool_era_shot.active {
         let reward = total_amount.amount.sub(pool_era_shot.active);
-        reward.mul(Uint128::new(1_000_000)).div(pool_info.rate)
+        let protocol_fee_raw = reward.mul(Uint128::new(1_000_000)).div(pool_info.rate);
+
+        let platform_fee = protocol_fee_raw
+            .mul(platform_info.platform_fee_commission)
+            .div(Uint128::new(1_000_000));
+        (protocol_fee_raw.sub(platform_fee), platform_fee)
     } else {
-        Uint128::zero()
+        (Uint128::zero(), Uint128::zero())
     };
 
     deps.as_ref().api.debug(
@@ -98,7 +107,7 @@ pub fn execute_era_active(
         Uint128::zero()
     };
 
-    let total_rtoken_amount = token_info.total_supply.add(protocol_fee);
+    let total_rtoken_amount = token_info.total_supply.add(protocol_fee).add(platform_fee);
     let new_rate = if total_rtoken_amount.u128() > 0 {
         new_active
             .mul(Uint128::new(1_000_000))
@@ -124,6 +133,19 @@ pub fn execute_era_active(
                 &(rtoken::msg::ExecuteMsg::Mint {
                     recipient: pool_info.protocol_fee_receiver.to_string(),
                     amount: protocol_fee,
+                }),
+            )?,
+            funds: vec![],
+        };
+        resp = resp.add_message(msg);
+    }
+    if !platform_fee.is_zero() {
+        let msg = WasmMsg::Execute {
+            contract_addr: pool_info.rtoken.to_string(),
+            msg: to_json_binary(
+                &(rtoken::msg::ExecuteMsg::Mint {
+                    recipient: platform_info.platform_fee_receiver.to_string(),
+                    amount: platform_fee,
                 }),
             )?,
             funds: vec![],

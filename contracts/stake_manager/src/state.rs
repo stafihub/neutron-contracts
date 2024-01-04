@@ -131,11 +131,12 @@ pub const INFO_OF_ICA_ID: Map<String, (IcaInfo, IcaInfo, Addr)> = Map::new("info
 pub const UNSTAKES_INDEX_FOR_USER: Map<(Addr, String), Vec<u64>> =
     Map::new("unstakes_index_for_user");
 
-//  key: pool_addr value: interchain_account_id
-pub const ADDR_ICAID_MAP: Map<String, String> = Map::new("pool_ica_map");
-
-// key: connection_id value:pool_addr list
-pub const CONNECTION_POOL_MAP: Map<String, Vec<String>> = Map::new("connection_pools");
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct PlatformInfo {
+    pub platform_fee_receiver: Addr,
+    pub platform_fee_commission: Uint128,
+}
+pub const PLATFORM_INFO: Item<PlatformInfo> = Item::new("platform_info");
 
 // key: ica address value: query reply id
 pub const ADDR_BALANCES_REPLY_ID: Map<String, u64> = Map::new("addr_balances_reply_id");

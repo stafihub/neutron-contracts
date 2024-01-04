@@ -2,7 +2,7 @@ use std::vec;
 
 use cosmwasm_std::{
     entry_point, from_json, to_json_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo,
-    Reply, Response, StdError, StdResult, SubMsg,
+    Reply, Response, StdError, StdResult, SubMsg, Uint128,
 };
 use cw2::set_contract_version;
 use schemars::JsonSchema;
@@ -37,8 +37,9 @@ use crate::query_callback::{
     write_balance_query_id_to_reply_id, write_delegation_query_id_to_reply_id,
 };
 use crate::state::{
-    save_icq_reply_payload, QueryKind, State, IBC_SUDO_ID_RANGE_END, IBC_SUDO_ID_RANGE_START,
-    QUERY_BALANCES_REPLY_ID_END, QUERY_DELEGATIONS_REPLY_ID_END, STATE,
+    save_icq_reply_payload, PlatformInfo, QueryKind, State, IBC_SUDO_ID_RANGE_END,
+    IBC_SUDO_ID_RANGE_START, PLATFORM_INFO, QUERY_BALANCES_REPLY_ID_END,
+    QUERY_DELEGATIONS_REPLY_ID_END, STATE,
 };
 use crate::{execute_config_pool::execute_config_pool, query::query_balance_by_addr};
 use crate::{execute_era_active::execute_era_active, query::query_delegation_by_addr};
@@ -120,10 +121,23 @@ pub fn instantiate(
 ) -> NeutronResult<Response<NeutronMsg>> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    STATE.save(deps.storage, &(State { owner: info.sender }))?;
+    STATE.save(
+        deps.storage,
+        &(State {
+            owner: info.sender.clone(),
+        }),
+    )?;
 
     LATEST_BALANCES_REPLY_ID.save(deps.storage, &QUERY_BALANCES_REPLY_ID_RANGE_START)?;
     LATEST_DELEGATIONS_REPLY_ID.save(deps.storage, &QUERY_DELEGATIONS_REPLY_ID_RANGE_START)?;
+
+    PLATFORM_INFO.save(
+        deps.storage,
+        &(PlatformInfo {
+            platform_fee_receiver: info.sender,
+            platform_fee_commission: Uint128::new(100_000),
+        }),
+    )?;
 
     Ok(Response::new())
 }
