@@ -30,6 +30,8 @@ use crate::{error_conversion::ContractError, state::REPLY_ID_TO_QUERY_ID};
 use crate::{helper::min_ntrn_ibc_fee, state::POOL_VALIDATOR_STATUS};
 
 // todo: What if submsg_redelegate fails when the old delegation query has been removed
+// It might be possible to save a list of query to be deleted and then perform the deletion at some point in each new era.
+// However, at present, there is a problem with the deletion query in the local test network, which can be seen after the test network experiment.
 pub fn execute_rm_pool_validators(
     mut deps: DepsMut<NeutronQuery>,
     env: Env,
@@ -141,8 +143,7 @@ pub fn execute_rm_pool_validators(
             .as_str(),
         );
 
-        let mut index = 0;
-        for target_validator in new_validators.clone() {
+        for (index, target_validator) in new_validators.clone().into_iter().enumerate() {
             let mut amount_for_this_validator = amount_per_validator;
 
             // Add the remainder to the first validator
@@ -167,7 +168,6 @@ pub fn execute_rm_pool_validators(
             );
 
             msgs.push(any_msg);
-            index += 1;
         }
     }
 
