@@ -33,7 +33,7 @@ pub fn execute_config_pool(
     pool_info.era_seconds = param.era_seconds;
     pool_info.offset = param.offset;
 
-    POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
+    POOLS.save(deps.storage, param.pool_addr.clone(), &pool_info)?;
 
     Ok(Response::default())
 }

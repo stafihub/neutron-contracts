@@ -1,7 +1,7 @@
 use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
 use cosmos_sdk_proto::cosmos::staking::v1beta1::{MsgBeginRedelegate, MsgDelegate};
 use cosmos_sdk_proto::prost::Message;
-use cosmwasm_std::{Binary, CustomQuery, Deps, Env, StdError, Uint128};
+use cosmwasm_std::{Binary, Uint128};
 
 use neutron_sdk::bindings::msg::IbcFee;
 use neutron_sdk::bindings::types::{KVKey, ProtobufAny};
@@ -12,11 +12,9 @@ use neutron_sdk::interchain_queries::v045::helpers::{
 use neutron_sdk::interchain_queries::v045::types::{
     KEY_BOND_DENOM, PARAMS_STORE_KEY, STAKING_STORE_KEY,
 };
-use neutron_sdk::interchain_txs::helpers::get_port_id;
-
-use crate::state::INTERCHAIN_ACCOUNTS;
 
 const FEE_DENOM: &str = "untrn";
+pub const ICA_WITHDRAW_SUFIX: &str = "-withdraw_addr";
 
 pub fn min_ntrn_ibc_fee(fee: IbcFee) -> IbcFee {
     IbcFee {
@@ -32,18 +30,6 @@ pub fn min_ntrn_ibc_fee(fee: IbcFee) -> IbcFee {
             .filter(|a| a.denom == FEE_DENOM)
             .collect(),
     }
-}
-
-pub fn get_ica(
-    deps: Deps<impl CustomQuery>,
-    env: &Env,
-    interchain_account_id: &str,
-) -> Result<(String, String), StdError> {
-    let key = get_port_id(env.contract.address.as_str(), interchain_account_id);
-
-    INTERCHAIN_ACCOUNTS
-        .load(deps.storage, key)?
-        .ok_or_else(|| StdError::generic_err("Interchain account is not created yet"))
 }
 
 pub fn gen_delegation_txs(
@@ -139,4 +125,8 @@ pub fn new_register_delegator_delegations_keys(
     }
 
     Some(keys)
+}
+
+pub fn get_withdraw_ica_id(interchain_account_id: String) -> String {
+    format!("{}{}", interchain_account_id.clone(), ICA_WITHDRAW_SUFIX)
 }

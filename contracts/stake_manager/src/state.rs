@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr, Binary, from_json, Order, StdResult, Storage, to_json_vec, Uint128};
+use cosmwasm_std::{from_json, to_json_vec, Addr, Binary, Order, StdResult, Storage, Uint128};
 use cw_storage_plus::{Item, Map};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -44,11 +44,9 @@ pub struct PoolInfo {
     pub unbond: Uint128,
     pub active: Uint128,
     pub rtoken: Addr,
-    pub withdraw_addr: String,
-    pub pool_addr: String,
+    pub ica_id: String,
     pub ibc_denom: String,
     pub remote_denom: String,
-    pub connection_id: String,
     pub validator_addrs: Vec<String>,
     pub era: u64,
     pub rate: Uint128,
@@ -116,13 +114,23 @@ pub struct UnstakeInfo {
 // (poolAddress,unstakeIndex)
 pub const UNSTAKES_OF_INDEX: Map<(String, u64), UnstakeInfo> = Map::new("unstakes_of_index");
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct IcaInfo {
+    pub ctrl_connection_id: String,
+    pub host_connection_id: String,
+    pub ctrl_channel_id: String,
+    pub host_channel_id: String,
+    pub ctrl_port_id: String,
+    pub ica_addr: String,
+}
+
+//  key: ica id value: (pool IcaInfo, withdraw icaInfo)
+pub const INFO_OF_ICA_ID: Map<String, (IcaInfo, IcaInfo)> = Map::new("info_of_ica_id");
+
 // (userAddress,poolAddress) => []unstakeIndex
 pub const UNSTAKES_INDEX_FOR_USER: Map<(Addr, String), Vec<u64>> =
     Map::new("unstakes_index_for_user");
 
-//  key: port_id value: Option<pool_addr,interchain_connection_id>
-pub const INTERCHAIN_ACCOUNTS: Map<String, Option<(String, String)>> =
-    Map::new("interchain_accounts");
 
 //  key: pool_addr value: interchain_account_id
 pub const ADDR_ICAID_MAP: Map<String, String> = Map::new("pool_ica_map");
@@ -194,7 +202,9 @@ pub fn get_next_id(store: &mut dyn Storage) -> StdResult<u64> {
 pub fn get_next_icq_reply_id(store: &mut dyn Storage, query_kind: QueryKind) -> StdResult<u64> {
     match query_kind {
         QueryKind::Balances => {
-            let mut id = LATEST_BALANCES_REPLY_ID.may_load(store)?.unwrap_or(QUERY_BALANCES_REPLY_ID_RANGE_START);
+            let mut id = LATEST_BALANCES_REPLY_ID
+                .may_load(store)?
+                .unwrap_or(QUERY_BALANCES_REPLY_ID_RANGE_START);
             if id > QUERY_BALANCES_REPLY_ID_END {
                 id = QUERY_BALANCES_REPLY_ID_RANGE_START;
             }
@@ -202,7 +212,9 @@ pub fn get_next_icq_reply_id(store: &mut dyn Storage, query_kind: QueryKind) -> 
             Ok(id)
         }
         QueryKind::Delegations => {
-            let mut id = LATEST_DELEGATIONS_REPLY_ID.may_load(store)?.unwrap_or(QUERY_DELEGATIONS_REPLY_ID_RANGE_START);
+            let mut id = LATEST_DELEGATIONS_REPLY_ID
+                .may_load(store)?
+                .unwrap_or(QUERY_DELEGATIONS_REPLY_ID_RANGE_START);
             if id > QUERY_DELEGATIONS_REPLY_ID_END {
                 id = QUERY_DELEGATIONS_REPLY_ID_RANGE_START;
             }
@@ -223,7 +235,11 @@ pub fn read_reply_payload(store: &dyn Storage, id: u64) -> StdResult<SudoPayload
     from_json(Binary(data))
 }
 
-pub fn save_icq_reply_payload(store: &mut dyn Storage, payload: SudoPayload, query_kind: QueryKind) -> StdResult<u64> {
+pub fn save_icq_reply_payload(
+    store: &mut dyn Storage,
+    payload: SudoPayload,
+    query_kind: QueryKind,
+) -> StdResult<u64> {
     let id = get_next_icq_reply_id(store, query_kind)?;
     REPLY_QUEUE_ID.save(store, id, &to_json_vec(&payload)?)?;
     Ok(id)

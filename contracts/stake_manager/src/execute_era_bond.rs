@@ -12,7 +12,6 @@ use cosmos_sdk_proto::prost::Message;
 use cosmwasm_std::{Binary, Delegation, DepsMut, Env, Response, StdError, StdResult, Uint128};
 
 use neutron_sdk::bindings::types::ProtobufAny;
-use neutron_sdk::interchain_txs::helpers::get_port_id;
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     query::min_ibc_fee::query_min_ibc_fee,
@@ -21,7 +20,7 @@ use neutron_sdk::{
 
 use crate::helper::{gen_delegation_txs, min_ntrn_ibc_fee};
 use crate::state::EraProcessStatus::{BondEnded, BondStarted, EraUpdateEnded};
-use crate::state::{ADDR_ICAID_MAP, POOLS};
+use crate::state::{INFO_OF_ICA_ID, POOLS};
 use crate::{
     contract::{msg_with_sudo_callback, SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS},
     query::query_delegation_by_addr,
@@ -37,7 +36,7 @@ struct ValidatorUnbondInfo {
 
 pub fn execute_era_bond(
     mut deps: DepsMut<NeutronQuery>,
-    env: Env,
+    _: Env,
     pool_addr: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
@@ -53,7 +52,6 @@ pub fn execute_era_bond(
     pool_info.era_process_status = BondStarted;
     POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
 
-    let interchain_account_id = ADDR_ICAID_MAP.load(deps.storage, pool_addr.clone())?;
     let pool_era_shot = POOL_ERA_SHOT.load(deps.storage, pool_addr.clone())?;
 
     let mut msgs = vec![];
@@ -174,7 +172,9 @@ pub fn execute_era_bond(
                 msgs.push(any_msg);
             }
         }
-        _ => {}
+        _ => {
+            return Err(NeutronError::Std(StdError::generic_err("Unreachable")));
+        }
     }
 
     deps.as_ref().api.debug(
@@ -185,6 +185,7 @@ pub fn execute_era_bond(
         .as_str(),
     );
 
+    // todo mv to unbond case
     if op_validators.len() != pool_info.validator_addrs.len() {
         // Find the difference between pool_info.validator_addrs and op_validators
         let pool_validators: HashSet<_> = pool_info.validator_addrs.into_iter().collect();
@@ -224,10 +225,12 @@ pub fn execute_era_bond(
         }
     }
 
+    let (pool_ica_info, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
+
     let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
     let cosmos_msg = NeutronMsg::submit_tx(
-        pool_info.connection_id.clone(),
-        interchain_account_id.clone(),
+        pool_ica_info.ctrl_connection_id,
+        pool_info.ica_id.clone(),
         msgs,
         "".to_string(),
         DEFAULT_TIMEOUT_SECONDS,
@@ -242,10 +245,7 @@ pub fn execute_era_bond(
         deps.branch(),
         cosmos_msg,
         SudoPayload {
-            port_id: get_port_id(
-                env.contract.address.to_string(),
-                interchain_account_id.clone(),
-            ),
+            port_id: pool_ica_info.ctrl_port_id,
             // the acknowledgement later
             message: "".to_string(),
             pool_addr: pool_addr.clone(),

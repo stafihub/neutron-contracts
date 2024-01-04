@@ -4,19 +4,15 @@ use cosmwasm_std::{DepsMut, Env, Response, StdError, StdResult, Uint128};
 
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
-    interchain_txs::helpers::get_port_id,
     query::min_ibc_fee::query_min_ibc_fee,
     NeutronError, NeutronResult,
 };
 
+use crate::contract::{msg_with_sudo_callback, SudoPayload, TxType};
 use crate::helper::{gen_delegation_txs, min_ntrn_ibc_fee};
 use crate::state::EraProcessStatus::{RestakeEnded, RestakeStarted, WithdrawEnded};
-use crate::state::POOLS;
+use crate::state::{INFO_OF_ICA_ID, POOLS};
 use crate::{contract::DEFAULT_TIMEOUT_SECONDS, state::POOL_ERA_SHOT};
-use crate::{
-    contract::{msg_with_sudo_callback, SudoPayload, TxType},
-    state::ADDR_ICAID_MAP,
-};
 
 pub fn execute_era_restake(
     mut deps: DepsMut<NeutronQuery>,
@@ -33,6 +29,8 @@ pub fn execute_era_restake(
         return Err(NeutronError::Std(StdError::generic_err("status not allow")));
     }
     pool_info.era_process_status = RestakeStarted;
+
+    let (pool_ica_info, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
 
     let pool_era_shot = POOL_ERA_SHOT.load(deps.storage, pool_addr.clone())?;
 
@@ -56,8 +54,6 @@ pub fn execute_era_restake(
         )
         .as_str(),
     );
-
-    let interchain_account_id = ADDR_ICAID_MAP.load(deps.storage, pool_addr.clone())?;
 
     let validator_count = pool_info.validator_addrs.len() as u128;
 
@@ -114,8 +110,8 @@ pub fn execute_era_restake(
     }
 
     let cosmos_msg = NeutronMsg::submit_tx(
-        pool_info.connection_id.clone(),
-        interchain_account_id.clone(),
+        pool_ica_info.ctrl_connection_id.clone(),
+        pool_info.ica_id,
         msgs,
         "".to_string(),
         DEFAULT_TIMEOUT_SECONDS,
@@ -134,10 +130,7 @@ pub fn execute_era_restake(
         deps.branch(),
         cosmos_msg,
         SudoPayload {
-            port_id: get_port_id(
-                env.contract.address.to_string(),
-                interchain_account_id.clone(),
-            ),
+            port_id: pool_ica_info.ctrl_port_id,
             // the acknowledgement later
             message: "".to_string(),
             pool_addr: pool_addr.clone(),
@@ -155,7 +148,7 @@ pub fn sudo_era_restake_callback(
 ) -> StdResult<Response> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
     pool_info.era_process_status = RestakeEnded;
-    POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
+    POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
 
     let mut pool_era_shot = POOL_ERA_SHOT.load(deps.storage, payload.pool_addr.clone())?;
     pool_era_shot.bond_height = env.block.height;
@@ -170,7 +163,7 @@ pub fn sudo_era_restake_failed_callback(
 ) -> StdResult<Response> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
     pool_info.era_process_status = WithdrawEnded;
-    POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
+    POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
 
     Ok(Response::new())
 }

@@ -5,24 +5,22 @@ use cosmwasm_std::{Binary, DepsMut, Env, Response, StdError, StdResult, Uint128}
 use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
-    interchain_txs::helpers::get_port_id,
     query::min_ibc_fee::query_min_ibc_fee,
     NeutronError, NeutronResult,
 };
 
-use crate::helper::min_ntrn_ibc_fee;
+use crate::helper::{get_withdraw_ica_id, min_ntrn_ibc_fee};
 use crate::state::EraProcessStatus::{BondEnded, WithdrawEnded, WithdrawStarted};
-use crate::state::POOLS;
+use crate::state::{INFO_OF_ICA_ID, POOLS};
 use crate::{contract::DEFAULT_TIMEOUT_SECONDS, state::POOL_ERA_SHOT};
 use crate::{
     contract::{msg_with_sudo_callback, SudoPayload, TxType},
     query::query_balance_by_addr,
-    state::ADDR_ICAID_MAP,
 };
 
 pub fn execute_era_collect_withdraw(
     mut deps: DepsMut<NeutronQuery>,
-    env: Env,
+    _: Env,
     pool_addr: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
@@ -40,9 +38,13 @@ pub fn execute_era_collect_withdraw(
     }
     pool_info.era_process_status = WithdrawStarted;
 
+    let (_, withdraw_ica_info) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
+
     // check withdraw address balance and send it to the pool
-    let withdraw_balances_result =
-        query_balance_by_addr(deps.as_ref(), pool_info.withdraw_addr.clone());
+    let withdraw_balances_result: Result<
+        neutron_sdk::interchain_queries::v045::queries::BalanceResponse,
+        NeutronError,
+    > = query_balance_by_addr(deps.as_ref(), withdraw_ica_info.ica_addr.clone());
 
     let mut pool_era_shot = POOL_ERA_SHOT.load(deps.storage, pool_addr.clone())?;
 
@@ -93,8 +95,8 @@ pub fn execute_era_collect_withdraw(
         .as_str(),
     );
 
-    let interchain_account_id =
-        ADDR_ICAID_MAP.load(deps.storage, pool_info.withdraw_addr.clone())?;
+    // let interchain_account_id =
+    //     ADDR_ICAID_MAP.load(deps.storage, pool_info.withdraw_addr.clone())?;
 
     let tx_withdraw_coin = cosmos_sdk_proto::cosmos::base::v1beta1::Coin {
         denom: pool_info.remote_denom.clone(),
@@ -102,7 +104,7 @@ pub fn execute_era_collect_withdraw(
     };
 
     let inter_send = MsgSend {
-        from_address: pool_info.withdraw_addr.clone(),
+        from_address: withdraw_ica_info.ica_addr.clone(),
         to_address: pool_addr.clone(),
         amount: vec![tx_withdraw_coin],
     };
@@ -123,8 +125,8 @@ pub fn execute_era_collect_withdraw(
 
     let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
     let cosmos_msg = NeutronMsg::submit_tx(
-        pool_info.connection_id.clone(),
-        interchain_account_id.clone(),
+        withdraw_ica_info.ctrl_connection_id.clone(),
+        get_withdraw_ica_id(pool_info.ica_id),
         vec![any_msg],
         "".to_string(),
         DEFAULT_TIMEOUT_SECONDS,
@@ -143,10 +145,7 @@ pub fn execute_era_collect_withdraw(
         deps.branch(),
         cosmos_msg,
         SudoPayload {
-            port_id: get_port_id(
-                env.contract.address.to_string(),
-                interchain_account_id.clone(),
-            ),
+            port_id: withdraw_ica_info.ctrl_port_id,
             message: "".to_string(),
             pool_addr: pool_addr.clone(),
             tx_type: TxType::EraCollectWithdraw,
@@ -166,10 +165,10 @@ pub fn sudo_era_collect_withdraw_callback(
 ) -> StdResult<Response> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
     pool_info.era_process_status = WithdrawEnded;
-    POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
+    POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
 
     let mut pool_era_shot = POOL_ERA_SHOT.load(deps.storage, payload.pool_addr.clone())?;
-    pool_era_shot.bond_height = env.block.height; 
+    pool_era_shot.bond_height = env.block.height;
     POOL_ERA_SHOT.save(deps.storage, payload.pool_addr, &pool_era_shot)?;
 
     Ok(Response::new())
@@ -181,7 +180,7 @@ pub fn sudo_era_collect_withdraw_failed_callback(
 ) -> StdResult<Response> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
     pool_info.era_process_status = BondEnded;
-    POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
+    POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
 
     Ok(Response::new())
 }

@@ -7,23 +7,21 @@ use cosmwasm_std::{
     Addr, Binary, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128,
 };
 use neutron_sdk::bindings::types::ProtobufAny;
-use neutron_sdk::interchain_txs::helpers::get_port_id;
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     query::min_ibc_fee::query_min_ibc_fee,
     NeutronError, NeutronResult,
 };
 
+use crate::contract::{msg_with_sudo_callback, SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS};
 use crate::helper::min_ntrn_ibc_fee;
-use crate::state::{WithdrawStatus, POOLS, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX};
-use crate::{
-    contract::{msg_with_sudo_callback, SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS},
-    state::ADDR_ICAID_MAP,
+use crate::state::{
+    WithdrawStatus, INFO_OF_ICA_ID, POOLS, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX,
 };
 
 pub fn execute_withdraw(
     mut deps: DepsMut<NeutronQuery>,
-    env: Env,
+    _: Env,
     info: MessageInfo,
     pool_addr: String,
     receiver: Addr,
@@ -36,8 +34,6 @@ pub fn execute_withdraw(
     }
 
     let pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
-
-    let interchain_account_id = ADDR_ICAID_MAP.load(deps.storage, pool_addr.clone())?;
 
     let mut total_withdraw_amount = Uint128::zero();
     for unstake_index in unstake_index_list.clone() {
@@ -120,9 +116,10 @@ pub fn execute_withdraw(
         value: Binary::from(buf),
     };
 
+    let (pool_ica_info, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
     let cosmos_msg = NeutronMsg::submit_tx(
-        pool_info.connection_id.clone(),
-        interchain_account_id.clone(),
+        pool_ica_info.ctrl_connection_id.clone(),
+        pool_info.ica_id.clone(),
         vec![send_msg],
         "".to_string(),
         DEFAULT_TIMEOUT_SECONDS,
@@ -135,7 +132,7 @@ pub fn execute_withdraw(
         deps.branch(),
         cosmos_msg,
         SudoPayload {
-            port_id: get_port_id(env.contract.address.as_str(), &interchain_account_id),
+            port_id: pool_ica_info.ctrl_port_id,
             message: format!("{}_{}", info.sender, unstake_index_list_str),
             pool_addr: pool_addr.clone(),
             tx_type: TxType::UserWithdraw,

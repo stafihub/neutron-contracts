@@ -9,7 +9,9 @@ use neutron_sdk::{
 };
 
 use crate::state::POOLS;
-use crate::state::{get_next_icq_reply_id, QueryKind, ADDR_DELEGATIONS_REPLY_ID};
+
+use crate::state::{get_next_icq_reply_id, QueryKind, ADDR_DELEGATIONS_REPLY_ID, INFO_OF_ICA_ID};
+
 use crate::{contract::DEFAULT_UPDATE_PERIOD, error_conversion::ContractError};
 
 pub fn execute_add_pool_validators(
@@ -43,9 +45,10 @@ pub fn execute_add_pool_validators(
     // let registered_query_id = REPLY_ID_TO_QUERY_ID.load(deps.storage, contract_query_id)?;
     // let remove_icq_msg = NeutronMsg::remove_interchain_query(registered_query_id);
 
+    let (pool_ica_info, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
     // register new query
     let register_delegation_query_msg = new_register_delegator_delegations_query_msg(
-        pool_info.connection_id.clone(),
+        pool_ica_info.ctrl_connection_id.clone(),
         pool_addr.clone(),
         pool_info.validator_addrs.clone(),
         DEFAULT_UPDATE_PERIOD,

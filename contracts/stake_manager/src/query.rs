@@ -17,11 +17,8 @@ use neutron_sdk::{
 };
 
 use crate::state::{read_errors_from_queue, ACKNOWLEDGEMENT_RESULTS, ADDR_BALANCES_REPLY_ID};
+use crate::state::{ADDR_DELEGATIONS_REPLY_ID, INFO_OF_ICA_ID, POOL_ERA_SHOT};
 use crate::state::{POOLS, REPLY_ID_TO_QUERY_ID, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX};
-use crate::{
-    helper::get_ica,
-    state::{ADDR_DELEGATIONS_REPLY_ID, POOL_ERA_SHOT},
-};
 
 pub fn query_user_unstake(
     deps: Deps<NeutronQuery>,
@@ -226,14 +223,11 @@ pub fn query_interchain_address(
 // returns ICA address from the contract storage. The address was saved in sudo_open_ack method
 pub fn query_interchain_address_contract(
     deps: Deps<NeutronQuery>,
-    env: Env,
+    _: Env,
     interchain_account_id: String,
 ) -> NeutronResult<Binary> {
-    Ok(to_json_binary(&get_ica(
-        deps,
-        &env,
-        &interchain_account_id,
-    )?)?)
+    let res = INFO_OF_ICA_ID.may_load(deps.storage, interchain_account_id)?;
+    Ok(to_json_binary(&res)?)
 }
 
 // returns the result

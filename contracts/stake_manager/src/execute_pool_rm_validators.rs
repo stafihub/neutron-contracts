@@ -6,7 +6,6 @@ use cosmwasm_std::{
 };
 
 use neutron_sdk::interchain_queries::v045::new_register_delegator_delegations_query_msg;
-use neutron_sdk::interchain_txs::helpers::get_port_id;
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     interchain_queries::{
@@ -20,7 +19,7 @@ use neutron_sdk::{
 use crate::contract::DEFAULT_UPDATE_PERIOD;
 use crate::helper::gen_redelegation_txs;
 use crate::state::{
-    get_next_icq_reply_id, QueryKind, ValidatorUpdateStatus, ADDR_ICAID_MAP, POOLS,
+    get_next_icq_reply_id, QueryKind, ValidatorUpdateStatus, INFO_OF_ICA_ID, POOLS,
 };
 use crate::{
     contract::{msg_with_sudo_callback, SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS},
@@ -34,7 +33,7 @@ use crate::{helper::min_ntrn_ibc_fee, state::POOL_VALIDATOR_STATUS};
 // However, at present, there is a problem with the deletion query in the local test network, which can be seen after the test network experiment.
 pub fn execute_rm_pool_validators(
     mut deps: DepsMut<NeutronQuery>,
-    env: Env,
+    _: Env,
     info: MessageInfo,
     pool_addr: String,
     validator_addrs: Vec<String>,
@@ -170,9 +169,10 @@ pub fn execute_rm_pool_validators(
             msgs.push(any_msg);
         }
     }
+    let (pool_ica_info, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
 
     let register_delegation_query_msg = new_register_delegator_delegations_query_msg(
-        pool_info.connection_id.clone(),
+        pool_ica_info.ctrl_connection_id.clone(),
         pool_addr.clone(),
         new_validators.clone(),
         DEFAULT_UPDATE_PERIOD,
@@ -186,10 +186,9 @@ pub fn execute_rm_pool_validators(
     let mut resp = Response::default().add_submessage(register_delegation_query_submsg); // .add_message(remove_msg_old_query)
 
     if !msgs.is_empty() {
-        let interchain_account_id = ADDR_ICAID_MAP.load(deps.storage, pool_addr.clone())?;
         let cosmos_msg = NeutronMsg::submit_tx(
-            pool_info.connection_id.clone(),
-            interchain_account_id.clone(),
+            pool_ica_info.ctrl_connection_id.clone(),
+            pool_info.ica_id.clone(),
             msgs,
             "".to_string(),
             DEFAULT_TIMEOUT_SECONDS,
@@ -207,11 +206,8 @@ pub fn execute_rm_pool_validators(
             deps.branch(),
             cosmos_msg,
             SudoPayload {
-                port_id: get_port_id(
-                    env.contract.address.to_string(),
-                    interchain_account_id.clone(),
-                ),
-                pool_addr: pool_info.pool_addr.clone(),
+                port_id: pool_ica_info.ctrl_port_id,
+                pool_addr: pool_ica_info.ica_addr.clone(),
                 message: new_validator_list_str,
                 tx_type: TxType::RmValidator,
             },

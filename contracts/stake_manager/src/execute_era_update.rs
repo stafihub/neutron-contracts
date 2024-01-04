@@ -1,7 +1,6 @@
 use std::ops::{Add, Div, Sub};
 
 use cosmwasm_std::{coin, DepsMut, Env, Response, StdError, StdResult, Uint128};
-use neutron_sdk::interchain_txs::helpers::get_port_id;
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     query::min_ibc_fee::query_min_ibc_fee,
@@ -11,7 +10,7 @@ use neutron_sdk::{
 
 use crate::helper::min_ntrn_ibc_fee;
 use crate::state::EraProcessStatus::{ActiveEnded, EraUpdateEnded, EraUpdateStarted};
-use crate::state::{ADDR_ICAID_MAP, POOLS};
+use crate::state::{INFO_OF_ICA_ID, POOLS};
 use crate::{
     contract::{msg_with_sudo_callback, SudoPayload, TxType},
     state::{EraShot, POOL_ERA_SHOT},
@@ -63,7 +62,7 @@ pub fn execute_era_update(
 
     if pool_info.bond.is_zero() {
         pool_info.era_process_status = EraUpdateEnded;
-        POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
+        POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
         return Ok(Response::default());
     }
 
@@ -82,7 +81,7 @@ pub fn execute_era_update(
 
     if amount == 0 {
         pool_info.era_process_status = EraUpdateEnded;
-        POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
+        POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
         return Ok(Response::default());
     }
 
@@ -109,16 +108,13 @@ pub fn execute_era_update(
         .api
         .debug(format!("WASMDEBUG: IbcTransfer msg: {:?}", msg).as_str());
 
-    let interchain_account_id = ADDR_ICAID_MAP.load(deps.storage, pool_addr.clone())?;
+    let (pool_ica_info, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id)?;
 
     let submsg_pool_ibc_send = msg_with_sudo_callback(
         deps.branch(),
         msg,
         SudoPayload {
-            port_id: get_port_id(
-                env.contract.address.to_string(),
-                interchain_account_id.clone(),
-            ),
+            port_id: pool_ica_info.ctrl_port_id,
             pool_addr: pool_addr.clone(),
             message: "".to_string(),
             tx_type: TxType::EraUpdate,
@@ -137,20 +133,20 @@ pub fn execute_era_update(
 }
 
 pub fn sudo_era_update_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
-    let mut pool_info = POOLS.load(deps.storage, payload.pool_addr)?;
+    let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
     pool_info.era_process_status = EraUpdateEnded;
-    POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
+    POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
 
     Ok(Response::new())
 }
 
 pub fn sudo_era_update_failed_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
-    let mut pool_info = POOLS.load(deps.storage, payload.pool_addr)?;
+    let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
     pool_info.era = pool_info.era.sub(1);
     pool_info.era_process_status = ActiveEnded;
-    POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
+    POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
 
-    POOL_ERA_SHOT.remove(deps.storage, pool_info.pool_addr);
+    POOL_ERA_SHOT.remove(deps.storage, payload.pool_addr);
 
     Ok(Response::new())
 }

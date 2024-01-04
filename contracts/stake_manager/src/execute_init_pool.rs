@@ -4,44 +4,44 @@ use cosmos_sdk_proto::cosmos::distribution::v1beta1::MsgSetWithdrawAddress;
 use cosmos_sdk_proto::prost::Message;
 use cosmwasm_std::{Binary, DepsMut, Env, MessageInfo, Response, StdError, SubMsg};
 
-use neutron_sdk::{
-    bindings::{msg::NeutronMsg, query::NeutronQuery},
-    NeutronError,
-    NeutronResult, query::min_ibc_fee::query_min_ibc_fee,
-};
 use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::interchain_queries::v045::new_register_balance_query_msg;
 use neutron_sdk::interchain_queries::v045::new_register_delegator_delegations_query_msg;
-use neutron_sdk::interchain_txs::helpers::get_port_id;
+use neutron_sdk::{
+    bindings::{msg::NeutronMsg, query::NeutronQuery},
+    query::min_ibc_fee::query_min_ibc_fee,
+    NeutronError, NeutronResult,
+};
 
+use crate::msg::InitPoolParams;
+use crate::state::POOLS;
+use crate::state::{
+    ADDR_BALANCES_REPLY_ID, INFO_OF_ICA_ID, LATEST_BALANCES_REPLY_ID, LATEST_DELEGATIONS_REPLY_ID,
+};
 use crate::{
     contract::{
-        DEFAULT_TIMEOUT_SECONDS, DEFAULT_UPDATE_PERIOD, msg_with_sudo_callback, SudoPayload, TxType,
+        msg_with_sudo_callback, SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS, DEFAULT_UPDATE_PERIOD,
     },
-    state::{ADDR_DELEGATIONS_REPLY_ID, POOL_VALIDATOR_STATUS, PoolValidatorStatus},
+    state::{PoolValidatorStatus, ADDR_DELEGATIONS_REPLY_ID, POOL_VALIDATOR_STATUS},
 };
-use crate::{
-    helper::{get_ica, min_ntrn_ibc_fee},
-    state::ValidatorUpdateStatus,
-};
-use crate::msg::InitPoolParams;
-use crate::state::{ADDR_BALANCES_REPLY_ID, LATEST_BALANCES_REPLY_ID, LATEST_DELEGATIONS_REPLY_ID};
-use crate::state::POOLS;
+use crate::{helper::min_ntrn_ibc_fee, state::ValidatorUpdateStatus};
 
 // add execute to config the validator addrs and withdraw address on reply
 pub fn execute_init_pool(
     mut deps: DepsMut<NeutronQuery>,
-    env: Env,
+    _: Env,
     info: MessageInfo,
     param: InitPoolParams,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
-    let (delegator, connection_id) = get_ica(deps.as_ref(), &env, &param.interchain_account_id)?;
+
+    let (pool_ica_info, withdraw_ica_info) =
+        INFO_OF_ICA_ID.load(deps.storage, param.interchain_account_id.clone())?;
 
     deps.as_ref().api.debug(
         format!(
-            "WASMDEBUG: execute_init_pool get_ica delegator: {:?},connection_id: {:?}",
-            delegator, connection_id
+            "WASMDEBUG: execute_init_pool get_ica delegator: {:?}, connection_id: {:?}",
+            pool_ica_info.ica_addr, pool_ica_info.ctrl_connection_id
         )
         .as_str(),
     );
@@ -52,7 +52,7 @@ pub fn execute_init_pool(
         )));
     }
 
-    let mut pool_info = POOLS.load(deps.as_ref().storage, delegator.clone())?;
+    let mut pool_info = POOLS.load(deps.as_ref().storage, pool_ica_info.ica_addr.clone())?;
 
     pool_info.unbond = param.unbond;
     pool_info.active = param.active;
@@ -60,7 +60,6 @@ pub fn execute_init_pool(
     pool_info.rate = param.rate;
     pool_info.ibc_denom = param.ibc_denom;
     pool_info.remote_denom = param.remote_denom;
-    pool_info.connection_id = connection_id.clone();
     pool_info.validator_addrs = param.validator_addrs.clone();
     pool_info.admin = info.sender;
 
@@ -68,7 +67,7 @@ pub fn execute_init_pool(
         .api
         .debug(format!("WASMDEBUG: execute_init_pool POOLS.load: {:?}", pool_info).as_str());
 
-    POOLS.save(deps.storage, pool_info.pool_addr.clone(), &pool_info)?;
+    POOLS.save(deps.storage, pool_ica_info.ica_addr.clone(), &pool_info)?;
 
     let latest_balance_query_id = LATEST_BALANCES_REPLY_ID.load(deps.as_ref().storage)?;
     let latest_delegation_query_id = LATEST_DELEGATIONS_REPLY_ID.load(deps.as_ref().storage)?;
@@ -89,8 +88,8 @@ pub fn execute_init_pool(
     LATEST_DELEGATIONS_REPLY_ID.save(deps.storage, &(pool_delegation_query_id + 1))?;
 
     let register_delegation_query_msg = new_register_delegator_delegations_query_msg(
-        connection_id.clone(),
-        delegator.clone(),
+        pool_ica_info.ctrl_connection_id.clone(),
+        pool_ica_info.ica_addr.clone(),
         param.validator_addrs,
         DEFAULT_UPDATE_PERIOD,
     )?;
@@ -99,11 +98,15 @@ pub fn execute_init_pool(
     let register_delegation_query_submsg =
         SubMsg::reply_on_success(register_delegation_query_msg, pool_delegation_query_id);
 
-    ADDR_DELEGATIONS_REPLY_ID.save(deps.storage, delegator.clone(), &pool_delegation_query_id)?;
+    ADDR_DELEGATIONS_REPLY_ID.save(
+        deps.storage,
+        pool_ica_info.ica_addr.clone(),
+        &pool_delegation_query_id,
+    )?;
 
     let register_balance_pool_msg = new_register_balance_query_msg(
-        connection_id.clone(),
-        delegator.clone(),
+        pool_ica_info.ctrl_connection_id.clone(),
+        pool_ica_info.ica_addr.clone(),
         pool_info.remote_denom.clone(),
         DEFAULT_UPDATE_PERIOD,
     )?;
@@ -112,11 +115,11 @@ pub fn execute_init_pool(
     let register_balance_pool_submsg =
         SubMsg::reply_on_success(register_balance_pool_msg, pool_query_id);
 
-    ADDR_BALANCES_REPLY_ID.save(deps.storage, delegator.clone(), &pool_query_id)?;
+    ADDR_BALANCES_REPLY_ID.save(deps.storage, pool_ica_info.ica_addr.clone(), &pool_query_id)?;
 
     let register_balance_withdraw_msg = new_register_balance_query_msg(
-        connection_id.clone(),
-        pool_info.withdraw_addr.clone(),
+        withdraw_ica_info.ctrl_connection_id.clone(),
+        withdraw_ica_info.ica_addr.clone(),
         pool_info.remote_denom.clone(),
         DEFAULT_UPDATE_PERIOD,
     )?;
@@ -127,13 +130,13 @@ pub fn execute_init_pool(
 
     ADDR_BALANCES_REPLY_ID.save(
         deps.storage,
-        pool_info.withdraw_addr.clone(),
+        withdraw_ica_info.ica_addr.clone(),
         &withdraw_query_id,
     )?;
 
     let set_withdraw_msg = MsgSetWithdrawAddress {
-        delegator_address: delegator.clone(),
-        withdraw_address: pool_info.withdraw_addr.clone(),
+        delegator_address: pool_ica_info.ica_addr.clone(),
+        withdraw_address: withdraw_ica_info.ica_addr.clone(),
     };
     let mut buf = Vec::new();
     buf.reserve(set_withdraw_msg.encoded_len());
@@ -151,7 +154,7 @@ pub fn execute_init_pool(
     };
 
     let cosmos_msg = NeutronMsg::submit_tx(
-        connection_id.clone(),
+        pool_ica_info.ctrl_channel_id.clone(),
         param.interchain_account_id.clone(),
         vec![any_msg],
         "".to_string(),
@@ -173,12 +176,9 @@ pub fn execute_init_pool(
         deps.branch(),
         cosmos_msg,
         SudoPayload {
-            port_id: get_port_id(
-                env.contract.address.to_string(),
-                param.interchain_account_id,
-            ),
-            message: pool_info.withdraw_addr,
-            pool_addr: pool_info.pool_addr.clone(),
+            port_id: pool_ica_info.ctrl_port_id,
+            message: withdraw_ica_info.ica_addr,
+            pool_addr: pool_ica_info.ica_addr.clone(),
             tx_type: TxType::SetWithdrawAddr,
         },
     )?;
@@ -193,7 +193,7 @@ pub fn execute_init_pool(
 
     POOL_VALIDATOR_STATUS.save(
         deps.storage,
-        pool_info.pool_addr,
+        pool_ica_info.ica_addr.clone(),
         &PoolValidatorStatus {
             status: ValidatorUpdateStatus::Success,
         },
