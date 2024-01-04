@@ -92,6 +92,7 @@ pub enum EraProcessStatus {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum ValidatorUpdateStatus {
     Pending,
+    WaitQueryUpdate,
     Success,
     Failed,
 }

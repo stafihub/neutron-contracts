@@ -199,7 +199,7 @@ pub fn execute_init_pool(
         deps.storage,
         pool_ica_info.ica_addr.clone(),
         &PoolValidatorStatus {
-            status: ValidatorUpdateStatus::Success,
+            status: ValidatorUpdateStatus::WaitQueryUpdate,
         },
     )?;
 
