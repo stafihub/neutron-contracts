@@ -46,6 +46,7 @@ pub struct PoolInfo {
     pub rtoken: Addr,
     pub ica_id: String,
     pub ibc_denom: String,
+    pub channel_id_of_ibc_denom: String,
     pub remote_denom: String,
     pub validator_addrs: Vec<String>,
     pub era: u64,
@@ -60,6 +61,7 @@ pub struct PoolInfo {
     pub unbond_commission: Uint128,
     pub protocol_fee_receiver: Addr,
     pub admin: Addr,
+    pub paused: bool,
 }
 
 pub const POOLS: Map<String, PoolInfo> = Map::new("pools");

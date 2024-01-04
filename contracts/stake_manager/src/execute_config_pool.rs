@@ -23,15 +23,30 @@ pub fn execute_config_pool(
         .api
         .debug(format!("WASMDEBUG: execute_config_pool POOLS.load: {:?}", pool_info).as_str());
 
-    pool_info.minimal_stake = param.minimal_stake;
-    pool_info.rtoken = Addr::unchecked(param.rtoken);
-    pool_info.next_unstake_index = param.next_unstake_index;
-    pool_info.unbonding_period = param.unbonding_period;
-    pool_info.unstake_times_limit = param.unstake_times_limit;
-    pool_info.unbond_commission = param.unbond_commission;
-    pool_info.protocol_fee_receiver = Addr::unchecked(param.protocol_fee_receiver);
-    pool_info.era_seconds = param.era_seconds;
-    pool_info.offset = param.offset;
+    if let Some(minimal_stake) = param.minimal_stake {
+        pool_info.minimal_stake = minimal_stake;
+    }
+    if let Some(next_unstake_index) = param.next_unstake_index {
+        pool_info.next_unstake_index = next_unstake_index;
+    }
+    if let Some(unbonding_period) = param.unbonding_period {
+        pool_info.unbonding_period = unbonding_period;
+    }
+    if let Some(unstake_times_limit) = param.unstake_times_limit {
+        pool_info.unstake_times_limit = unstake_times_limit;
+    }
+    if let Some(unbond_commission) = param.unbond_commission {
+        pool_info.unbond_commission = unbond_commission;
+    }
+    if let Some(era_seconds) = param.era_seconds {
+        pool_info.era_seconds = era_seconds;
+    }
+    if let Some(offset) = param.offset {
+        pool_info.offset = offset;
+    }
+    if let Some(receiver) = param.protocol_fee_receiver {
+        pool_info.protocol_fee_receiver = Addr::unchecked(receiver);
+    }
 
     POOLS.save(deps.storage, param.pool_addr.clone(), &pool_info)?;
 

@@ -54,28 +54,31 @@ pub enum QueryMsg {
 pub struct InitPoolParams {
     pub interchain_account_id: String,
     pub unbond: Uint128,
+    pub bond: Uint128,
     pub active: Uint128,
     pub ibc_denom: String,
+    pub channel_id_of_ibc_denom: String,
     pub remote_denom: String,
-    pub bond: Uint128,
     pub validator_addrs: Vec<String>,
     pub era: u64,
     pub rate: Uint128,
+    pub rtoken: String,
+    pub protocol_fee_receiver: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct ConfigPoolParams {
     pub pool_addr: String,
-    pub rtoken: String,
-    pub protocol_fee_receiver: String,
-    pub minimal_stake: Uint128,
-    pub unstake_times_limit: u64,
-    pub next_unstake_index: u64,
-    pub unbonding_period: u64,
-    pub unbond_commission: Uint128,
-    pub era_seconds: u64,
-    pub offset: u64,
+    pub protocol_fee_receiver: Option<String>,
+    pub minimal_stake: Option<Uint128>,
+    pub unstake_times_limit: Option<u64>,
+    pub next_unstake_index: Option<u64>,
+    pub unbonding_period: Option<u64>,
+    pub unbond_commission: Option<Uint128>,
+    pub era_seconds: Option<u64>,
+    pub offset: Option<u64>,
+    pub paused: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
@@ -136,7 +139,6 @@ pub enum ExecuteMsg {
         new_validator: String,
     },
     EraUpdate {
-        channel: String,
         pool_addr: String,
     },
     EraBond {

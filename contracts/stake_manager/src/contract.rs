@@ -266,9 +266,7 @@ pub fn execute(
         } => {
             execute_pool_update_validator(deps, env, info, pool_addr, old_validator, new_validator)
         }
-        ExecuteMsg::EraUpdate { channel, pool_addr } => {
-            execute_era_update(deps, env, channel, pool_addr)
-        }
+        ExecuteMsg::EraUpdate { pool_addr } => execute_era_update(deps, env, pool_addr),
         ExecuteMsg::EraBond { pool_addr } => execute_era_bond(deps, env, pool_addr),
         ExecuteMsg::EraCollectWithdraw { pool_addr } => {
             execute_era_collect_withdraw(deps, env, pool_addr)

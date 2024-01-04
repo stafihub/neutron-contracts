@@ -19,11 +19,12 @@ use crate::{
 pub fn execute_era_update(
     mut deps: DepsMut<NeutronQuery>,
     env: Env,
-    channel: String,
     pool_addr: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
-
+    if pool_info.paused {
+        return Err(NeutronError::Std(StdError::generic_err("Pool is paused")));
+    }
     // check era state
     if pool_info.era_process_status != ActiveEnded {
         deps.as_ref()
@@ -90,7 +91,7 @@ pub fn execute_era_update(
     let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
     let msg: NeutronMsg = NeutronMsg::IbcTransfer {
         source_port: "transfer".to_string(),
-        source_channel: channel.clone(),
+        source_channel: pool_info.channel_id_of_ibc_denom,
         sender: env.contract.address.to_string(),
         receiver: pool_addr.clone(),
         token: tx_coin,

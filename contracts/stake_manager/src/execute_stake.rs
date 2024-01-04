@@ -26,6 +26,9 @@ pub fn execute_stake(
     }
 
     let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
+    if pool_info.paused {
+        return Err(NeutronError::Std(StdError::generic_err("Pool is paused")));
+    }
 
     let mut token_amount = 0;
     if !info.funds.is_empty() {

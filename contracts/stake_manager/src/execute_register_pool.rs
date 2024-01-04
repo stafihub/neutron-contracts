@@ -182,6 +182,7 @@ pub fn sudo_open_ack(
                 rtoken: Addr::unchecked(""),
                 ica_id: ica_id.clone(),
                 ibc_denom: "".to_string(),
+                channel_id_of_ibc_denom: "".to_string(),
                 remote_denom: "".to_string(),
                 validator_addrs: vec![],
                 era: 0,
@@ -196,6 +197,7 @@ pub fn sudo_open_ack(
                 admin: admin.clone(),
                 era_seconds: 0,
                 offset: 0,
+                paused: true,
             };
 
             POOLS.save(deps.storage, pool_ica_info.ica_addr.clone(), &pool_info)?;

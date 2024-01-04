@@ -2,6 +2,7 @@ use std::vec;
 
 use cosmos_sdk_proto::cosmos::distribution::v1beta1::MsgSetWithdrawAddress;
 use cosmos_sdk_proto::prost::Message;
+use cosmwasm_std::{Addr, Uint128};
 use cosmwasm_std::{Binary, DepsMut, Env, MessageInfo, Response, StdError, SubMsg};
 
 use neutron_sdk::bindings::types::ProtobufAny;
@@ -58,14 +59,27 @@ pub fn execute_init_pool(
         return Err(ContractError::Unauthorized {}.into());
     }
 
+    pool_info.bond = param.bond;
     pool_info.unbond = param.unbond;
     pool_info.active = param.active;
     pool_info.era = param.era;
     pool_info.rate = param.rate;
     pool_info.ibc_denom = param.ibc_denom;
+    pool_info.channel_id_of_ibc_denom = param.channel_id_of_ibc_denom;
     pool_info.remote_denom = param.remote_denom;
     pool_info.validator_addrs = param.validator_addrs.clone();
-    pool_info.admin = info.sender;
+    pool_info.protocol_fee_receiver = Addr::unchecked(param.protocol_fee_receiver);
+    pool_info.rtoken = Addr::unchecked(param.rtoken);
+
+    // default
+    pool_info.minimal_stake = Uint128::new(10_000);
+    pool_info.next_unstake_index = 0;
+    pool_info.unbonding_period = 15;
+    pool_info.unstake_times_limit = 20;
+    pool_info.unbond_commission = Uint128::zero();
+    pool_info.era_seconds = 24 * 60 * 60;
+    pool_info.offset = 0;
+    pool_info.paused = true;
 
     deps.as_ref()
         .api
