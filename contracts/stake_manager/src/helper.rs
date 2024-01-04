@@ -1,5 +1,5 @@
 use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
-use cosmos_sdk_proto::cosmos::staking::v1beta1::MsgDelegate;
+use cosmos_sdk_proto::cosmos::staking::v1beta1::{MsgBeginRedelegate, MsgDelegate};
 use cosmos_sdk_proto::prost::Message;
 use cosmwasm_std::{Binary, CustomQuery, Deps, Env, StdError, Uint128};
 
@@ -71,6 +71,36 @@ pub fn gen_delegation_txs(
     // Put the serialized Delegate message to a types.Any protobuf message.
     ProtobufAny {
         type_url: "/cosmos.staking.v1beta1.MsgDelegate".to_string(),
+        value: Binary::from(buf),
+    }
+}
+
+pub fn gen_redelegation_txs(
+    delegator: String,
+    src_validator: String,
+    target_validator: String,
+    remote_denom: String,
+    amount_for_this_validator: Uint128,
+) -> ProtobufAny {
+    let redelegate_msg = MsgBeginRedelegate {
+        delegator_address: delegator.clone(),
+        validator_src_address: src_validator.clone(),
+        validator_dst_address: target_validator.clone(),
+        amount: Some(Coin {
+            denom: remote_denom.clone(),
+            amount: amount_for_this_validator.to_string(),
+        }),
+    };
+
+    // Serialize the Delegate message.
+    let mut buf = Vec::new();
+    buf.reserve(redelegate_msg.encoded_len());
+
+    let _ = redelegate_msg.encode(&mut buf);
+
+    // Put the serialized Delegate message to a types.Any protobuf message.
+    ProtobufAny {
+        type_url: "/cosmos.staking.v1beta1.BeginRedelegate".to_string(),
         value: Binary::from(buf),
     }
 }
