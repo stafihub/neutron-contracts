@@ -30,7 +30,7 @@ pub fn execute_era_restake(
     }
     pool_info.era_process_status = RestakeStarted;
 
-    let (pool_ica_info, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
+    let (pool_ica_info, _, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
 
     let pool_era_shot = POOL_ERA_SHOT.load(deps.storage, pool_addr.clone())?;
 

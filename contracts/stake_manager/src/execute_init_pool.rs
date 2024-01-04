@@ -13,6 +13,7 @@ use neutron_sdk::{
     NeutronError, NeutronResult,
 };
 
+use crate::error_conversion::ContractError;
 use crate::msg::InitPoolParams;
 use crate::state::POOLS;
 use crate::state::{
@@ -35,7 +36,7 @@ pub fn execute_init_pool(
 ) -> NeutronResult<Response<NeutronMsg>> {
     let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
 
-    let (pool_ica_info, withdraw_ica_info) =
+    let (pool_ica_info, withdraw_ica_info, _) =
         INFO_OF_ICA_ID.load(deps.storage, param.interchain_account_id.clone())?;
 
     deps.as_ref().api.debug(
@@ -53,6 +54,9 @@ pub fn execute_init_pool(
     }
 
     let mut pool_info = POOLS.load(deps.as_ref().storage, pool_ica_info.ica_addr.clone())?;
+    if info.sender != pool_info.admin {
+        return Err(ContractError::Unauthorized {}.into());
+    }
 
     pool_info.unbond = param.unbond;
     pool_info.active = param.active;

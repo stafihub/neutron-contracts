@@ -88,6 +88,11 @@ pub enum ExecuteMsg {
     },
     InitPool(Box<InitPoolParams>),
     ConfigPool(Box<ConfigPoolParams>),
+    OpenChannel {
+        pool_addr: String,
+        closed_channel_id: String,
+        register_fee: Vec<Coin>,
+    },
     RegisterBalanceQuery {
         connection_id: String,
         update_period: u64,

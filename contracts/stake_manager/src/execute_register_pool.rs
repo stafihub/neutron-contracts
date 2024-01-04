@@ -28,7 +28,7 @@ struct OpenAckVersion {
 pub fn execute_register_pool(
     deps: DepsMut<NeutronQuery>,
     env: Env,
-    _: MessageInfo,
+    info: MessageInfo,
     connection_id: String,
     interchain_account_id: String,
     register_fee: Vec<cosmwasm_std::Coin>,
@@ -37,7 +37,10 @@ pub fn execute_register_pool(
         .api
         .debug(format!("WASMDEBUG: register_fee {:?}", register_fee).as_str());
 
-    if interchain_account_id.contains(".") || interchain_account_id.contains("-") {
+    if interchain_account_id.is_empty()
+        || interchain_account_id.contains(".")
+        || interchain_account_id.contains("-")
+    {
         return Err(NeutronError::Std(StdError::generic_err(
             "Invalid interchain_account_id",
         )));
@@ -103,6 +106,7 @@ pub fn execute_register_pool(
                 ctrl_port_id: ctrl_port_id_of_withdraw,
                 ica_addr: "".to_string(),
             },
+            info.sender,
         ),
     )?;
 
@@ -148,8 +152,9 @@ pub fn sudo_open_ack(
             ica_id_raw.clone()
         };
 
-        let (mut pool_ica_info, mut withdraw_ica_info) =
+        let (mut pool_ica_info, mut withdraw_ica_info, admin) =
             INFO_OF_ICA_ID.load(deps.storage, ica_id.clone())?;
+
         if is_pool {
             pool_ica_info.ctrl_channel_id = _channel_id;
             pool_ica_info.ctrl_port_id = port_id;
@@ -164,7 +169,12 @@ pub fn sudo_open_ack(
             withdraw_ica_info.ica_addr = parsed_version.address;
         }
 
-        if !pool_ica_info.ica_addr.is_empty() && !withdraw_ica_info.ica_addr.is_empty() {
+        if !pool_ica_info.ica_addr.is_empty()
+            && !withdraw_ica_info.ica_addr.is_empty()
+            && POOLS
+                .load(deps.storage, pool_ica_info.ica_addr.clone())
+                .is_err()
+        {
             let pool_info = PoolInfo {
                 bond: Uint128::zero(),
                 unbond: Uint128::zero(),
@@ -183,17 +193,18 @@ pub fn sudo_open_ack(
                 era_process_status: EraProcessStatus::ActiveEnded,
                 unbond_commission: Uint128::zero(),
                 protocol_fee_receiver: Addr::unchecked(""),
-                admin: Addr::unchecked(""),
+                admin: admin.clone(),
                 era_seconds: 0,
                 offset: 0,
             };
+
             POOLS.save(deps.storage, pool_ica_info.ica_addr.clone(), &pool_info)?;
         }
 
         INFO_OF_ICA_ID.save(
             deps.storage,
             ica_id.clone(),
-            &(pool_ica_info, withdraw_ica_info),
+            &(pool_ica_info, withdraw_ica_info, admin),
         )?;
 
         return Ok(Response::default());

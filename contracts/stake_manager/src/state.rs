@@ -124,13 +124,12 @@ pub struct IcaInfo {
     pub ica_addr: String,
 }
 
-//  key: ica id value: (pool IcaInfo, withdraw icaInfo)
-pub const INFO_OF_ICA_ID: Map<String, (IcaInfo, IcaInfo)> = Map::new("info_of_ica_id");
+//  key: ica id value: (pool IcaInfo, withdraw icaInfo, admin)
+pub const INFO_OF_ICA_ID: Map<String, (IcaInfo, IcaInfo, Addr)> = Map::new("info_of_ica_id");
 
 // (userAddress,poolAddress) => []unstakeIndex
 pub const UNSTAKES_INDEX_FOR_USER: Map<(Addr, String), Vec<u64>> =
     Map::new("unstakes_index_for_user");
-
 
 //  key: pool_addr value: interchain_account_id
 pub const ADDR_ICAID_MAP: Map<String, String> = Map::new("pool_ica_map");

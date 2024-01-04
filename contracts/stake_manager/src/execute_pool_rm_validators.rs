@@ -169,7 +169,7 @@ pub fn execute_rm_pool_validators(
             msgs.push(any_msg);
         }
     }
-    let (pool_ica_info, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
+    let (pool_ica_info, _, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
 
     let register_delegation_query_msg = new_register_delegator_delegations_query_msg(
         pool_ica_info.ctrl_connection_id.clone(),

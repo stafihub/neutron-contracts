@@ -38,7 +38,7 @@ pub fn execute_era_collect_withdraw(
     }
     pool_info.era_process_status = WithdrawStarted;
 
-    let (_, withdraw_ica_info) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
+    let (_, withdraw_ica_info, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
 
     // check withdraw address balance and send it to the pool
     let withdraw_balances_result: Result<

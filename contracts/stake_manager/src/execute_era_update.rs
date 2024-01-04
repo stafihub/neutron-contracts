@@ -108,7 +108,7 @@ pub fn execute_era_update(
         .api
         .debug(format!("WASMDEBUG: IbcTransfer msg: {:?}", msg).as_str());
 
-    let (pool_ica_info, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id)?;
+    let (pool_ica_info, _, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id)?;
 
     let submsg_pool_ibc_send = msg_with_sudo_callback(
         deps.branch(),

@@ -116,7 +116,7 @@ pub fn execute_withdraw(
         value: Binary::from(buf),
     };
 
-    let (pool_ica_info, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
+    let (pool_ica_info, _, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
     let cosmos_msg = NeutronMsg::submit_tx(
         pool_ica_info.ctrl_connection_id.clone(),
         pool_info.ica_id.clone(),

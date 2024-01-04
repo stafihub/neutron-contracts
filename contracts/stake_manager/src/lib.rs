@@ -24,3 +24,4 @@ pub mod helper;
 pub mod query;
 pub mod query_callback;
 mod error_conversion;
+pub mod execute_open_channel;

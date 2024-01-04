@@ -19,6 +19,7 @@ use neutron_sdk::{
 };
 
 use crate::execute_era_restake::sudo_era_restake_failed_callback;
+use crate::execute_open_channel::execute_open_channel;
 use crate::execute_pool_rm_validators::execute_rm_pool_validators;
 use crate::execute_register_pool::{execute_register_pool, sudo_open_ack};
 use crate::execute_register_query::{register_balance_query, register_delegations_query};
@@ -201,6 +202,11 @@ pub fn execute(
         ),
         ExecuteMsg::InitPool(params) => execute_init_pool(deps, env, info, *params),
         ExecuteMsg::ConfigPool(params) => execute_config_pool(deps, info, *params),
+        ExecuteMsg::OpenChannel {
+            pool_addr,
+            closed_channel_id,
+            register_fee,
+        } => execute_open_channel(deps, env, info, pool_addr, closed_channel_id, register_fee),
         ExecuteMsg::RegisterBalanceQuery {
             connection_id,
             addr,
