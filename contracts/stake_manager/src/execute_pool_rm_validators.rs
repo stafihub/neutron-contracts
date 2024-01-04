@@ -1,11 +1,8 @@
 use std::ops::{Div, Mul, Sub};
 use std::{collections::HashSet, vec};
 
-use cosmwasm_std::{
-    Delegation, DepsMut, Env, MessageInfo, Response, StdError, StdResult, SubMsg, Uint128,
-};
+use cosmwasm_std::{Delegation, DepsMut, Env, MessageInfo, Response, StdError, Uint128};
 
-use neutron_sdk::interchain_queries::v045::new_register_delegator_delegations_query_msg;
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     interchain_queries::{
@@ -16,11 +13,8 @@ use neutron_sdk::{
     NeutronError, NeutronResult,
 };
 
-use crate::contract::DEFAULT_UPDATE_PERIOD;
-use crate::helper::gen_redelegation_txs;
-use crate::state::{
-    get_next_icq_reply_id, QueryKind, ValidatorUpdateStatus, INFO_OF_ICA_ID, POOLS,
-};
+use crate::helper::gen_redelegate_txs;
+use crate::state::{ValidatorUpdateStatus, INFO_OF_ICA_ID, POOLS};
 use crate::{
     contract::{msg_with_sudo_callback, SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS},
     state::ADDR_DELEGATIONS_REPLY_ID,
@@ -28,9 +22,6 @@ use crate::{
 use crate::{error_conversion::ContractError, state::REPLY_ID_TO_QUERY_ID};
 use crate::{helper::min_ntrn_ibc_fee, state::POOL_VALIDATOR_STATUS};
 
-// todo: What if submsg_redelegate fails when the old delegation query has been removed
-// It might be possible to save a list of query to be deleted and then perform the deletion at some point in each new era.
-// However, at present, there is a problem with the deletion query in the local test network, which can be seen after the test network experiment.
 pub fn execute_rm_pool_validators(
     mut deps: DepsMut<NeutronQuery>,
     _: Env,
@@ -71,8 +62,6 @@ pub fn execute_rm_pool_validators(
         )
         .as_str(),
     );
-
-    let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
 
     // redelegate
     let contract_query_id = ADDR_DELEGATIONS_REPLY_ID.load(deps.storage, pool_addr.clone())?;
@@ -158,7 +147,7 @@ pub fn execute_rm_pool_validators(
                 .as_str(),
             );
 
-            let any_msg = gen_redelegation_txs(
+            let any_msg = gen_redelegate_txs(
                 pool_addr.clone(),
                 delegation.validator.clone(),
                 target_validator.clone(),
@@ -171,28 +160,19 @@ pub fn execute_rm_pool_validators(
     }
     let (pool_ica_info, _, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
 
-    let register_delegation_query_msg = new_register_delegator_delegations_query_msg(
-        pool_ica_info.ctrl_connection_id.clone(),
-        pool_addr.clone(),
-        new_validators.clone(),
-        DEFAULT_UPDATE_PERIOD,
-    )?;
-
-    let next_icq_reply_id = get_next_icq_reply_id(deps.storage, QueryKind::Delegations)?;
-    let register_delegation_query_submsg =
-        SubMsg::reply_on_success(register_delegation_query_msg, next_icq_reply_id);
-
     // let remove_msg_old_query = NeutronMsg::remove_interchain_query(registere_query_id);
-    let mut resp = Response::default().add_submessage(register_delegation_query_submsg); // .add_message(remove_msg_old_query)
+    let mut resp = Response::default(); // .add_message(remove_msg_old_query)
 
     if !msgs.is_empty() {
+        let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
+
         let cosmos_msg = NeutronMsg::submit_tx(
             pool_ica_info.ctrl_connection_id.clone(),
             pool_info.ica_id.clone(),
             msgs,
             "".to_string(),
             DEFAULT_TIMEOUT_SECONDS,
-            fee.clone(),
+            fee,
         );
 
         let new_validator_list_str = new_validators
@@ -209,12 +189,13 @@ pub fn execute_rm_pool_validators(
                 port_id: pool_ica_info.ctrl_port_id,
                 pool_addr: pool_ica_info.ica_addr.clone(),
                 message: new_validator_list_str,
-                tx_type: TxType::RmValidator,
+                tx_type: TxType::UpdateValidators,
             },
         )?;
 
         pool_validator_status.status = ValidatorUpdateStatus::Pending;
 
+        pool_validator_status.status = ValidatorUpdateStatus::WaitQueryUpdate;
         resp = resp.add_submessage(submsg_redelegate)
     } else {
         pool_info.validator_addrs = new_validators;
@@ -225,37 +206,4 @@ pub fn execute_rm_pool_validators(
     POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
 
     Ok(resp)
-}
-
-pub fn sudo_rm_validator_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
-    let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
-    let mut pool_validator_status =
-        POOL_VALIDATOR_STATUS.load(deps.storage, payload.pool_addr.clone())?;
-
-    let new_validators: Vec<String> = payload.message.split('_').map(String::from).collect();
-
-    pool_info.validator_addrs = new_validators;
-    pool_validator_status.status = ValidatorUpdateStatus::Success;
-
-    POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
-    POOL_VALIDATOR_STATUS.save(
-        deps.storage,
-        payload.pool_addr.clone(),
-        &pool_validator_status,
-    )?;
-
-    Ok(Response::new())
-}
-
-pub fn sudo_rm_validator_failed_callback(
-    deps: DepsMut,
-    payload: SudoPayload,
-) -> StdResult<Response> {
-    let mut pool_validator_status =
-        POOL_VALIDATOR_STATUS.load(deps.storage, payload.pool_addr.clone())?;
-
-    pool_validator_status.status = ValidatorUpdateStatus::Failed;
-
-    POOL_VALIDATOR_STATUS.save(deps.storage, payload.pool_addr, &pool_validator_status)?;
-    Ok(Response::new())
 }
