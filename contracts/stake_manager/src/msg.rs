@@ -137,7 +137,7 @@ pub enum ExecuteMsg {
     EraActive {
         pool_addr: String,
     },
-    StakeLSM {
+    StakeLsm {
         // todo!
     },
 }

@@ -78,16 +78,6 @@ pub fn execute_rm_pool_validators(
     let contract_query_id = ADDR_DELEGATIONS_REPLY_ID.load(deps.storage, pool_addr.clone())?;
     let registered_query_id = REPLY_ID_TO_QUERY_ID.load(deps.storage, contract_query_id)?;
 
-    let remove_msg_old_query = NeutronMsg::remove_interchain_query(registered_query_id);
-
-    deps.as_ref().api.debug(
-        format!(
-            "WASMDEBUG: execute_rm_pool_validators contract_query_id: {:?} registered_query_id:{:?}",
-            contract_query_id, registered_query_id
-        )
-            .as_str(),
-    );
-
     let interchain_account_id = ADDR_ICAID_MAP.load(deps.storage, pool_addr.clone())?;
 
     deps.as_ref().api.debug(
@@ -221,8 +211,9 @@ pub fn execute_rm_pool_validators(
     pool_validator_status.status = ValidatorUpdateStatus::Pending;
     POOL_VALIDATOR_STATUS.save(deps.storage, pool_addr, &pool_validator_status)?;
 
+    // let remove_msg_old_query = NeutronMsg::remove_interchain_query(registered_query_id);
     Ok(Response::default()
-        .add_message(remove_msg_old_query)
+        // .add_message(remove_msg_old_query)
         .add_submessage(register_delegation_query_submsg)
         .add_submessage(submsg_redelegate))
 }

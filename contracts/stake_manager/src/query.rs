@@ -1,6 +1,6 @@
 use std::vec;
 
-use cosmwasm_std::{Addr, Binary, Deps, Env, to_json_binary};
+use cosmwasm_std::{to_json_binary, Addr, Binary, Deps, Env};
 
 use neutron_sdk::{
     bindings::query::{NeutronQuery, QueryInterchainAccountAddressResponse},
@@ -16,12 +16,12 @@ use neutron_sdk::{
     interchain_txs::helpers::get_port_id,
 };
 
+use crate::state::{read_errors_from_queue, ACKNOWLEDGEMENT_RESULTS, ADDR_BALANCES_REPLY_ID};
+use crate::state::{POOLS, REPLY_ID_TO_QUERY_ID, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX};
 use crate::{
     helper::get_ica,
     state::{ADDR_DELEGATIONS_REPLY_ID, POOL_ERA_SHOT},
 };
-use crate::state::{ACKNOWLEDGEMENT_RESULTS, ADDR_BALANCES_REPLY_ID, read_errors_from_queue};
-use crate::state::{REPLY_ID_TO_QUERY_ID, POOLS, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX};
 
 pub fn query_user_unstake(
     deps: Deps<NeutronQuery>,
@@ -61,6 +61,15 @@ pub fn query_balance_by_addr(
     let registered_query_id = REPLY_ID_TO_QUERY_ID.load(deps.storage, contract_query_id)?;
     // get info about the query
     let registered_query = get_registered_query(deps, registered_query_id)?;
+
+    deps.api.debug(
+        format!(
+            "WASMDEBUG: query_balance_by_addr contract_query_id is {:?} registered_query_id is: {:?} registered_query is:{:?}",
+            contract_query_id, registered_query_id, registered_query
+        )
+            .as_str(),
+    );
+
     // check that query type is KV
     check_query_type(registered_query.registered_query.query_type, QueryType::KV)?;
     // reconstruct a nice Balances structure from raw KV-storage values
@@ -92,6 +101,15 @@ pub fn query_delegation_by_addr(
     // get info about the query
     let registered_query: neutron_sdk::bindings::query::QueryRegisteredQueryResponse =
         get_registered_query(deps, registered_query_id)?;
+
+    deps.api.debug(
+        format!(
+            "WASMDEBUG: query_delegation_by_addr contract_query_id is {:?} registered_query_id is: {:?} registered_query is:{:?}",
+            contract_query_id, registered_query_id, registered_query
+        )
+            .as_str(),
+    );
+
     // check that query type is KV
     check_query_type(registered_query.registered_query.query_type, QueryType::KV)?;
     // reconstruct a nice Balances structure from raw KV-storage values

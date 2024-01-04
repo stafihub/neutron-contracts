@@ -240,7 +240,7 @@ pub fn execute(
         }
         ExecuteMsg::EraRestake { pool_addr } => execute_era_restake(deps, env, pool_addr),
         ExecuteMsg::EraActive { pool_addr } => execute_era_active(deps, pool_addr),
-        ExecuteMsg::StakeLSM {} => execute_stake_lsm(deps, env, info),
+        ExecuteMsg::StakeLsm {} => execute_stake_lsm(deps, env, info),
     }
 }
 

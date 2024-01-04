@@ -9,9 +9,7 @@ use neutron_sdk::{
 };
 
 use crate::state::POOLS;
-use crate::state::{
-    get_next_icq_reply_id, QueryKind, ADDR_DELEGATIONS_REPLY_ID, REPLY_ID_TO_QUERY_ID,
-};
+use crate::state::{get_next_icq_reply_id, QueryKind, ADDR_DELEGATIONS_REPLY_ID};
 use crate::{contract::DEFAULT_UPDATE_PERIOD, error_conversion::ContractError};
 
 pub fn execute_add_pool_validators(
@@ -40,9 +38,10 @@ pub fn execute_add_pool_validators(
     result.extend(pool_info.validator_addrs.clone().into_iter());
     pool_info.validator_addrs = result.into_iter().collect();
 
-    let contract_query_id = ADDR_DELEGATIONS_REPLY_ID.load(deps.storage, pool_addr.clone())?;
-    let registered_query_id = REPLY_ID_TO_QUERY_ID.load(deps.storage, contract_query_id)?;
-    let remove_icq_msg = NeutronMsg::remove_interchain_query(registered_query_id);
+    // todo: remove old query wait for test in testnet Testing the network locally would cause ICQ to be completely unavailable
+    // let contract_query_id = ADDR_DELEGATIONS_REPLY_ID.load(deps.storage, pool_addr.clone())?;
+    // let registered_query_id = REPLY_ID_TO_QUERY_ID.load(deps.storage, contract_query_id)?;
+    // let remove_icq_msg = NeutronMsg::remove_interchain_query(registered_query_id);
 
     // register new query
     let register_delegation_query_msg = new_register_delegator_delegations_query_msg(
@@ -61,6 +60,6 @@ pub fn execute_add_pool_validators(
     POOLS.save(deps.storage, pool_addr, &pool_info)?;
 
     Ok(Response::new()
-        .add_message(remove_icq_msg)
+        // .add_message(remove_icq_msg)
         .add_submessage(register_delegation_query_submsg))
 }
