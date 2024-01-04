@@ -12,6 +12,7 @@ pub mod execute_era_restake;
 pub mod execute_era_update;
 pub mod execute_pool_add_validators;
 pub mod execute_pool_rm_validators;
+pub mod execute_pool_update_validator;
 pub mod execute_register_pool;
 pub mod execute_register_query;
 pub mod execute_stake;
