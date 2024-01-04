@@ -59,7 +59,8 @@ use crate::{
 };
 use crate::{
     execute_era_restake::execute_era_restake,
-    execute_pool_add_validators::execute_add_pool_validators, query::query_era_snapshot,
+    execute_pool_add_validators::execute_add_pool_validators,
+    execute_redeem_token_for_share::execute_redeem_token_for_share, query::query_era_snapshot,
 };
 use crate::{execute_era_restake::sudo_era_restake_callback, query::query_user_unstake_index};
 use crate::{
@@ -101,6 +102,7 @@ pub enum TxType {
     EraBond,
     EraCollectWithdraw,
     EraRestake,
+    RedeemTokenForShare,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
@@ -221,6 +223,9 @@ pub fn execute(
             closed_channel_id,
             register_fee,
         } => execute_open_channel(deps, env, info, pool_addr, closed_channel_id, register_fee),
+        ExecuteMsg::RedeemTokenForShare { pool_addr, tokens } => {
+            execute_redeem_token_for_share(deps, info, pool_addr, tokens)
+        }
         ExecuteMsg::RegisterBalanceQuery {
             connection_id,
             addr,
@@ -324,7 +329,6 @@ fn sudo_callback(deps: DepsMut, env: Env, payload: SudoPayload) -> StdResult<Res
         TxType::EraRestake => sudo_era_restake_callback(deps, env, payload),
         TxType::UserWithdraw => sudo_withdraw_callback(deps, payload),
         TxType::RmValidator => sudo_rm_validator_callback(deps, payload),
-
         _ => Ok(Response::new()),
     }
 }

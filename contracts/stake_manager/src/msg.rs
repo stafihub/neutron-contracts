@@ -93,6 +93,10 @@ pub enum ExecuteMsg {
         closed_channel_id: String,
         register_fee: Vec<Coin>,
     },
+    RedeemTokenForShare {
+        pool_addr: String,
+        tokens: Vec<Coin>,
+    },
     RegisterBalanceQuery {
         connection_id: String,
         update_period: u64,

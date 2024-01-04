@@ -32,6 +32,7 @@ neutron-sdk = { path = "../../packages/neutron-sdk", default-features = false }
 cosmos-sdk-proto = { workspace = true }
 rtoken = { path = "../rtoken", features = ["library"] }
 thiserror = "1.0.50"
+prost = "0.12.2"
 
 [dev-dependencies]
 cosmwasm-schema = { workspace = true }
