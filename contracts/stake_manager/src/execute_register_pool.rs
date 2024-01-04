@@ -192,6 +192,7 @@ pub fn sudo_open_ack(
                 next_unstake_index: 0,
                 unbonding_period: 0,
                 era_process_status: EraProcessStatus::ActiveEnded,
+                protocol_fee_commission: Uint128::zero(),
                 unbond_commission: Uint128::zero(),
                 protocol_fee_receiver: Addr::unchecked(""),
                 admin: admin.clone(),

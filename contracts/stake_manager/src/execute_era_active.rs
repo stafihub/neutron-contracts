@@ -82,7 +82,9 @@ pub fn execute_era_active(
     // calculate protocol fee
     let (protocol_fee, platform_fee) = if total_amount.amount > pool_era_shot.active {
         let reward = total_amount.amount.sub(pool_era_shot.active);
-        let protocol_fee_raw = reward.mul(Uint128::new(1_000_000)).div(pool_info.rate);
+        let protocol_fee_raw = reward
+            .mul(pool_info.protocol_fee_commission)
+            .div(pool_info.rate);
 
         let platform_fee = protocol_fee_raw
             .mul(platform_info.platform_fee_commission)

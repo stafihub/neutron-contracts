@@ -76,6 +76,7 @@ pub struct ConfigPoolParams {
     pub next_unstake_index: Option<u64>,
     pub unbonding_period: Option<u64>,
     pub unbond_commission: Option<Uint128>,
+    pub protocol_fee_commission: Option<Uint128>,
     pub era_seconds: Option<u64>,
     pub offset: Option<u64>,
     pub paused: Option<bool>,

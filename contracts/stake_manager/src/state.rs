@@ -59,6 +59,7 @@ pub struct PoolInfo {
     pub unbonding_period: u64,
     pub era_process_status: EraProcessStatus,
     pub unbond_commission: Uint128,
+    pub protocol_fee_commission: Uint128,
     pub protocol_fee_receiver: Addr,
     pub admin: Addr,
     pub paused: bool,

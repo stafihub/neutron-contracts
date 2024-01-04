@@ -77,6 +77,7 @@ pub fn execute_init_pool(
     pool_info.unbonding_period = 15;
     pool_info.unstake_times_limit = 20;
     pool_info.unbond_commission = Uint128::zero();
+    pool_info.protocol_fee_commission = Uint128::new(100_000);
     pool_info.era_seconds = 24 * 60 * 60;
     pool_info.offset = 0;
     pool_info.paused = true;

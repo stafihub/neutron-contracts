@@ -38,6 +38,9 @@ pub fn execute_config_pool(
     if let Some(unbond_commission) = param.unbond_commission {
         pool_info.unbond_commission = unbond_commission;
     }
+    if let Some(protocol_fee_commission) = param.protocol_fee_commission {
+        pool_info.protocol_fee_commission = protocol_fee_commission;
+    }
     if let Some(era_seconds) = param.era_seconds {
         pool_info.era_seconds = era_seconds;
     }
@@ -46,6 +49,9 @@ pub fn execute_config_pool(
     }
     if let Some(receiver) = param.protocol_fee_receiver {
         pool_info.protocol_fee_receiver = Addr::unchecked(receiver);
+    }
+    if let Some(paused) = param.paused {
+        pool_info.paused = paused;
     }
 
     POOLS.save(deps.storage, param.pool_addr.clone(), &pool_info)?;
