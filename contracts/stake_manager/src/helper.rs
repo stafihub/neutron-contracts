@@ -61,7 +61,7 @@ pub fn gen_delegation_txs(
     }
 }
 
-pub fn gen_redelegation_txs(
+pub fn gen_redelegate_txs(
     delegator: String,
     src_validator: String,
     target_validator: String,

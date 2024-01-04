@@ -18,7 +18,7 @@ use neutron_sdk::{
     NeutronResult,
 };
 
-use crate::execute_era_restake::sudo_era_restake_failed_callback;
+use crate::execute_era_update::execute_era_update;
 use crate::execute_open_channel::execute_open_channel;
 use crate::execute_pool_rm_validators::execute_rm_pool_validators;
 use crate::execute_register_pool::{execute_register_pool, sudo_open_ack};
@@ -44,7 +44,10 @@ use crate::state::{
 use crate::{execute_config_pool::execute_config_pool, query::query_balance_by_addr};
 use crate::{execute_era_active::execute_era_active, query::query_delegation_by_addr};
 use crate::{
-    execute_era_bond::execute_era_bond, execute_pool_rm_validators::sudo_rm_validator_callback,
+    execute_era_bond::execute_era_bond,
+    execute_pool_update_validator::{
+        sudo_update_validators_callback, sudo_update_validators_failed_callback,
+    },
 };
 use crate::{
     execute_era_bond::sudo_era_bond_callback,
@@ -63,8 +66,8 @@ use crate::{
 };
 use crate::{execute_era_restake::sudo_era_restake_callback, query::query_user_unstake_index};
 use crate::{
-    execute_era_update::execute_era_update,
-    execute_pool_rm_validators::sudo_rm_validator_failed_callback,
+    execute_era_restake::sudo_era_restake_failed_callback,
+    execute_pool_update_validator::execute_pool_update_validator,
 };
 use crate::{
     msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
@@ -94,7 +97,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 #[serde(rename_all = "snake_case")]
 pub enum TxType {
     SetWithdrawAddr,
-    RmValidator,
+    UpdateValidators,
     AddValidator,
     UserWithdraw,
     EraUpdate,
@@ -243,14 +246,21 @@ pub fn execute(
             receiver,
             unstake_index_list,
         } => execute_withdraw(deps, env, info, pool_addr, receiver, unstake_index_list),
-        ExecuteMsg::PoolRmValidator {
+        ExecuteMsg::PoolRmValidators {
             pool_addr,
             validator_addrs,
         } => execute_rm_pool_validators(deps, env, info, pool_addr, validator_addrs),
-        ExecuteMsg::PoolAddValidator {
+        ExecuteMsg::PoolAddValidators {
             pool_addr,
             validator_addrs,
         } => execute_add_pool_validators(deps, env, info, pool_addr, validator_addrs),
+        ExecuteMsg::PoolUpdateValidator {
+            pool_addr,
+            old_validator,
+            new_validator,
+        } => {
+            execute_pool_update_validator(deps, env, info, pool_addr, old_validator, new_validator)
+        }
         ExecuteMsg::EraUpdate { channel, pool_addr } => {
             execute_era_update(deps, env, channel, pool_addr)
         }
@@ -323,7 +333,7 @@ fn sudo_callback(deps: DepsMut, env: Env, payload: SudoPayload) -> StdResult<Res
         TxType::EraCollectWithdraw => sudo_era_collect_withdraw_callback(deps, env, payload),
         TxType::EraRestake => sudo_era_restake_callback(deps, env, payload),
         TxType::UserWithdraw => sudo_withdraw_callback(deps, payload),
-        TxType::RmValidator => sudo_rm_validator_callback(deps, payload),
+        TxType::UpdateValidators => sudo_update_validators_callback(deps, payload),
 
         _ => Ok(Response::new()),
     }
@@ -336,7 +346,7 @@ fn sudo_err_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response>
         TxType::EraCollectWithdraw => sudo_era_collect_withdraw_failed_callback(deps, payload),
         TxType::EraRestake => sudo_era_restake_failed_callback(deps, payload),
         TxType::UserWithdraw => sudo_withdraw_failed_callback(deps, payload),
-        TxType::RmValidator => sudo_rm_validator_failed_callback(deps, payload),
+        TxType::UpdateValidators => sudo_update_validators_failed_callback(deps, payload),
         _ => Ok(Response::new()),
     }
 }

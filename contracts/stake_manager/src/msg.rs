@@ -118,13 +118,18 @@ pub enum ExecuteMsg {
         receiver: Addr,
         unstake_index_list: Vec<u64>,
     },
-    PoolRmValidator {
+    PoolRmValidators {
         pool_addr: String,
         validator_addrs: Vec<String>,
     },
-    PoolAddValidator {
+    PoolAddValidators {
         pool_addr: String,
         validator_addrs: Vec<String>,
+    },
+    PoolUpdateValidator {
+        pool_addr: String,
+        old_validator: String,
+        new_validator: String,
     },
     EraUpdate {
         channel: String,
