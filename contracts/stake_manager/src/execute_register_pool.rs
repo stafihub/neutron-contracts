@@ -10,7 +10,7 @@ use neutron_sdk::{
 };
 
 use crate::{
-    helper::{get_withdraw_ica_id, ICA_WITHDRAW_SUFIX},
+    helper::{get_withdraw_ica_id, ICA_WITHDRAW_SUFIX, INTERCHAIN_ACCOUNT_ID_LEN_LIMIT},
     state::{EraProcessStatus, IcaInfo, PoolInfo, INFO_OF_ICA_ID, POOLS},
 };
 
@@ -37,9 +37,10 @@ pub fn execute_register_pool(
         .api
         .debug(format!("WASMDEBUG: register_fee {:?}", register_fee).as_str());
 
-    if interchain_account_id.is_empty()
+    if interchain_account_id.trim().is_empty()
         || interchain_account_id.contains(".")
         || interchain_account_id.contains("-")
+        || interchain_account_id.len() > INTERCHAIN_ACCOUNT_ID_LEN_LIMIT
     {
         return Err(NeutronError::Std(StdError::generic_err(
             "Invalid interchain_account_id",

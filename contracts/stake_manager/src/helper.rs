@@ -15,6 +15,7 @@ use neutron_sdk::interchain_queries::v045::types::{
 
 const FEE_DENOM: &str = "untrn";
 pub const ICA_WITHDRAW_SUFIX: &str = "-withdraw_addr";
+pub const INTERCHAIN_ACCOUNT_ID_LEN_LIMIT: usize = 10;
 
 pub fn min_ntrn_ibc_fee(fee: IbcFee) -> IbcFee {
     IbcFee {
