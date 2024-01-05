@@ -37,9 +37,8 @@ use crate::query_callback::{
     write_balance_query_id_to_reply_id, write_delegation_query_id_to_reply_id,
 };
 use crate::state::{
-    save_icq_reply_payload, PlatformInfo, QueryKind, State, IBC_SUDO_ID_RANGE_END,
-    IBC_SUDO_ID_RANGE_START, PLATFORM_INFO, QUERY_BALANCES_REPLY_ID_END,
-    QUERY_DELEGATIONS_REPLY_ID_END, STATE,
+    PlatformInfo, State, IBC_SUDO_ID_RANGE_END, IBC_SUDO_ID_RANGE_START, PLATFORM_INFO,
+    QUERY_BALANCES_REPLY_ID_END, QUERY_DELEGATIONS_REPLY_ID_END, STATE,
 };
 use crate::{execute_config_pool::execute_config_pool, query::query_balance_by_addr};
 use crate::{execute_era_active::execute_era_active, query::query_delegation_by_addr};
@@ -361,16 +360,6 @@ pub fn msg_with_sudo_callback<C: Into<CosmosMsg<T>>, T>(
     payload: SudoPayload,
 ) -> StdResult<SubMsg<T>> {
     let id = save_reply_payload(deps.storage, payload)?;
-    Ok(SubMsg::reply_on_success(msg, id))
-}
-
-pub fn msg_icq_with_reply<C: Into<CosmosMsg<T>>, T>(
-    deps: DepsMut<NeutronQuery>,
-    msg: C,
-    payload: SudoPayload,
-    query_kind: QueryKind,
-) -> StdResult<SubMsg<T>> {
-    let id = save_icq_reply_payload(deps.storage, payload, query_kind)?;
     Ok(SubMsg::reply_on_success(msg, id))
 }
 

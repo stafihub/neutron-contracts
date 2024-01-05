@@ -9,12 +9,12 @@ pub const IBC_SUDO_ID_RANGE_START: u64 = 1_000_000_000;
 pub const IBC_SUDO_ID_RANGE_SIZE: u64 = 1_000;
 pub const IBC_SUDO_ID_RANGE_END: u64 = IBC_SUDO_ID_RANGE_START + IBC_SUDO_ID_RANGE_SIZE;
 
-pub const QUERY_BALANCES_REPLY_ID_RANGE_START: u64 = 1000;
+pub const QUERY_BALANCES_REPLY_ID_RANGE_START: u64 = 10_000;
 pub const QUERY_BALANCES_REPLY_ID_RANGE_SIZE: u64 = 500;
 pub const QUERY_BALANCES_REPLY_ID_END: u64 =
     QUERY_BALANCES_REPLY_ID_RANGE_START + QUERY_BALANCES_REPLY_ID_RANGE_SIZE;
 
-pub const QUERY_DELEGATIONS_REPLY_ID_RANGE_START: u64 = 2000;
+pub const QUERY_DELEGATIONS_REPLY_ID_RANGE_START: u64 = 20_000;
 pub const QUERY_DELEGATIONS_REPLY_ID_RANGE_SIZE: u64 = 500;
 pub const QUERY_DELEGATIONS_REPLY_ID_END: u64 =
     QUERY_DELEGATIONS_REPLY_ID_RANGE_START + QUERY_DELEGATIONS_REPLY_ID_RANGE_SIZE;
@@ -209,7 +209,7 @@ pub fn get_next_icq_reply_id(store: &mut dyn Storage, query_kind: QueryKind) -> 
             let mut id = LATEST_BALANCES_REPLY_ID
                 .may_load(store)?
                 .unwrap_or(QUERY_BALANCES_REPLY_ID_RANGE_START);
-            if id > QUERY_BALANCES_REPLY_ID_END {
+            if id >= QUERY_BALANCES_REPLY_ID_END {
                 id = QUERY_BALANCES_REPLY_ID_RANGE_START;
             }
             LATEST_BALANCES_REPLY_ID.save(store, &(id + 1))?;
@@ -219,7 +219,7 @@ pub fn get_next_icq_reply_id(store: &mut dyn Storage, query_kind: QueryKind) -> 
             let mut id = LATEST_DELEGATIONS_REPLY_ID
                 .may_load(store)?
                 .unwrap_or(QUERY_DELEGATIONS_REPLY_ID_RANGE_START);
-            if id > QUERY_DELEGATIONS_REPLY_ID_END {
+            if id >= QUERY_DELEGATIONS_REPLY_ID_END {
                 id = QUERY_DELEGATIONS_REPLY_ID_RANGE_START;
             }
             LATEST_DELEGATIONS_REPLY_ID.save(store, &(id + 1))?;
@@ -237,16 +237,6 @@ pub fn save_reply_payload(store: &mut dyn Storage, payload: SudoPayload) -> StdR
 pub fn read_reply_payload(store: &dyn Storage, id: u64) -> StdResult<SudoPayload> {
     let data = REPLY_QUEUE_ID.load(store, id)?;
     from_json(Binary(data))
-}
-
-pub fn save_icq_reply_payload(
-    store: &mut dyn Storage,
-    payload: SudoPayload,
-    query_kind: QueryKind,
-) -> StdResult<u64> {
-    let id = get_next_icq_reply_id(store, query_kind)?;
-    REPLY_QUEUE_ID.save(store, id, &to_json_vec(&payload)?)?;
-    Ok(id)
 }
 
 /// SUDO_PAYLOAD - tmp storage for sudo handler payloads
