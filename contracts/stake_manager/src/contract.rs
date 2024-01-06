@@ -35,10 +35,12 @@ use crate::query::{
 };
 use crate::query_callback::{
     write_balance_query_id_to_reply_id, write_delegation_query_id_to_reply_id,
+    write_validator_query_id_to_reply_id,
 };
 use crate::state::{
     PlatformInfo, State, IBC_SUDO_ID_RANGE_END, IBC_SUDO_ID_RANGE_START, PLATFORM_INFO,
-    QUERY_BALANCES_REPLY_ID_END, QUERY_DELEGATIONS_REPLY_ID_END, STATE,
+    QUERY_BALANCES_REPLY_ID_END, QUERY_DELEGATIONS_REPLY_ID_END, QUERY_VALIDATOR_REPLY_ID_END,
+    QUERY_VALIDATOR_REPLY_ID_RANGE_START, STATE,
 };
 use crate::{execute_config_pool::execute_config_pool, query::query_balance_by_addr};
 use crate::{execute_era_active::execute_era_active, query::query_delegation_by_addr};
@@ -105,6 +107,7 @@ pub enum TxType {
     EraCollectWithdraw,
     EraRestake,
     RedeemTokenForShare,
+    StakeLsm,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
@@ -272,7 +275,10 @@ pub fn execute(
         }
         ExecuteMsg::EraRestake { pool_addr } => execute_era_restake(deps, env, pool_addr),
         ExecuteMsg::EraActive { pool_addr } => execute_era_active(deps, pool_addr),
-        ExecuteMsg::StakeLsm {} => execute_stake_lsm(deps, env, info),
+        ExecuteMsg::StakeLsm {
+            neutron_address,
+            pool_addr,
+        } => execute_stake_lsm(deps, env, info, neutron_address, pool_addr),
     }
 }
 
@@ -288,6 +294,9 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> StdResult<Response> {
         }
         QUERY_DELEGATIONS_REPLY_ID_RANGE_START..=QUERY_DELEGATIONS_REPLY_ID_END => {
             write_delegation_query_id_to_reply_id(deps, msg)
+        }
+        QUERY_VALIDATOR_REPLY_ID_RANGE_START..=QUERY_VALIDATOR_REPLY_ID_END => {
+            write_validator_query_id_to_reply_id(deps, msg)
         }
         _ => Err(StdError::generic_err(format!(
             "unsupported reply message id {}",

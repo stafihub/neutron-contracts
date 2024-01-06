@@ -155,7 +155,8 @@ pub enum ExecuteMsg {
         pool_addr: String,
     },
     StakeLsm {
-        // todo!
+        neutron_address: String,
+        pool_addr: String,
     },
 }
 

@@ -7,17 +7,19 @@ use neutron_sdk::{
     interchain_queries::{
         check_query_type, get_registered_query, query_kv_result,
         types::QueryType,
-        v045::{queries::BalanceResponse, types::Balances, types::Delegations},
+        v045::{
+            queries::BalanceResponse, types::Balances, types::Delegations, types::StakingValidator,
+        },
     },
     NeutronResult,
 };
 use neutron_sdk::{
-    interchain_queries::v045::queries::DelegatorDelegationsResponse,
+    interchain_queries::v045::queries::{DelegatorDelegationsResponse, ValidatorResponse},
     interchain_txs::helpers::get_port_id,
 };
 
 use crate::state::{read_errors_from_queue, ACKNOWLEDGEMENT_RESULTS, ADDR_BALANCES_REPLY_ID};
-use crate::state::{ADDR_DELEGATIONS_REPLY_ID, INFO_OF_ICA_ID, POOL_ERA_SHOT};
+use crate::state::{ADDR_DELEGATIONS_REPLY_ID, INFO_OF_ICA_ID};
 use crate::state::{POOLS, REPLY_ID_TO_QUERY_ID, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX};
 
 pub fn query_user_unstake(
@@ -129,58 +131,44 @@ pub fn query_delegation_by_addr(
     })
 }
 
-pub fn query_delegation(
+pub fn query_validator_by_addr(
     deps: Deps<NeutronQuery>,
-    registered_query_id: u64,
-) -> NeutronResult<DelegatorDelegationsResponse> {
+    addr: String,
+) -> NeutronResult<ValidatorResponse> {
+    let contract_query_id = ADDR_DELEGATIONS_REPLY_ID.load(deps.storage, addr)?;
+    let registered_query_id = REPLY_ID_TO_QUERY_ID.load(deps.storage, contract_query_id)?;
     // get info about the query
-    let registered_query = get_registered_query(deps, registered_query_id)?;
-    // check that query type is KV
-    check_query_type(registered_query.registered_query.query_type, QueryType::KV)?;
-    // reconstruct a nice Balances structure from raw KV-storage values
-    let delegations: Delegations = query_kv_result(deps, registered_query_id)?;
+    let registered_query: neutron_sdk::bindings::query::QueryRegisteredQueryResponse =
+        get_registered_query(deps, registered_query_id)?;
 
     deps.api.debug(
         format!(
-            "WASMDEBUG: query_delegation_by_addr Delegations is {:?}",
-            delegations
+            "WASMDEBUG: query_delegation_by_addr contract_query_id is {:?} registered_query_id is: {:?} registered_query is:{:?}",
+            contract_query_id, registered_query_id, registered_query
+        )
+            .as_str(),
+    );
+
+    // check that query type is KV
+    check_query_type(registered_query.registered_query.query_type, QueryType::KV)?;
+    // reconstruct a nice Balances structure from raw KV-storage values
+    let staking_validator: StakingValidator = query_kv_result(deps, registered_query_id)?;
+
+    deps.api.debug(
+        format!(
+            "WASMDEBUG: query_validator_by_addr validator is {:?}",
+            staking_validator
         )
         .as_str(),
     );
 
-    Ok(DelegatorDelegationsResponse {
+    Ok(ValidatorResponse {
         // last_submitted_height tells us when the query result was updated last time (block height)
         last_submitted_local_height: registered_query
             .registered_query
             .last_submitted_result_local_height,
-        delegations: delegations.delegations,
+        validator: staking_validator,
     })
-}
-
-pub fn query_balance(
-    deps: Deps<NeutronQuery>,
-    _env: Env,
-    registered_query_id: u64,
-) -> NeutronResult<Binary> {
-    // get info about the query
-    let registered_query = get_registered_query(deps, registered_query_id)?;
-    // check that query type is KV
-    check_query_type(registered_query.registered_query.query_type, QueryType::KV)?;
-    // reconstruct a nice Balances structure from raw KV-storage values
-    let balances: Balances = query_kv_result(deps, registered_query_id)?;
-
-    deps.api
-        .debug(format!("WASMDEBUG: query_balance Balances is {:?}", balances).as_str());
-
-    Ok(to_json_binary(
-        &(BalanceResponse {
-            // last_submitted_height tells us when the query result was updated last time (block height)
-            last_submitted_local_height: registered_query
-                .registered_query
-                .last_submitted_result_local_height,
-            balances,
-        }),
-    )?)
 }
 
 pub fn query_pool_info(
@@ -198,7 +186,8 @@ pub fn query_era_snapshot(
     _env: Env,
     pool_addr: String,
 ) -> NeutronResult<Binary> {
-    let result = POOL_ERA_SHOT.load(deps.storage, pool_addr)?;
+    let pool_info = POOLS.load(deps.storage, pool_addr)?;
+    let result = pool_info.era_snapshot;
 
     Ok(to_json_binary(&result)?)
 }

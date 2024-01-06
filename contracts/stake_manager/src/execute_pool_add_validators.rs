@@ -2,13 +2,14 @@ use cosmwasm_std::{DepsMut, Env, MessageInfo, Response, StdError, SubMsg};
 
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
+    interchain_queries::v045::new_register_staking_validators_query_msg,
     NeutronResult,
 };
 use neutron_sdk::{
     interchain_queries::v045::new_register_delegator_delegations_query_msg, NeutronError,
 };
 
-use crate::state::POOLS;
+use crate::state::{ADDR_VALIDATOR_REPLY_ID, POOLS};
 
 use crate::state::{get_next_icq_reply_id, QueryKind, ADDR_DELEGATIONS_REPLY_ID, INFO_OF_ICA_ID};
 
@@ -54,15 +55,41 @@ pub fn execute_add_pool_validators(
         DEFAULT_UPDATE_PERIOD,
     )?;
 
-    let next_icq_reply_id = get_next_icq_reply_id(deps.storage, QueryKind::Delegations)?;
+    let register_staking_validators_query_msg = new_register_staking_validators_query_msg(
+        pool_ica_info.ctrl_connection_id.clone(),
+        pool_info.validator_addrs.clone(),
+        DEFAULT_UPDATE_PERIOD,
+    )?;
 
-    let register_delegation_query_submsg =
-        SubMsg::reply_on_success(register_delegation_query_msg, next_icq_reply_id);
+    let next_icq_reply_id_for_delegations =
+        get_next_icq_reply_id(deps.storage, QueryKind::Delegations)?;
+    let next_icq_reply_id_for_validator =
+        get_next_icq_reply_id(deps.storage, QueryKind::Validator)?;
 
-    ADDR_DELEGATIONS_REPLY_ID.save(deps.storage, pool_addr.clone(), &next_icq_reply_id)?;
+    let register_delegation_query_submsg = SubMsg::reply_on_success(
+        register_delegation_query_msg,
+        next_icq_reply_id_for_delegations,
+    );
+    let register_staking_validator_query_submsg = SubMsg::reply_on_success(
+        register_staking_validators_query_msg,
+        next_icq_reply_id_for_validator,
+    );
+
+    ADDR_DELEGATIONS_REPLY_ID.save(
+        deps.storage,
+        pool_addr.clone(),
+        &next_icq_reply_id_for_delegations,
+    )?;
+    ADDR_VALIDATOR_REPLY_ID.save(
+        deps.storage,
+        pool_addr.clone(),
+        &next_icq_reply_id_for_validator,
+    )?;
+
     POOLS.save(deps.storage, pool_addr, &pool_info)?;
 
     Ok(Response::new()
         // .add_message(remove_icq_msg)
-        .add_submessage(register_delegation_query_submsg))
+        .add_submessage(register_delegation_query_submsg)
+        .add_submessage(register_staking_validator_query_submsg))
 }

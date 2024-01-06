@@ -9,6 +9,7 @@ use neutron_sdk::{
     NeutronResult,
 };
 
+use crate::state::EraSnapshot;
 use crate::{
     helper::{get_withdraw_ica_id, ICA_WITHDRAW_SUFIX, INTERCHAIN_ACCOUNT_ID_LEN_LIMIT},
     state::{EraProcessStatus, IcaInfo, PoolInfo, INFO_OF_ICA_ID, POOLS},
@@ -40,6 +41,7 @@ pub fn execute_register_pool(
     if interchain_account_id.trim().is_empty()
         || interchain_account_id.contains(".")
         || interchain_account_id.contains("-")
+        || interchain_account_id.contains(ICA_WITHDRAW_SUFIX)
         || interchain_account_id.len() > INTERCHAIN_ACCOUNT_ID_LEN_LIMIT
     {
         return Err(NeutronError::Std(StdError::generic_err(
@@ -200,6 +202,15 @@ pub fn sudo_open_ack(
                 era_seconds: 0,
                 offset: 0,
                 paused: true,
+                pending_share_tokens: vec![],
+                era_snapshot: EraSnapshot {
+                    era: 0,
+                    bond: Uint128::zero(),
+                    unbond: Uint128::zero(),
+                    active: Uint128::zero(),
+                    restake_amount: Uint128::zero(),
+                    bond_height: 0,
+                },
             };
 
             POOLS.save(deps.storage, pool_ica_info.ica_addr.clone(), &pool_info)?;

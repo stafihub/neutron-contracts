@@ -1,9 +1,10 @@
 use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
 use cosmos_sdk_proto::cosmos::staking::v1beta1::{MsgBeginRedelegate, MsgDelegate};
 use cosmos_sdk_proto::prost::Message;
-use cosmwasm_std::{Binary, Uint128};
+use cosmwasm_std::{Binary, Deps, QueryRequest, StdResult, Uint128};
 
 use neutron_sdk::bindings::msg::IbcFee;
+use neutron_sdk::bindings::query::NeutronQuery;
 use neutron_sdk::bindings::types::{KVKey, ProtobufAny};
 use neutron_sdk::interchain_queries::helpers::decode_and_convert;
 use neutron_sdk::interchain_queries::v045::helpers::{
@@ -12,6 +13,8 @@ use neutron_sdk::interchain_queries::v045::helpers::{
 use neutron_sdk::interchain_queries::v045::types::{
     KEY_BOND_DENOM, PARAMS_STORE_KEY, STAKING_STORE_KEY,
 };
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 const FEE_DENOM: &str = "untrn";
 pub const ICA_WITHDRAW_SUFIX: &str = "-withdraw_addr";
@@ -130,4 +133,85 @@ pub fn new_register_delegator_delegations_keys(
 
 pub fn get_withdraw_ica_id(interchain_account_id: String) -> String {
     format!("{}{}", interchain_account_id.clone(), ICA_WITHDRAW_SUFIX)
+}
+
+#[derive(Clone, PartialEq, Message)]
+pub struct RawCoin {
+    #[prost(string, tag = "1")]
+    pub denom: String,
+    #[prost(string, tag = "2")]
+    pub amount: String,
+}
+
+impl From<cosmwasm_std::Coin> for RawCoin {
+    fn from(value: cosmwasm_std::Coin) -> Self {
+        Self {
+            denom: value.denom,
+            amount: value.amount.to_string(),
+        }
+    }
+}
+
+pub fn redeem_token_for_share_msg(
+    delegator: impl Into<String>,
+    token: cosmwasm_std::Coin,
+) -> ProtobufAny {
+    #[derive(Clone, PartialEq, Message)]
+    struct MsgRedeemTokenForShare {
+        #[prost(string, tag = "1")]
+        delegator_address: String,
+        #[prost(message, optional, tag = "2")]
+        amount: Option<RawCoin>,
+    }
+
+    fn build_msg(delegator_address: String, raw_coin: RawCoin) -> ProtobufAny {
+        let msg = MsgRedeemTokenForShare {
+            delegator_address,
+            amount: Some(raw_coin),
+        };
+
+        let encoded = msg.encode_to_vec();
+
+        ProtobufAny {
+            type_url: "/cosmos.staking.v1beta1.MsgRedeemTokensForShares".to_string(),
+            value: encoded.into(),
+        }
+    }
+
+    build_msg(delegator.into(), token.into())
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct DenomTrace {
+    pub path: String,
+    pub base_denom: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct QueryDenomTraceResponse {
+    pub denom_trace: DenomTrace,
+}
+
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct QueryDenomTraceRequest {
+    #[prost(string, tag = "1")]
+    pub hash: ::prost::alloc::string::String,
+}
+
+pub fn query_denom_trace(
+    deps: Deps<NeutronQuery>,
+    hash: String,
+) -> StdResult<QueryDenomTraceResponse> {
+    let req = QueryRequest::Stargate {
+        path: "/ibc.applications.transfer.v1.Query/DenomTrace".to_owned(),
+        data: QueryDenomTraceRequest {
+            hash: hash.to_string(),
+        }
+        .encode_to_vec()
+        .into(),
+    };
+    let denom_trace: QueryDenomTraceResponse = deps.querier.query(&req.into())?;
+    return Ok(denom_trace);
 }

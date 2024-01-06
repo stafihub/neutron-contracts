@@ -24,7 +24,6 @@ use crate::state::{INFO_OF_ICA_ID, POOLS};
 use crate::{
     contract::{msg_with_sudo_callback, SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS},
     query::query_delegation_by_addr,
-    state::POOL_ERA_SHOT,
 };
 
 #[derive(Clone, Debug)]
@@ -52,18 +51,16 @@ pub fn execute_era_bond(
     pool_info.era_process_status = BondStarted;
     POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
 
-    let pool_era_shot = POOL_ERA_SHOT.load(deps.storage, pool_addr.clone())?;
-
     let mut msgs = vec![];
     // Check whether the delegator-validator needs to manually withdraw
     let mut op_validators = vec![];
 
     match (
-        pool_era_shot.unbond > pool_era_shot.bond,
-        pool_era_shot.bond > pool_era_shot.unbond,
+        pool_info.era_snapshot.unbond > pool_info.era_snapshot.bond,
+        pool_info.era_snapshot.bond > pool_info.era_snapshot.unbond,
     ) {
         (true, false) => {
-            let unbond_amount = pool_era_shot.unbond - pool_era_shot.bond;
+            let unbond_amount = pool_info.era_snapshot.unbond - pool_info.era_snapshot.bond;
 
             deps.as_ref().api.debug(
                 format!(
@@ -115,7 +112,7 @@ pub fn execute_era_bond(
             }
         }
         (false, true) => {
-            let stake_amount = pool_era_shot.bond - pool_era_shot.unbond;
+            let stake_amount = pool_info.era_snapshot.bond - pool_info.era_snapshot.unbond;
             let validator_count = pool_info.validator_addrs.len() as u128;
 
             deps.as_ref().api.debug(
@@ -302,11 +299,8 @@ pub fn sudo_era_bond_callback(
 ) -> StdResult<Response> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
     pool_info.era_process_status = BondEnded;
+    pool_info.era_snapshot.bond_height = env.block.height;
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
-
-    let mut pool_era_shot = POOL_ERA_SHOT.load(deps.storage, payload.pool_addr.clone())?;
-    pool_era_shot.bond_height = env.block.height;
-    POOL_ERA_SHOT.save(deps.storage, payload.pool_addr, &pool_era_shot)?;
 
     Ok(Response::new())
 }

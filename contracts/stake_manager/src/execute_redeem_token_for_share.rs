@@ -1,15 +1,14 @@
 use cosmwasm_std::{DepsMut, MessageInfo, Response};
 
 use neutron_sdk::{
-    bindings::{msg::NeutronMsg, query::NeutronQuery, types::ProtobufAny},
+    bindings::{msg::NeutronMsg, query::NeutronQuery},
     query::min_ibc_fee::query_min_ibc_fee,
     NeutronResult,
 };
-use prost::Message;
 
 use crate::{
     contract::{msg_with_sudo_callback, SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS},
-    helper::min_ntrn_ibc_fee,
+    helper::{min_ntrn_ibc_fee, redeem_token_for_share_msg},
     state::POOLS,
 };
 use crate::{error_conversion::ContractError, state::INFO_OF_ICA_ID};
@@ -59,50 +58,4 @@ pub fn execute_redeem_token_for_share(
     )?;
 
     Ok(Response::default().add_submessage(submsg))
-}
-
-#[derive(Clone, PartialEq, Message)]
-pub struct RawCoin {
-    #[prost(string, tag = "1")]
-    pub denom: String,
-    #[prost(string, tag = "2")]
-    pub amount: String,
-}
-
-impl From<cosmwasm_std::Coin> for RawCoin {
-    fn from(value: cosmwasm_std::Coin) -> Self {
-        Self {
-            denom: value.denom,
-            amount: value.amount.to_string(),
-        }
-    }
-}
-
-pub fn redeem_token_for_share_msg(
-    delegator: impl Into<String>,
-    token: cosmwasm_std::Coin,
-) -> ProtobufAny {
-    #[derive(Clone, PartialEq, Message)]
-    struct MsgRedeemTokenForShare {
-        #[prost(string, tag = "1")]
-        delegator_address: String,
-        #[prost(message, optional, tag = "2")]
-        amount: Option<RawCoin>,
-    }
-
-    fn build_msg(delegator_address: String, raw_coin: RawCoin) -> ProtobufAny {
-        let msg = MsgRedeemTokenForShare {
-            delegator_address,
-            amount: Some(raw_coin),
-        };
-
-        let encoded = msg.encode_to_vec();
-
-        ProtobufAny {
-            type_url: "/cosmos.staking.v1beta1.MsgRedeemTokensForShares".to_string(),
-            value: encoded.into(),
-        }
-    }
-
-    build_msg(delegator.into(), token.into())
 }

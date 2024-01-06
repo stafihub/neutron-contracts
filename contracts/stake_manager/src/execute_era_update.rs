@@ -13,7 +13,7 @@ use crate::state::EraProcessStatus::{ActiveEnded, EraUpdateEnded, EraUpdateStart
 use crate::state::{INFO_OF_ICA_ID, POOLS};
 use crate::{
     contract::{msg_with_sudo_callback, SudoPayload, TxType},
-    state::{EraShot, POOL_ERA_SHOT},
+    state::EraSnapshot,
 };
 
 pub fn execute_era_update(
@@ -47,19 +47,14 @@ pub fn execute_era_update(
 
     pool_info.era_process_status = EraUpdateStarted;
     pool_info.era = pool_info.era.add(1);
-
-    POOL_ERA_SHOT.save(
-        deps.storage,
-        pool_addr.clone(),
-        &(EraShot {
-            era: pool_info.era,
-            bond: pool_info.bond,
-            unbond: pool_info.unbond,
-            active: pool_info.active,
-            bond_height: 0,
-            restake_amount: Uint128::zero(),
-        }),
-    )?;
+    pool_info.era_snapshot = EraSnapshot {
+        era: pool_info.era,
+        bond: pool_info.bond,
+        unbond: pool_info.unbond,
+        active: pool_info.active,
+        bond_height: 0,
+        restake_amount: Uint128::zero(),
+    };
 
     if pool_info.bond.is_zero() {
         pool_info.era_process_status = EraUpdateEnded;
@@ -145,9 +140,16 @@ pub fn sudo_era_update_failed_callback(deps: DepsMut, payload: SudoPayload) -> S
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
     pool_info.era = pool_info.era.sub(1);
     pool_info.era_process_status = ActiveEnded;
-    POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
+    pool_info.era_snapshot = EraSnapshot {
+        era: 0,
+        bond: Uint128::zero(),
+        unbond: Uint128::zero(),
+        active: Uint128::zero(),
+        restake_amount: Uint128::zero(),
+        bond_height: 0,
+    };
 
-    POOL_ERA_SHOT.remove(deps.storage, payload.pool_addr);
+    POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
 
     Ok(Response::new())
 }

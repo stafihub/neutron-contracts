@@ -19,6 +19,11 @@ pub const QUERY_DELEGATIONS_REPLY_ID_RANGE_SIZE: u64 = 500;
 pub const QUERY_DELEGATIONS_REPLY_ID_END: u64 =
     QUERY_DELEGATIONS_REPLY_ID_RANGE_START + QUERY_DELEGATIONS_REPLY_ID_RANGE_SIZE;
 
+pub const QUERY_VALIDATOR_REPLY_ID_RANGE_START: u64 = 30_000;
+pub const QUERY_VALIDATOR_REPLY_ID_RANGE_SIZE: u64 = 500;
+pub const QUERY_VALIDATOR_REPLY_ID_END: u64 =
+    QUERY_VALIDATOR_REPLY_ID_RANGE_START + QUERY_VALIDATOR_REPLY_ID_RANGE_SIZE;
+
 pub const REPLY_QUEUE_ID: Map<u64, Vec<u8>> = Map::new("reply_queue_id");
 
 const REPLY_ID: Item<u64> = Item::new("reply_id");
@@ -37,6 +42,16 @@ pub struct PoolValidatorStatus {
 
 pub const POOL_VALIDATOR_STATUS: Map<String, PoolValidatorStatus> =
     Map::new("pool_validator_status");
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct EraSnapshot {
+    pub era: u64,
+    pub bond: Uint128,
+    pub unbond: Uint128,
+    pub active: Uint128,
+    pub restake_amount: Uint128,
+    pub bond_height: u64,
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct PoolInfo {
@@ -63,21 +78,13 @@ pub struct PoolInfo {
     pub protocol_fee_receiver: Addr,
     pub admin: Addr,
     pub paused: bool,
+    pub pending_share_tokens: Vec<cosmwasm_std::Coin>,
+    pub era_snapshot: EraSnapshot,
 }
 
 pub const POOLS: Map<String, PoolInfo> = Map::new("pools");
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct EraShot {
-    pub era: u64,
-    pub bond: Uint128,
-    pub unbond: Uint128,
-    pub active: Uint128,
-    pub restake_amount: Uint128,
-    pub bond_height: u64,
-}
-
-pub const POOL_ERA_SHOT: Map<String, EraShot> = Map::new("pool_era_shot");
+// pub const POOL_ERA_SHOT: Map<String, EraShot> = Map::new("pool_era_shot");
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum EraProcessStatus {
@@ -147,9 +154,13 @@ pub const ADDR_BALANCES_REPLY_ID: Map<String, u64> = Map::new("addr_balances_rep
 
 pub const ADDR_DELEGATIONS_REPLY_ID: Map<String, u64> = Map::new("addr_delegations_reply_id");
 
+pub const ADDR_VALIDATOR_REPLY_ID: Map<String, u64> = Map::new("addr_validator_reply_id");
+
 pub const LATEST_BALANCES_REPLY_ID: Item<u64> = Item::new("latest_balances_reply_id");
 
 pub const LATEST_DELEGATIONS_REPLY_ID: Item<u64> = Item::new("latest_delegations_reply_id");
+
+pub const LATEST_VALIDATOR_REPLY_ID: Item<u64> = Item::new("latest_validator_reply_id");
 
 pub const KV_QUERY_ID_TO_CALLBACKS: Map<u64, QueryKind> = Map::new("kv_query_id_to_callbacks");
 
@@ -161,6 +172,7 @@ pub enum QueryKind {
     // Balance query
     Balances,
     Delegations,
+    Validator,
     // You can add your handlers to understand what query to deserialize by query_id in sudo callback
 }
 
@@ -196,7 +208,7 @@ pub fn read_errors_from_queue(store: &dyn Storage) -> StdResult<Vec<(Vec<u8>, St
 /// we can safely reuse the same id set in every new transaction
 pub fn get_next_id(store: &mut dyn Storage) -> StdResult<u64> {
     let mut id = REPLY_ID.may_load(store)?.unwrap_or(IBC_SUDO_ID_RANGE_START);
-    if id > IBC_SUDO_ID_RANGE_END {
+    if id >= IBC_SUDO_ID_RANGE_END {
         id = IBC_SUDO_ID_RANGE_START;
     }
     REPLY_ID.save(store, &(id + 1))?;
@@ -206,23 +218,36 @@ pub fn get_next_id(store: &mut dyn Storage) -> StdResult<u64> {
 pub fn get_next_icq_reply_id(store: &mut dyn Storage, query_kind: QueryKind) -> StdResult<u64> {
     match query_kind {
         QueryKind::Balances => {
-            let mut id = LATEST_BALANCES_REPLY_ID
+            let id = LATEST_BALANCES_REPLY_ID
                 .may_load(store)?
                 .unwrap_or(QUERY_BALANCES_REPLY_ID_RANGE_START);
-            if id >= QUERY_BALANCES_REPLY_ID_END {
-                id = QUERY_BALANCES_REPLY_ID_RANGE_START;
+            let mut save_id = id + 1;
+            if save_id >= QUERY_BALANCES_REPLY_ID_END {
+                save_id = QUERY_BALANCES_REPLY_ID_RANGE_START;
             }
-            LATEST_BALANCES_REPLY_ID.save(store, &(id + 1))?;
+            LATEST_BALANCES_REPLY_ID.save(store, &save_id)?;
             Ok(id)
         }
         QueryKind::Delegations => {
-            let mut id = LATEST_DELEGATIONS_REPLY_ID
+            let id = LATEST_DELEGATIONS_REPLY_ID
                 .may_load(store)?
                 .unwrap_or(QUERY_DELEGATIONS_REPLY_ID_RANGE_START);
-            if id >= QUERY_DELEGATIONS_REPLY_ID_END {
-                id = QUERY_DELEGATIONS_REPLY_ID_RANGE_START;
+            let mut save_id = id + 1;
+            if save_id > QUERY_DELEGATIONS_REPLY_ID_END {
+                save_id = QUERY_DELEGATIONS_REPLY_ID_RANGE_START;
             }
-            LATEST_DELEGATIONS_REPLY_ID.save(store, &(id + 1))?;
+            LATEST_DELEGATIONS_REPLY_ID.save(store, &save_id)?;
+            Ok(id)
+        }
+        QueryKind::Validator => {
+            let id = LATEST_VALIDATOR_REPLY_ID
+                .may_load(store)?
+                .unwrap_or(QUERY_VALIDATOR_REPLY_ID_RANGE_START);
+            let mut save_id = id + 1;
+            if save_id >= QUERY_VALIDATOR_REPLY_ID_END {
+                save_id = QUERY_VALIDATOR_REPLY_ID_RANGE_START;
+            }
+            LATEST_VALIDATOR_REPLY_ID.save(store, &save_id)?;
             Ok(id)
         }
     }

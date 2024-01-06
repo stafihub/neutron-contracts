@@ -9,12 +9,12 @@ use neutron_sdk::{
     NeutronError, NeutronResult,
 };
 
+use crate::query::query_delegation_by_addr;
 use crate::state::POOLS;
 use crate::state::{
     EraProcessStatus::{ActiveEnded, RestakeEnded},
     PLATFORM_INFO,
 };
-use crate::{query::query_delegation_by_addr, state::POOL_ERA_SHOT};
 
 pub fn execute_era_active(
     deps: DepsMut<NeutronQuery>,
@@ -29,12 +29,10 @@ pub fn execute_era_active(
         return Err(NeutronError::Std(StdError::generic_err("status not allow")));
     }
 
-    let pool_era_shot = POOL_ERA_SHOT.load(deps.storage, pool_addr.clone())?;
-
     deps.as_ref().api.debug(
         format!(
             "WASMDEBUG: execute_era_active pool_era_shot: {:?}",
-            pool_era_shot
+            pool_info.era_snapshot
         )
         .as_str(),
     );
@@ -48,7 +46,7 @@ pub fn execute_era_active(
 
     match delegations_result {
         Ok(delegations_resp) => {
-            if delegations_resp.last_submitted_local_height <= pool_era_shot.bond_height {
+            if delegations_resp.last_submitted_local_height <= pool_info.era_snapshot.bond_height {
                 return Err(NeutronError::Std(StdError::generic_err("Delegation submission height is less than 
                 or equal to the bond/withdraw collect height of the pool era, which is not allowed.")));
             }
@@ -80,8 +78,8 @@ pub fn execute_era_active(
 
     let platform_info = PLATFORM_INFO.load(deps.storage)?;
     // calculate protocol fee
-    let (protocol_fee, platform_fee) = if total_amount.amount > pool_era_shot.active {
-        let reward = total_amount.amount.sub(pool_era_shot.active);
+    let (protocol_fee, platform_fee) = if total_amount.amount > pool_info.era_snapshot.active {
+        let reward = total_amount.amount.sub(pool_info.era_snapshot.active);
         let protocol_fee_raw = reward
             .mul(pool_info.protocol_fee_commission)
             .div(pool_info.rate);
@@ -103,8 +101,8 @@ pub fn execute_era_active(
     );
 
     let cal_temp = pool_info.active.add(total_amount.amount);
-    let new_active = if cal_temp > pool_era_shot.active {
-        cal_temp.sub(pool_era_shot.active)
+    let new_active = if cal_temp > pool_info.era_snapshot.active {
+        cal_temp.sub(pool_info.era_snapshot.active)
     } else {
         Uint128::zero()
     };
@@ -125,7 +123,6 @@ pub fn execute_era_active(
     pool_info.active = new_active;
 
     POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
-    POOL_ERA_SHOT.remove(deps.storage, pool_addr);
 
     let mut resp = Response::new().add_attribute("new_rate", pool_info.rate);
     if !protocol_fee.is_zero() {

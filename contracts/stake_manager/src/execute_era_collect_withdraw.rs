@@ -9,10 +9,10 @@ use neutron_sdk::{
     NeutronError, NeutronResult,
 };
 
+use crate::contract::DEFAULT_TIMEOUT_SECONDS;
 use crate::helper::{get_withdraw_ica_id, min_ntrn_ibc_fee};
 use crate::state::EraProcessStatus::{BondEnded, WithdrawEnded, WithdrawStarted};
 use crate::state::{INFO_OF_ICA_ID, POOLS};
-use crate::{contract::DEFAULT_TIMEOUT_SECONDS, state::POOL_ERA_SHOT};
 use crate::{
     contract::{msg_with_sudo_callback, SudoPayload, TxType},
     query::query_balance_by_addr,
@@ -46,12 +46,10 @@ pub fn execute_era_collect_withdraw(
         NeutronError,
     > = query_balance_by_addr(deps.as_ref(), withdraw_ica_info.ica_addr.clone());
 
-    let mut pool_era_shot = POOL_ERA_SHOT.load(deps.storage, pool_addr.clone())?;
-
     let mut withdraw_amount = Uint128::zero();
     match withdraw_balances_result {
         Ok(balance_response) => {
-            if balance_response.last_submitted_local_height <= pool_era_shot.bond_height {
+            if balance_response.last_submitted_local_height <= pool_info.era_snapshot.bond_height {
                 return Err(NeutronError::Std(StdError::generic_err("Withdraw Addr submission height is less than or equal to the bond height of the pool era, which is not allowed.")));
             }
 
@@ -95,9 +93,6 @@ pub fn execute_era_collect_withdraw(
         .as_str(),
     );
 
-    // let interchain_account_id =
-    //     ADDR_ICAID_MAP.load(deps.storage, pool_info.withdraw_addr.clone())?;
-
     let tx_withdraw_coin = cosmos_sdk_proto::cosmos::base::v1beta1::Coin {
         denom: pool_info.remote_denom.clone(),
         amount: withdraw_amount.to_string(),
@@ -126,7 +121,7 @@ pub fn execute_era_collect_withdraw(
     let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
     let cosmos_msg = NeutronMsg::submit_tx(
         withdraw_ica_info.ctrl_connection_id.clone(),
-        get_withdraw_ica_id(pool_info.ica_id),
+        get_withdraw_ica_id(pool_info.ica_id.clone()),
         vec![any_msg],
         "".to_string(),
         DEFAULT_TIMEOUT_SECONDS,
@@ -152,8 +147,8 @@ pub fn execute_era_collect_withdraw(
         },
     )?;
 
-    pool_era_shot.restake_amount = withdraw_amount;
-    POOL_ERA_SHOT.save(deps.storage, pool_addr, &pool_era_shot)?;
+    pool_info.era_snapshot.restake_amount = withdraw_amount;
+    POOLS.save(deps.storage, pool_addr, &pool_info)?;
 
     Ok(Response::default().add_submessage(submsg))
 }
@@ -165,11 +160,8 @@ pub fn sudo_era_collect_withdraw_callback(
 ) -> StdResult<Response> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
     pool_info.era_process_status = WithdrawEnded;
+    pool_info.era_snapshot.bond_height = env.block.height;
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
-
-    let mut pool_era_shot = POOL_ERA_SHOT.load(deps.storage, payload.pool_addr.clone())?;
-    pool_era_shot.bond_height = env.block.height;
-    POOL_ERA_SHOT.save(deps.storage, payload.pool_addr, &pool_era_shot)?;
 
     Ok(Response::new())
 }

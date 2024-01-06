@@ -6,8 +6,10 @@ use cosmwasm_std::{Addr, Uint128};
 use cosmwasm_std::{Binary, DepsMut, Env, MessageInfo, Response, StdError, SubMsg};
 
 use neutron_sdk::bindings::types::ProtobufAny;
-use neutron_sdk::interchain_queries::v045::new_register_balance_query_msg;
 use neutron_sdk::interchain_queries::v045::new_register_delegator_delegations_query_msg;
+use neutron_sdk::interchain_queries::v045::{
+    new_register_balance_query_msg, new_register_staking_validators_query_msg,
+};
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     query::min_ibc_fee::query_min_ibc_fee,
@@ -16,10 +18,8 @@ use neutron_sdk::{
 
 use crate::error_conversion::ContractError;
 use crate::msg::InitPoolParams;
-use crate::state::POOLS;
-use crate::state::{
-    ADDR_BALANCES_REPLY_ID, INFO_OF_ICA_ID, LATEST_BALANCES_REPLY_ID, LATEST_DELEGATIONS_REPLY_ID,
-};
+use crate::state::{get_next_icq_reply_id, QueryKind, ADDR_VALIDATOR_REPLY_ID, POOLS};
+use crate::state::{ADDR_BALANCES_REPLY_ID, INFO_OF_ICA_ID};
 use crate::{
     contract::{
         msg_with_sudo_callback, SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS, DEFAULT_UPDATE_PERIOD,
@@ -88,23 +88,14 @@ pub fn execute_init_pool(
 
     POOLS.save(deps.storage, pool_ica_info.ica_addr.clone(), &pool_info)?;
 
-    let latest_balance_query_id = LATEST_BALANCES_REPLY_ID.load(deps.as_ref().storage)?;
-    let latest_delegation_query_id = LATEST_DELEGATIONS_REPLY_ID.load(deps.as_ref().storage)?;
-
-    deps.as_ref().api.debug(
-        format!(
-            "WASMDEBUG: execute_init_pool pool update: {:?},latest_query_id is {:?}",
-            pool_info, latest_balance_query_id
-        )
-        .as_str(),
-    );
-
-    let pool_delegation_query_id = latest_delegation_query_id + 1;
-    let pool_query_id = latest_balance_query_id + 1;
-    let withdraw_query_id = latest_balance_query_id + 2;
-
-    LATEST_BALANCES_REPLY_ID.save(deps.storage, &(withdraw_query_id + 1))?;
-    LATEST_DELEGATIONS_REPLY_ID.save(deps.storage, &(pool_delegation_query_id + 1))?;
+    let next_icq_reply_id_for_pool_balances =
+        get_next_icq_reply_id(deps.storage, QueryKind::Balances)?;
+    let next_icq_reply_id_for_withdraw_balances =
+        get_next_icq_reply_id(deps.storage, QueryKind::Balances)?;
+    let next_icq_reply_id_for_delegations =
+        get_next_icq_reply_id(deps.storage, QueryKind::Delegations)?;
+    let next_icq_reply_id_for_validator =
+        get_next_icq_reply_id(deps.storage, QueryKind::Validator)?;
 
     let register_delegation_query_msg = new_register_delegator_delegations_query_msg(
         pool_ica_info.ctrl_connection_id.clone(),
@@ -114,13 +105,15 @@ pub fn execute_init_pool(
     )?;
 
     // wrap into submessage to save {query_id, query_type} on reply that'll later be used to handle sudo kv callback
-    let register_delegation_query_submsg =
-        SubMsg::reply_on_success(register_delegation_query_msg, pool_delegation_query_id);
+    let register_delegation_query_submsg = SubMsg::reply_on_success(
+        register_delegation_query_msg,
+        next_icq_reply_id_for_delegations,
+    );
 
     ADDR_DELEGATIONS_REPLY_ID.save(
         deps.storage,
         pool_ica_info.ica_addr.clone(),
-        &pool_delegation_query_id,
+        &next_icq_reply_id_for_delegations,
     )?;
 
     let register_balance_pool_msg = new_register_balance_query_msg(
@@ -131,10 +124,16 @@ pub fn execute_init_pool(
     )?;
 
     // wrap into submessage to save {query_id, query_type} on reply that'll later be used to handle sudo kv callback
-    let register_balance_pool_submsg =
-        SubMsg::reply_on_success(register_balance_pool_msg, pool_query_id);
+    let register_balance_pool_submsg = SubMsg::reply_on_success(
+        register_balance_pool_msg,
+        next_icq_reply_id_for_pool_balances,
+    );
 
-    ADDR_BALANCES_REPLY_ID.save(deps.storage, pool_ica_info.ica_addr.clone(), &pool_query_id)?;
+    ADDR_BALANCES_REPLY_ID.save(
+        deps.storage,
+        pool_ica_info.ica_addr.clone(),
+        &next_icq_reply_id_for_pool_balances,
+    )?;
 
     let register_balance_withdraw_msg = new_register_balance_query_msg(
         withdraw_ica_info.ctrl_connection_id.clone(),
@@ -144,13 +143,33 @@ pub fn execute_init_pool(
     )?;
 
     // wrap into submessage to save {query_id, query_type} on reply that'll later be used to handle sudo kv callback
-    let register_balance_withdraw_submsg =
-        SubMsg::reply_on_success(register_balance_withdraw_msg, withdraw_query_id);
+    let register_balance_withdraw_submsg = SubMsg::reply_on_success(
+        register_balance_withdraw_msg,
+        next_icq_reply_id_for_withdraw_balances,
+    );
 
     ADDR_BALANCES_REPLY_ID.save(
         deps.storage,
         withdraw_ica_info.ica_addr.clone(),
-        &withdraw_query_id,
+        &next_icq_reply_id_for_withdraw_balances,
+    )?;
+
+    let register_validaotr_query_msg = new_register_staking_validators_query_msg(
+        pool_ica_info.ctrl_connection_id.clone(),
+        pool_info.validator_addrs.clone(),
+        DEFAULT_UPDATE_PERIOD,
+    )?;
+
+    // wrap into submessage to save {query_id, query_type} on reply that'll later be used to handle sudo kv callback
+    let register_validaotr_query_submsg = SubMsg::reply_on_success(
+        register_validaotr_query_msg,
+        next_icq_reply_id_for_validator,
+    );
+
+    ADDR_VALIDATOR_REPLY_ID.save(
+        deps.storage,
+        pool_ica_info.ica_addr.clone(),
+        &next_icq_reply_id_for_validator,
     )?;
 
     let set_withdraw_msg = MsgSetWithdrawAddress {
@@ -222,6 +241,7 @@ pub fn execute_init_pool(
         register_delegation_query_submsg,
         register_balance_pool_submsg,
         register_balance_withdraw_submsg,
+        register_validaotr_query_submsg,
         submsg_set_withdraw,
     ]))
 }
