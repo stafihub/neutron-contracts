@@ -264,3 +264,5 @@ pub const ADDRESS_TO_REPLY_ID: Map<(String, String), u64> =
     Map::new("address_querykind_to_reply_id");
 
 pub const REPLY_ID_TO_QUERY_ID: Map<u64, u64> = Map::new("reply_id_to_query_id");
+
+pub const LSD_TOKEN_CODE_ID: Item<u64> = Item::new("lsp_token_code_id");

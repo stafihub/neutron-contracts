@@ -16,11 +16,15 @@ crate-type = ["cdylib", "rlib"]
 [features]
 # for quicker tests, cargo test --lib
 # for more explicit tests, cargo test --features=backtraces
-backtraces = ["cosmwasm-std/backtraces"]
 library = []
+backtraces = ["cosmwasm-std/backtraces"]
+cosmwasm_1_1 = ["cosmwasm-std/cosmwasm_1_1"]
+cosmwasm_1_2 = ["cosmwasm_1_1", "cosmwasm-std/cosmwasm_1_2"]
+cosmwasm_1_3 = ["cosmwasm_1_2", "cosmwasm-std/cosmwasm_1_3"]
+cosmwasm_1_4 = ["cosmwasm_1_3", "cosmwasm-std/cosmwasm_1_4"]
 
 [dependencies]
-cosmwasm-std = { workspace = true, features = ["staking", "stargate"] }
+cosmwasm-std = { workspace = true, features = ["staking", "stargate", "cosmwasm_1_2"] }
 cw2 = { workspace = true }
 cw20 = { workspace = true }
 schemars = { workspace = true }
@@ -33,6 +37,7 @@ cosmos-sdk-proto = { workspace = true }
 rtoken = { path = "../rtoken", features = ["library"] }
 thiserror = "1.0.50"
 prost = "0.12.2"
+cw-utils = "1.0.3"
 
 [dev-dependencies]
 cosmwasm-schema = { workspace = true }

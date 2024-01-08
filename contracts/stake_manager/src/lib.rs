@@ -20,6 +20,7 @@ pub mod execute_stake_lsm;
 pub mod execute_unstake;
 pub mod execute_update_delegations_query;
 pub mod execute_withdraw;
+mod execute_update_lsd_token_code_id;
 
 pub mod error_conversion;
 pub mod execute_open_channel;

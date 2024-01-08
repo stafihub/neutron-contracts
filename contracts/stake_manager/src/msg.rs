@@ -62,9 +62,10 @@ pub struct InitPoolParams {
     pub validator_addrs: Vec<String>,
     pub era: u64,
     pub rate: Uint128,
-    pub lsd_token: String,
     pub protocol_fee_receiver: String,
     pub pending_share_tokens: Vec<Coin>,
+    pub lsd_token_name: String,
+    pub lsd_token_symbol: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
@@ -145,6 +146,9 @@ pub enum ExecuteMsg {
     },
     EraActive {
         pool_addr: String,
+    },
+    UpdateLsdTokenCodeId {
+        code_id: u64
     },
     StakeLsm {
         neutron_address: String,

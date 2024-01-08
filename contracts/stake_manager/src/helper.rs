@@ -20,6 +20,7 @@ const FEE_DENOM: &str = "untrn";
 pub const ICA_WITHDRAW_SUFIX: &str = "-withdraw_addr";
 pub const INTERCHAIN_ACCOUNT_ID_LEN_LIMIT: usize = 10;
 pub const CAL_BASE: Uint128 = Uint128::new(1_000_000);
+pub const DEFAULT_DECIMALS: u8 = 6;
 
 pub fn min_ntrn_ibc_fee(fee: IbcFee) -> IbcFee {
     IbcFee {

@@ -118,77 +118,6 @@
     {
       "type": "object",
       "required": [
-        "register_balance_query"
-      ],
-      "properties": {
-        "register_balance_query": {
-          "type": "object",
-          "required": [
-            "addr",
-            "connection_id",
-            "denom",
-            "update_period"
-          ],
-          "properties": {
-            "addr": {
-              "type": "string"
-            },
-            "connection_id": {
-              "type": "string"
-            },
-            "denom": {
-              "type": "string"
-            },
-            "update_period": {
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0.0
-            }
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "register_delegator_delegations_query"
-      ],
-      "properties": {
-        "register_delegator_delegations_query": {
-          "type": "object",
-          "required": [
-            "connection_id",
-            "delegator",
-            "update_period",
-            "validators"
-          ],
-          "properties": {
-            "connection_id": {
-              "type": "string"
-            },
-            "delegator": {
-              "type": "string"
-            },
-            "update_period": {
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0.0
-            },
-            "validators": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
         "stake"
       ],
       "properties": {
@@ -277,17 +206,14 @@
           "type": "object",
           "required": [
             "pool_addr",
-            "validator_addrs"
+            "validator_addr"
           ],
           "properties": {
             "pool_addr": {
               "type": "string"
             },
-            "validator_addrs": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
+            "validator_addr": {
+              "type": "string"
             }
           }
         }
@@ -443,6 +369,28 @@
           "properties": {
             "pool_addr": {
               "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "update_lsd_token_code_id"
+      ],
+      "properties": {
+        "update_lsd_token_code_id": {
+          "type": "object",
+          "required": [
+            "code_id"
+          ],
+          "properties": {
+            "code_id": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
             }
           }
         }
@@ -620,7 +568,8 @@
         "era",
         "ibc_denom",
         "interchain_account_id",
-        "lsd_token",
+        "lsd_token_name",
+        "lsd_token_symbol",
         "pending_share_tokens",
         "protocol_fee_receiver",
         "rate",
@@ -649,7 +598,10 @@
         "interchain_account_id": {
           "type": "string"
         },
-        "lsd_token": {
+        "lsd_token_name": {
+          "type": "string"
+        },
+        "lsd_token_symbol": {
           "type": "string"
         },
         "pending_share_tokens": {

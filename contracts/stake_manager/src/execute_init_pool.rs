@@ -2,17 +2,10 @@ use std::vec;
 
 use cosmos_sdk_proto::cosmos::distribution::v1beta1::MsgSetWithdrawAddress;
 use cosmos_sdk_proto::prost::Message;
-use cosmwasm_std::{Addr, Uint128};
+use cosmwasm_std::{instantiate2_address, to_json_binary, Addr, Uint128, WasmMsg};
 use cosmwasm_std::{Binary, DepsMut, Env, MessageInfo, Response, StdError};
+use cw20::MinterResponse;
 
-use crate::contract::{DEFAULT_TIMEOUT_SECONDS, DEFAULT_UPDATE_PERIOD};
-use crate::error_conversion::ContractError;
-use crate::msg::InitPoolParams;
-use crate::query_callback::register_query_submsg;
-use crate::state::INFO_OF_ICA_ID;
-use crate::state::{QueryKind, SudoPayload, TxType, POOLS};
-use crate::tx_callback::msg_with_sudo_callback;
-use crate::{helper::min_ntrn_ibc_fee, state::ValidatorUpdateStatus};
 use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::interchain_queries::v045::new_register_delegator_delegations_query_msg;
 use neutron_sdk::interchain_queries::v045::{
@@ -24,10 +17,20 @@ use neutron_sdk::{
     NeutronError, NeutronResult,
 };
 
+use crate::contract::{DEFAULT_TIMEOUT_SECONDS, DEFAULT_UPDATE_PERIOD};
+use crate::error_conversion::ContractError;
+use crate::helper::DEFAULT_DECIMALS;
+use crate::msg::InitPoolParams;
+use crate::query_callback::register_query_submsg;
+use crate::state::INFO_OF_ICA_ID;
+use crate::state::{QueryKind, SudoPayload, TxType, LSD_TOKEN_CODE_ID, POOLS};
+use crate::tx_callback::msg_with_sudo_callback;
+use crate::{helper::min_ntrn_ibc_fee, state::ValidatorUpdateStatus};
+
 // add execute to config the validator addrs and withdraw address on reply
 pub fn execute_init_pool(
     mut deps: DepsMut<NeutronQuery>,
-    _: Env,
+    env: Env,
     info: MessageInfo,
     param: InitPoolParams,
 ) -> NeutronResult<Response<NeutronMsg>> {
@@ -58,6 +61,43 @@ pub fn execute_init_pool(
         return Err(NeutronError::Std(StdError::generic_err("Rate is zero")));
     }
 
+    // create lsd token
+    let code_id = LSD_TOKEN_CODE_ID.load(deps.storage)?;
+    let salt = pool_ica_info.ica_addr.clone();
+
+    let code_info = deps.querier.query_wasm_code_info(code_id)?;
+    let creator_cannonical = deps.api.addr_canonicalize(env.contract.address.as_str())?;
+
+    let i2_address =
+        instantiate2_address(&code_info.checksum, &creator_cannonical, salt.as_bytes())
+            .map_err(|_| NeutronError::Std(StdError::generic_err("instantiate2_address failed")))?;
+
+    let contract_addr = deps
+        .api
+        .addr_humanize(&i2_address)
+        .map_err(NeutronError::Std)?;
+
+    let instantiate_lsd_msg = WasmMsg::Instantiate2 {
+        admin: Option::from(info.sender.to_string()),
+        code_id,
+        msg: to_json_binary(
+            &(rtoken::msg::InstantiateMsg {
+                name: param.lsd_token_name.clone(),
+                symbol: param.lsd_token_symbol,
+                decimals: DEFAULT_DECIMALS,
+                initial_balances: vec![],
+                mint: Option::from(MinterResponse {
+                    minter: env.contract.address.to_string(),
+                    cap: None,
+                }),
+                marketing: None,
+            }),
+        )?,
+        funds: vec![],
+        label: param.lsd_token_name.clone(),
+        salt: salt.as_bytes().into(),
+    };
+
     pool_info.bond = param.bond;
     pool_info.unbond = param.unbond;
     pool_info.active = param.active;
@@ -68,7 +108,7 @@ pub fn execute_init_pool(
     pool_info.remote_denom = param.remote_denom;
     pool_info.validator_addrs = param.validator_addrs.clone();
     pool_info.protocol_fee_receiver = Addr::unchecked(param.protocol_fee_receiver);
-    pool_info.lsd_token = Addr::unchecked(param.lsd_token);
+    pool_info.lsd_token = contract_addr;
     pool_info.pending_share_tokens = param.pending_share_tokens;
 
     // default
@@ -192,11 +232,13 @@ pub fn execute_init_pool(
         .as_str(),
     );
 
-    Ok(Response::default().add_submessages(vec![
-        register_balance_pool_submsg,
-        register_balance_withdraw_submsg,
-        register_delegation_submsg,
-        register_validator_submsg,
-        submsg_set_withdraw,
-    ]))
+    Ok(Response::default()
+        .add_message(instantiate_lsd_msg)
+        .add_submessages(vec![
+            register_balance_pool_submsg,
+            register_balance_withdraw_submsg,
+            register_delegation_submsg,
+            register_validator_submsg,
+            submsg_set_withdraw,
+        ]))
 }

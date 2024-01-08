@@ -20,6 +20,7 @@ use crate::execute_register_pool::{execute_register_pool, sudo_open_ack};
 use crate::execute_stake::execute_stake;
 use crate::execute_stake_lsm::execute_stake_lsm;
 use crate::execute_unstake::execute_unstake;
+use crate::execute_update_lsd_token_code_id::execute_update_lsd_token_code_id;
 use crate::execute_withdraw::execute_withdraw;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
 use crate::query::query_user_unstake_index;
@@ -201,6 +202,9 @@ pub fn execute(
         }
         ExecuteMsg::EraRestake { pool_addr } => execute_era_restake(deps, env, pool_addr),
         ExecuteMsg::EraActive { pool_addr } => execute_era_active(deps, pool_addr),
+        ExecuteMsg::UpdateLsdTokenCodeId { code_id } => {
+            execute_update_lsd_token_code_id(deps, code_id)
+        }
         ExecuteMsg::StakeLsm {
             neutron_address,
             pool_addr,
