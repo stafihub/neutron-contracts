@@ -9,7 +9,7 @@ use neutron_sdk::{
     NeutronResult,
 };
 
-use crate::state::EraSnapshot;
+use crate::state::{EraSnapshot, ValidatorUpdateStatus};
 use crate::{
     helper::{get_withdraw_ica_id, ICA_WITHDRAW_SUFIX, INTERCHAIN_ACCOUNT_ID_LEN_LIMIT},
     state::{EraProcessStatus, IcaInfo, PoolInfo, INFO_OF_ICA_ID, POOLS},
@@ -182,7 +182,7 @@ pub fn sudo_open_ack(
                 bond: Uint128::zero(),
                 unbond: Uint128::zero(),
                 active: Uint128::zero(),
-                rtoken: Addr::unchecked(""),
+                lsd_token: Addr::unchecked(""),
                 ica_id: ica_id.clone(),
                 ibc_denom: "".to_string(),
                 channel_id_of_ibc_denom: "".to_string(),
@@ -195,13 +195,13 @@ pub fn sudo_open_ack(
                 next_unstake_index: 0,
                 unbonding_period: 0,
                 era_process_status: EraProcessStatus::ActiveEnded,
+                validator_update_status: ValidatorUpdateStatus::Success,
                 protocol_fee_commission: Uint128::zero(),
                 unbond_commission: Uint128::zero(),
                 protocol_fee_receiver: Addr::unchecked(""),
                 admin: admin.clone(),
                 era_seconds: 0,
                 offset: 0,
-                paused: true,
                 pending_share_tokens: vec![],
                 era_snapshot: EraSnapshot {
                     era: 0,
@@ -211,6 +211,10 @@ pub fn sudo_open_ack(
                     restake_amount: Uint128::zero(),
                     bond_height: 0,
                 },
+                paused: true,
+                lsm_support: false,
+                lsm_pending_limit: 0,
+                rate_change_limit: Uint128::zero(),
             };
 
             POOLS.save(deps.storage, pool_ica_info.ica_addr.clone(), &pool_info)?;

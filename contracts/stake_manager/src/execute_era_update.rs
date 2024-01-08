@@ -8,12 +8,13 @@ use neutron_sdk::{
     NeutronError, NeutronResult,
 };
 
-use crate::helper::min_ntrn_ibc_fee;
 use crate::state::EraProcessStatus::{ActiveEnded, EraUpdateEnded, EraUpdateStarted};
+use crate::state::EraSnapshot;
 use crate::state::{INFO_OF_ICA_ID, POOLS};
 use crate::{
-    contract::{msg_with_sudo_callback, SudoPayload, TxType},
-    state::EraSnapshot,
+    helper::min_ntrn_ibc_fee,
+    state::{SudoPayload, TxType},
+    tx_callback::msg_with_sudo_callback,
 };
 
 pub fn execute_era_update(

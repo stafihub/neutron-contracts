@@ -3,30 +3,13 @@ use cw_storage_plus::{Item, Map};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::contract::SudoPayload;
+pub const REPLY_ID_RANGE_START: u64 = 1_000_000_000;
+pub const REPLY_ID_RANGE_SIZE: u64 = 1_000_000;
+pub const REPLY_ID_RANGE_END: u64 = REPLY_ID_RANGE_START + REPLY_ID_RANGE_SIZE;
 
-pub const IBC_SUDO_ID_RANGE_START: u64 = 1_000_000_000;
-pub const IBC_SUDO_ID_RANGE_SIZE: u64 = 1_000;
-pub const IBC_SUDO_ID_RANGE_END: u64 = IBC_SUDO_ID_RANGE_START + IBC_SUDO_ID_RANGE_SIZE;
-
-pub const QUERY_BALANCES_REPLY_ID_RANGE_START: u64 = 10_000;
-pub const QUERY_BALANCES_REPLY_ID_RANGE_SIZE: u64 = 500;
-pub const QUERY_BALANCES_REPLY_ID_END: u64 =
-    QUERY_BALANCES_REPLY_ID_RANGE_START + QUERY_BALANCES_REPLY_ID_RANGE_SIZE;
-
-pub const QUERY_DELEGATIONS_REPLY_ID_RANGE_START: u64 = 20_000;
-pub const QUERY_DELEGATIONS_REPLY_ID_RANGE_SIZE: u64 = 500;
-pub const QUERY_DELEGATIONS_REPLY_ID_END: u64 =
-    QUERY_DELEGATIONS_REPLY_ID_RANGE_START + QUERY_DELEGATIONS_REPLY_ID_RANGE_SIZE;
-
-pub const QUERY_VALIDATOR_REPLY_ID_RANGE_START: u64 = 30_000;
-pub const QUERY_VALIDATOR_REPLY_ID_RANGE_SIZE: u64 = 500;
-pub const QUERY_VALIDATOR_REPLY_ID_END: u64 =
-    QUERY_VALIDATOR_REPLY_ID_RANGE_START + QUERY_VALIDATOR_REPLY_ID_RANGE_SIZE;
-
-pub const REPLY_QUEUE_ID: Map<u64, Vec<u8>> = Map::new("reply_queue_id");
-
-const REPLY_ID: Item<u64> = Item::new("reply_id");
+pub const QUERY_REPLY_ID_RANGE_START: u64 = 2_000_000_000;
+pub const QUERY_REPLY_ID_RANGE_SIZE: u64 = 1_000_000;
+pub const QUERY_REPLY_ID_RANGE_END: u64 = QUERY_REPLY_ID_RANGE_START + QUERY_REPLY_ID_RANGE_SIZE;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct State {
@@ -34,14 +17,6 @@ pub struct State {
 }
 
 pub const STATE: Item<State> = Item::new("state");
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct PoolValidatorStatus {
-    pub status: ValidatorUpdateStatus,
-}
-
-pub const POOL_VALIDATOR_STATUS: Map<String, PoolValidatorStatus> =
-    Map::new("pool_validator_status");
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct EraSnapshot {
@@ -58,7 +33,7 @@ pub struct PoolInfo {
     pub bond: Uint128,
     pub unbond: Uint128,
     pub active: Uint128,
-    pub rtoken: Addr,
+    pub lsd_token: Addr,
     pub ica_id: String,
     pub ibc_denom: String,
     pub channel_id_of_ibc_denom: String,
@@ -73,18 +48,20 @@ pub struct PoolInfo {
     pub next_unstake_index: u64,
     pub unbonding_period: u64,
     pub era_process_status: EraProcessStatus,
+    pub validator_update_status: ValidatorUpdateStatus,
     pub unbond_commission: Uint128,
     pub protocol_fee_commission: Uint128,
     pub protocol_fee_receiver: Addr,
     pub admin: Addr,
-    pub paused: bool,
     pub pending_share_tokens: Vec<cosmwasm_std::Coin>,
     pub era_snapshot: EraSnapshot,
+    pub paused: bool,
+    pub lsm_support: bool,
+    pub lsm_pending_limit: u64,
+    pub rate_change_limit: Uint128,
 }
 
 pub const POOLS: Map<String, PoolInfo> = Map::new("pools");
-
-// pub const POOL_ERA_SHOT: Map<String, EraShot> = Map::new("pool_era_shot");
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum EraProcessStatus {
@@ -149,31 +126,24 @@ pub struct PlatformInfo {
 }
 pub const PLATFORM_INFO: Item<PlatformInfo> = Item::new("platform_info");
 
-// key: ica address value: query reply id
-pub const ADDR_BALANCES_REPLY_ID: Map<String, u64> = Map::new("addr_balances_reply_id");
-
-pub const ADDR_DELEGATIONS_REPLY_ID: Map<String, u64> = Map::new("addr_delegations_reply_id");
-
-pub const ADDR_VALIDATOR_REPLY_ID: Map<String, u64> = Map::new("addr_validator_reply_id");
-
-pub const LATEST_BALANCES_REPLY_ID: Item<u64> = Item::new("latest_balances_reply_id");
-
-pub const LATEST_DELEGATIONS_REPLY_ID: Item<u64> = Item::new("latest_delegations_reply_id");
-
-pub const LATEST_VALIDATOR_REPLY_ID: Item<u64> = Item::new("latest_validator_reply_id");
-
-pub const KV_QUERY_ID_TO_CALLBACKS: Map<u64, QueryKind> = Map::new("kv_query_id_to_callbacks");
-
-pub const REPLY_ID_TO_QUERY_ID: Map<u64, u64> = Map::new("reply_id_to_query_id");
-
 // contains query kinds that we expect to handle in `sudo_kv_query_result`
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub enum QueryKind {
     // Balance query
     Balances,
     Delegations,
-    Validator,
+    Validators,
     // You can add your handlers to understand what query to deserialize by query_id in sudo callback
+}
+
+impl QueryKind {
+    pub fn to_string(self) -> String {
+        match self {
+            QueryKind::Balances => "balances".to_string(),
+            QueryKind::Delegations => "delegations".to_string(),
+            QueryKind::Validators => "validators".to_string(),
+        }
+    }
 }
 
 /// Serves for storing acknowledgement calls for interchain transactions
@@ -206,61 +176,63 @@ pub fn read_errors_from_queue(store: &dyn Storage) -> StdResult<Vec<(Vec<u8>, St
 /// execute ->(unique reply.id) reply (channel_id,seq_id)-> sudo handler
 /// Since id uniqueless id only matters inside a transaction,
 /// we can safely reuse the same id set in every new transaction
-pub fn get_next_id(store: &mut dyn Storage) -> StdResult<u64> {
-    let mut id = REPLY_ID.may_load(store)?.unwrap_or(IBC_SUDO_ID_RANGE_START);
-    if id >= IBC_SUDO_ID_RANGE_END {
-        id = IBC_SUDO_ID_RANGE_START;
+const LATEST_REPLY_ID: Item<u64> = Item::new("latest_reply_id");
+pub fn get_next_reply_id(store: &mut dyn Storage) -> StdResult<u64> {
+    let id = LATEST_REPLY_ID
+        .may_load(store)?
+        .unwrap_or(REPLY_ID_RANGE_START);
+    let mut save_id = id + 1;
+    if save_id > REPLY_ID_RANGE_END {
+        save_id = REPLY_ID_RANGE_START;
     }
-    REPLY_ID.save(store, &(id + 1))?;
+    LATEST_REPLY_ID.save(store, &save_id)?;
     Ok(id)
 }
 
-pub fn get_next_icq_reply_id(store: &mut dyn Storage, query_kind: QueryKind) -> StdResult<u64> {
-    match query_kind {
-        QueryKind::Balances => {
-            let id = LATEST_BALANCES_REPLY_ID
-                .may_load(store)?
-                .unwrap_or(QUERY_BALANCES_REPLY_ID_RANGE_START);
-            let mut save_id = id + 1;
-            if save_id >= QUERY_BALANCES_REPLY_ID_END {
-                save_id = QUERY_BALANCES_REPLY_ID_RANGE_START;
-            }
-            LATEST_BALANCES_REPLY_ID.save(store, &save_id)?;
-            Ok(id)
-        }
-        QueryKind::Delegations => {
-            let id = LATEST_DELEGATIONS_REPLY_ID
-                .may_load(store)?
-                .unwrap_or(QUERY_DELEGATIONS_REPLY_ID_RANGE_START);
-            let mut save_id = id + 1;
-            if save_id > QUERY_DELEGATIONS_REPLY_ID_END {
-                save_id = QUERY_DELEGATIONS_REPLY_ID_RANGE_START;
-            }
-            LATEST_DELEGATIONS_REPLY_ID.save(store, &save_id)?;
-            Ok(id)
-        }
-        QueryKind::Validator => {
-            let id = LATEST_VALIDATOR_REPLY_ID
-                .may_load(store)?
-                .unwrap_or(QUERY_VALIDATOR_REPLY_ID_RANGE_START);
-            let mut save_id = id + 1;
-            if save_id >= QUERY_VALIDATOR_REPLY_ID_END {
-                save_id = QUERY_VALIDATOR_REPLY_ID_RANGE_START;
-            }
-            LATEST_VALIDATOR_REPLY_ID.save(store, &save_id)?;
-            Ok(id)
-        }
+const LATEST_QUERY_REPLY_ID: Item<u64> = Item::new("latest_query_reply_id");
+pub fn get_next_query_reply_id(store: &mut dyn Storage) -> StdResult<u64> {
+    let id = LATEST_QUERY_REPLY_ID
+        .may_load(store)?
+        .unwrap_or(QUERY_REPLY_ID_RANGE_START);
+    let mut save_id = id + 1;
+    if save_id > QUERY_REPLY_ID_RANGE_END {
+        save_id = QUERY_REPLY_ID_RANGE_START;
     }
+    LATEST_QUERY_REPLY_ID.save(store, &save_id)?;
+    Ok(id)
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum TxType {
+    SetWithdrawAddr,
+    UpdateValidators,
+    AddValidator,
+    UserWithdraw,
+    EraUpdate,
+    EraBond,
+    EraCollectWithdraw,
+    EraRestake,
+    RedeemTokenForShare,
+    StakeLsm,
+}
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct SudoPayload {
+    pub message: String,
+    pub pool_addr: String,
+    pub port_id: String,
+    pub tx_type: TxType,
+}
+
+pub const REPLY_ID_TO_PAYLOAD: Map<u64, Vec<u8>> = Map::new("reply_id_to_payload");
 pub fn save_reply_payload(store: &mut dyn Storage, payload: SudoPayload) -> StdResult<u64> {
-    let id = get_next_id(store)?;
-    REPLY_QUEUE_ID.save(store, id, &to_json_vec(&payload)?)?;
+    let id = get_next_reply_id(store)?;
+    REPLY_ID_TO_PAYLOAD.save(store, id, &to_json_vec(&payload)?)?;
     Ok(id)
 }
-
 pub fn read_reply_payload(store: &dyn Storage, id: u64) -> StdResult<SudoPayload> {
-    let data = REPLY_QUEUE_ID.load(store, id)?;
+    let data = REPLY_ID_TO_PAYLOAD.load(store, id)?;
     from_json(Binary(data))
 }
 
@@ -270,7 +242,6 @@ pub fn read_reply_payload(store: &dyn Storage, id: u64) -> StdResult<SudoPayload
 /// we can catch the counter in the reply msg for outgoing sudo msg
 /// and save our payload for the msg
 pub const SUDO_PAYLOAD: Map<(String, u64), Vec<u8>> = Map::new("sudo_payload");
-
 pub fn save_sudo_payload(
     store: &mut dyn Storage,
     channel_id: String,
@@ -279,7 +250,6 @@ pub fn save_sudo_payload(
 ) -> StdResult<()> {
     SUDO_PAYLOAD.save(store, (channel_id, seq_id), &to_json_vec(&payload)?)
 }
-
 pub fn read_sudo_payload(
     store: &dyn Storage,
     channel_id: String,
@@ -288,3 +258,9 @@ pub fn read_sudo_payload(
     let data = SUDO_PAYLOAD.load(store, (channel_id, seq_id))?;
     from_json(Binary(data))
 }
+
+// key: (ica address, query kind) value: query reply id
+pub const ADDRESS_TO_REPLY_ID: Map<(String, String), u64> =
+    Map::new("address_querykind_to_reply_id");
+
+pub const REPLY_ID_TO_QUERY_ID: Map<u64, u64> = Map::new("reply_id_to_query_id");

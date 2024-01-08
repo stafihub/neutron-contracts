@@ -1,26 +1,20 @@
-use std::vec;
-
+use crate::helper::min_ntrn_ibc_fee;
+use crate::state::INFO_OF_ICA_ID;
+use crate::state::{ValidatorUpdateStatus, POOLS};
+use crate::{contract::DEFAULT_TIMEOUT_SECONDS, query::query_delegation_by_addr};
+use crate::{error_conversion::ContractError, state::EraProcessStatus};
+use crate::{
+    helper::gen_redelegate_txs,
+    state::{SudoPayload, TxType},
+    tx_callback::msg_with_sudo_callback,
+};
 use cosmwasm_std::{DepsMut, Env, MessageInfo, Response, StdError, StdResult};
-
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
-    interchain_queries::{
-        check_query_type, get_registered_query, query_kv_result, types::QueryType,
-        v045::types::Delegations,
-    },
     query::min_ibc_fee::query_min_ibc_fee,
     NeutronError, NeutronResult,
 };
-
-use crate::helper::gen_redelegate_txs;
-use crate::state::INFO_OF_ICA_ID;
-use crate::state::{ValidatorUpdateStatus, POOLS};
-use crate::{
-    contract::{msg_with_sudo_callback, SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS},
-    state::ADDR_DELEGATIONS_REPLY_ID,
-};
-use crate::{error_conversion::ContractError, state::REPLY_ID_TO_QUERY_ID};
-use crate::{helper::min_ntrn_ibc_fee, state::POOL_VALIDATOR_STATUS};
+use std::vec;
 
 pub fn execute_pool_update_validator(
     mut deps: DepsMut<NeutronQuery>,
@@ -36,6 +30,11 @@ pub fn execute_pool_update_validator(
     if info.sender != pool_info.admin {
         return Err(ContractError::Unauthorized {}.into());
     }
+    if pool_info.era_process_status != EraProcessStatus::ActiveEnded {
+        return Err(NeutronError::Std(StdError::generic_err(
+            "Era process not end",
+        )));
+    }
 
     deps.as_ref().api.debug(
         format!(
@@ -45,30 +44,11 @@ pub fn execute_pool_update_validator(
         .as_str(),
     );
 
-    let mut pool_validator_status = POOL_VALIDATOR_STATUS.load(deps.storage, pool_addr.clone())?;
-    deps.as_ref().api.debug(
-        format!(
-            "WASMDEBUG: execute_pool_update_validator pool_validator_status: {:?}",
-            pool_validator_status
-        )
-        .as_str(),
-    );
-    if pool_validator_status.status == ValidatorUpdateStatus::Pending {
+    if pool_info.validator_update_status == ValidatorUpdateStatus::Pending {
         return Err(NeutronError::Std(StdError::generic_err("status not allow")));
     }
 
-    // redelegate
-    let contract_query_id = ADDR_DELEGATIONS_REPLY_ID.load(deps.storage, pool_addr.clone())?;
-    let registered_query_id = REPLY_ID_TO_QUERY_ID.load(deps.storage, contract_query_id)?;
-
-    // get info about the query
-    let registered_query = get_registered_query(deps.as_ref(), registered_query_id)?;
-
-    // check that query type is KV
-    check_query_type(registered_query.registered_query.query_type, QueryType::KV)?;
-    // reconstruct a nice Delegations structure from raw KV-storage values
-    let delegations: Delegations = query_kv_result(deps.as_ref(), registered_query_id)?;
-
+    let delegations = query_delegation_by_addr(deps.as_ref(), pool_addr.clone())?;
     deps.as_ref().api.debug(
         format!(
             "WASMDEBUG: execute_pool_update_validator delegations: {:?}",
@@ -139,34 +119,27 @@ pub fn execute_pool_update_validator(
             },
         )?;
 
-        pool_validator_status.status = ValidatorUpdateStatus::Pending;
+        pool_info.validator_update_status = ValidatorUpdateStatus::Pending;
 
         resp = resp.add_submessage(submsg_redelegate)
     } else {
-        pool_validator_status.status = ValidatorUpdateStatus::WaitQueryUpdate;
+        pool_info.validator_update_status = ValidatorUpdateStatus::WaitQueryUpdate;
     }
 
-    POOL_VALIDATOR_STATUS.save(deps.storage, pool_addr.clone(), &pool_validator_status)?;
+    POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
 
     Ok(resp)
 }
 
 pub fn sudo_update_validators_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
-    let mut pool_validator_status =
-        POOL_VALIDATOR_STATUS.load(deps.storage, payload.pool_addr.clone())?;
 
     let new_validators: Vec<String> = payload.message.split('_').map(String::from).collect();
 
     pool_info.validator_addrs = new_validators;
-    pool_validator_status.status = ValidatorUpdateStatus::WaitQueryUpdate;
+    pool_info.validator_update_status = ValidatorUpdateStatus::WaitQueryUpdate;
 
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
-    POOL_VALIDATOR_STATUS.save(
-        deps.storage,
-        payload.pool_addr.clone(),
-        &pool_validator_status,
-    )?;
 
     Ok(Response::new())
 }
@@ -175,11 +148,11 @@ pub fn sudo_update_validators_failed_callback(
     deps: DepsMut,
     payload: SudoPayload,
 ) -> StdResult<Response> {
-    let mut pool_validator_status =
-        POOL_VALIDATOR_STATUS.load(deps.storage, payload.pool_addr.clone())?;
+    let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
 
-    pool_validator_status.status = ValidatorUpdateStatus::Failed;
+    pool_info.validator_update_status = ValidatorUpdateStatus::Failed;
 
-    POOL_VALIDATOR_STATUS.save(deps.storage, payload.pool_addr, &pool_validator_status)?;
+    POOLS.save(deps.storage, payload.pool_addr, &pool_info)?;
+
     Ok(Response::new())
 }

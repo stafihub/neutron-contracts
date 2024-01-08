@@ -11,12 +11,10 @@ use neutron_sdk::{
 
 use crate::contract::DEFAULT_TIMEOUT_SECONDS;
 use crate::helper::{get_withdraw_ica_id, min_ntrn_ibc_fee};
+use crate::query::query_balance_by_addr;
 use crate::state::EraProcessStatus::{BondEnded, WithdrawEnded, WithdrawStarted};
-use crate::state::{INFO_OF_ICA_ID, POOLS};
-use crate::{
-    contract::{msg_with_sudo_callback, SudoPayload, TxType},
-    query::query_balance_by_addr,
-};
+use crate::state::{SudoPayload, TxType, INFO_OF_ICA_ID, POOLS};
+use crate::tx_callback::msg_with_sudo_callback;
 
 pub fn execute_era_collect_withdraw(
     mut deps: DepsMut<NeutronQuery>,

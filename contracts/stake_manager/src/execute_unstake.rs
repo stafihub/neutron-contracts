@@ -9,6 +9,7 @@ use neutron_sdk::{
     NeutronError, NeutronResult,
 };
 
+use crate::helper::CAL_BASE;
 use crate::state::{
     UnstakeInfo, WithdrawStatus, POOLS, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX,
 };
@@ -59,14 +60,12 @@ pub fn execute_unstake(
     // cal fee
     let mut will_burn_rtoken_amount = rtoken_amount;
     if pool_info.unbond_commission > Uint128::zero() {
-        let cms_fee = rtoken_amount
-            .mul(pool_info.unbond_commission)
-            .div(Uint128::new(1_000_000));
+        let cms_fee = rtoken_amount.mul(pool_info.unbond_commission).div(CAL_BASE);
         will_burn_rtoken_amount = rtoken_amount.sub(cms_fee);
 
         if cms_fee.u128() > 0 {
             let mint_msg = WasmMsg::Execute {
-                contract_addr: pool_info.rtoken.to_string(),
+                contract_addr: pool_info.lsd_token.to_string(),
                 msg: to_json_binary(
                     &(rtoken::msg::ExecuteMsg::TransferFrom {
                         owner: info.sender.to_string(),
@@ -95,9 +94,7 @@ pub fn execute_unstake(
     }
 
     // Calculate the number of tokens(atom)
-    let token_amount = will_burn_rtoken_amount
-        .mul(pool_info.rate)
-        .div(Uint128::new(1_000_000));
+    let token_amount = will_burn_rtoken_amount.mul(pool_info.rate).div(CAL_BASE);
 
     deps.as_ref().api.debug(
         format!(
@@ -114,7 +111,7 @@ pub fn execute_unstake(
 
     // burn
     let burn_msg = WasmMsg::Execute {
-        contract_addr: pool_info.rtoken.to_string(),
+        contract_addr: pool_info.lsd_token.to_string(),
         msg: to_json_binary(
             &(rtoken::msg::ExecuteMsg::BurnFrom {
                 owner: info.sender.to_string(),

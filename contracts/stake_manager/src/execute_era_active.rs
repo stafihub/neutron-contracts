@@ -9,12 +9,12 @@ use neutron_sdk::{
     NeutronError, NeutronResult,
 };
 
-use crate::query::query_delegation_by_addr;
 use crate::state::POOLS;
 use crate::state::{
     EraProcessStatus::{ActiveEnded, RestakeEnded},
     PLATFORM_INFO,
 };
+use crate::{helper::CAL_BASE, query::query_delegation_by_addr};
 
 pub fn execute_era_active(
     deps: DepsMut<NeutronQuery>,
@@ -27,6 +27,12 @@ pub fn execute_era_active(
             .api
             .debug(format!("WASMDEBUG: execute_era_active skip pool: {:?}", pool_addr).as_str());
         return Err(NeutronError::Std(StdError::generic_err("status not allow")));
+    }
+
+    if pool_info.pending_share_tokens.len() > 0 {
+        return Err(NeutronError::Std(StdError::generic_err(
+            "Pending share token not empty",
+        )));
     }
 
     deps.as_ref().api.debug(
@@ -72,7 +78,7 @@ pub fn execute_era_active(
     let token_info_msg = rtoken::msg::QueryMsg::TokenInfo {};
     let token_info: cw20::TokenInfoResponse =
         deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-            contract_addr: pool_info.rtoken.to_string(),
+            contract_addr: pool_info.lsd_token.to_string(),
             msg: to_json_binary(&token_info_msg)?,
         }))?;
 
@@ -86,7 +92,7 @@ pub fn execute_era_active(
 
         let platform_fee = protocol_fee_raw
             .mul(platform_info.platform_fee_commission)
-            .div(Uint128::new(1_000_000));
+            .div(CAL_BASE);
         (protocol_fee_raw.sub(platform_fee), platform_fee)
     } else {
         (Uint128::zero(), Uint128::zero())
@@ -109,12 +115,29 @@ pub fn execute_era_active(
 
     let total_rtoken_amount = token_info.total_supply.add(protocol_fee).add(platform_fee);
     let new_rate = if total_rtoken_amount.u128() > 0 {
-        new_active
-            .mul(Uint128::new(1_000_000))
-            .div(total_rtoken_amount)
+        new_active.mul(CAL_BASE).div(total_rtoken_amount)
     } else {
-        Uint128::new(1_000_000)
+        CAL_BASE
     };
+
+    let rate_change = if pool_info.rate > new_rate {
+        pool_info
+            .rate
+            .sub(new_rate)
+            .mul(CAL_BASE)
+            .div(pool_info.rate)
+    } else {
+        new_rate
+            .sub(pool_info.rate)
+            .mul(CAL_BASE)
+            .div(pool_info.rate)
+    };
+
+    if rate_change > pool_info.rate_change_limit {
+        return Err(NeutronError::Std(StdError::generic_err(
+            "rate change over limit",
+        )));
+    }
 
     pool_info.rate = new_rate;
     pool_info.era_process_status = ActiveEnded;
@@ -127,7 +150,7 @@ pub fn execute_era_active(
     let mut resp = Response::new().add_attribute("new_rate", pool_info.rate);
     if !protocol_fee.is_zero() {
         let msg = WasmMsg::Execute {
-            contract_addr: pool_info.rtoken.to_string(),
+            contract_addr: pool_info.lsd_token.to_string(),
             msg: to_json_binary(
                 &(rtoken::msg::ExecuteMsg::Mint {
                     recipient: pool_info.protocol_fee_receiver.to_string(),
@@ -140,7 +163,7 @@ pub fn execute_era_active(
     }
     if !platform_fee.is_zero() {
         let msg = WasmMsg::Execute {
-            contract_addr: pool_info.rtoken.to_string(),
+            contract_addr: pool_info.lsd_token.to_string(),
             msg: to_json_binary(
                 &(rtoken::msg::ExecuteMsg::Mint {
                     recipient: platform_info.platform_fee_receiver.to_string(),

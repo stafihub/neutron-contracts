@@ -60,6 +60,64 @@
     {
       "type": "object",
       "required": [
+        "open_channel"
+      ],
+      "properties": {
+        "open_channel": {
+          "type": "object",
+          "required": [
+            "closed_channel_id",
+            "pool_addr",
+            "register_fee"
+          ],
+          "properties": {
+            "closed_channel_id": {
+              "type": "string"
+            },
+            "pool_addr": {
+              "type": "string"
+            },
+            "register_fee": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Coin"
+              }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "redeem_token_for_share"
+      ],
+      "properties": {
+        "redeem_token_for_share": {
+          "type": "object",
+          "required": [
+            "pool_addr",
+            "tokens"
+          ],
+          "properties": {
+            "pool_addr": {
+              "type": "string"
+            },
+            "tokens": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Coin"
+              }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
         "register_balance_query"
       ],
       "properties": {
@@ -185,19 +243,24 @@
         "withdraw": {
           "type": "object",
           "required": [
-            "interchain_account_id",
             "pool_addr",
-            "receiver"
+            "receiver",
+            "unstake_index_list"
           ],
           "properties": {
-            "interchain_account_id": {
-              "type": "string"
-            },
             "pool_addr": {
               "type": "string"
             },
             "receiver": {
               "$ref": "#/definitions/Addr"
+            },
+            "unstake_index_list": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "format": "uint64",
+                "minimum": 0.0
+              }
             }
           }
         }
@@ -207,10 +270,10 @@
     {
       "type": "object",
       "required": [
-        "pool_rm_validator"
+        "pool_rm_validators"
       ],
       "properties": {
-        "pool_rm_validator": {
+        "pool_rm_validators": {
           "type": "object",
           "required": [
             "pool_addr",
@@ -234,10 +297,10 @@
     {
       "type": "object",
       "required": [
-        "pool_add_validator"
+        "pool_add_validators"
       ],
       "properties": {
-        "pool_add_validator": {
+        "pool_add_validators": {
           "type": "object",
           "required": [
             "pool_addr",
@@ -252,6 +315,34 @@
               "items": {
                 "type": "string"
               }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "pool_update_validator"
+      ],
+      "properties": {
+        "pool_update_validator": {
+          "type": "object",
+          "required": [
+            "new_validator",
+            "old_validator",
+            "pool_addr"
+          ],
+          "properties": {
+            "new_validator": {
+              "type": "string"
+            },
+            "old_validator": {
+              "type": "string"
+            },
+            "pool_addr": {
+              "type": "string"
             }
           }
         }
@@ -267,13 +358,9 @@
         "era_update": {
           "type": "object",
           "required": [
-            "channel",
             "pool_addr"
           ],
           "properties": {
-            "channel": {
-              "type": "string"
-            },
             "pool_addr": {
               "type": "string"
             }
@@ -325,6 +412,26 @@
     {
       "type": "object",
       "required": [
+        "era_restake"
+      ],
+      "properties": {
+        "era_restake": {
+          "type": "object",
+          "required": [
+            "pool_addr"
+          ],
+          "properties": {
+            "pool_addr": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
         "era_active"
       ],
       "properties": {
@@ -345,11 +452,23 @@
     {
       "type": "object",
       "required": [
-        "stake_l_s_m"
+        "stake_lsm"
       ],
       "properties": {
-        "stake_l_s_m": {
-          "type": "object"
+        "stake_lsm": {
+          "type": "object",
+          "required": [
+            "neutron_address",
+            "pool_addr"
+          ],
+          "properties": {
+            "neutron_address": {
+              "type": "string"
+            },
+            "pool_addr": {
+              "type": "string"
+            }
+          }
         }
       },
       "additionalProperties": false
@@ -378,55 +497,115 @@
     "ConfigPoolParams": {
       "type": "object",
       "required": [
-        "era_seconds",
-        "minimal_stake",
-        "next_unstake_index",
-        "offset",
-        "pool_addr",
-        "protocol_fee_receiver",
-        "rtoken",
-        "unbond_commission",
-        "unbonding_period",
-        "unstake_times_limit"
+        "pool_addr"
       ],
       "properties": {
         "era_seconds": {
-          "type": "integer",
+          "type": [
+            "integer",
+            "null"
+          ],
           "format": "uint64",
           "minimum": 0.0
         },
+        "lsm_pending_limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "lsm_support": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "minimal_stake": {
-          "$ref": "#/definitions/Uint128"
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Uint128"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "next_unstake_index": {
-          "type": "integer",
+          "type": [
+            "integer",
+            "null"
+          ],
           "format": "uint64",
           "minimum": 0.0
         },
         "offset": {
-          "type": "integer",
+          "type": [
+            "integer",
+            "null"
+          ],
           "format": "uint64",
           "minimum": 0.0
+        },
+        "paused": {
+          "type": [
+            "boolean",
+            "null"
+          ]
         },
         "pool_addr": {
           "type": "string"
         },
-        "protocol_fee_receiver": {
-          "type": "string"
+        "protocol_fee_commission": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Uint128"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
-        "rtoken": {
-          "type": "string"
+        "protocol_fee_receiver": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rate_change_limit": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Uint128"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "unbond_commission": {
-          "$ref": "#/definitions/Uint128"
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Uint128"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "unbonding_period": {
-          "type": "integer",
+          "type": [
+            "integer",
+            "null"
+          ],
           "format": "uint64",
           "minimum": 0.0
         },
         "unstake_times_limit": {
-          "type": "integer",
+          "type": [
+            "integer",
+            "null"
+          ],
           "format": "uint64",
           "minimum": 0.0
         }
@@ -437,9 +616,13 @@
       "required": [
         "active",
         "bond",
+        "channel_id_of_ibc_denom",
         "era",
         "ibc_denom",
         "interchain_account_id",
+        "lsd_token",
+        "pending_share_tokens",
+        "protocol_fee_receiver",
         "rate",
         "remote_denom",
         "unbond",
@@ -452,6 +635,9 @@
         "bond": {
           "$ref": "#/definitions/Uint128"
         },
+        "channel_id_of_ibc_denom": {
+          "type": "string"
+        },
         "era": {
           "type": "integer",
           "format": "uint64",
@@ -461,6 +647,18 @@
           "type": "string"
         },
         "interchain_account_id": {
+          "type": "string"
+        },
+        "lsd_token": {
+          "type": "string"
+        },
+        "pending_share_tokens": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Coin"
+          }
+        },
+        "protocol_fee_receiver": {
           "type": "string"
         },
         "rate": {

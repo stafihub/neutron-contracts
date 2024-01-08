@@ -15,10 +15,10 @@ use neutron_sdk::{
 };
 
 use crate::{
-    contract::{msg_with_sudo_callback, SudoPayload, TxType},
-    helper::{min_ntrn_ibc_fee, query_denom_trace},
+    helper::{min_ntrn_ibc_fee, query_denom_trace, CAL_BASE},
     query::query_validator_by_addr,
-    state::{INFO_OF_ICA_ID, POOLS},
+    state::{EraProcessStatus, SudoPayload, TxType, INFO_OF_ICA_ID, POOLS},
+    tx_callback::msg_with_sudo_callback,
 };
 
 pub fn execute_stake_lsm(
@@ -29,6 +29,22 @@ pub fn execute_stake_lsm(
     pool_addr: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
+    if !pool_info.lsm_support {
+        return Err(NeutronError::Std(StdError::generic_err(
+            "Lsm stake not support",
+        )));
+    }
+    if pool_info.pending_share_tokens.len() >= pool_info.lsm_pending_limit as usize {
+        return Err(NeutronError::Std(StdError::generic_err(
+            "Lsm pending stake over limit",
+        )));
+    }
+    if pool_info.era_process_status != EraProcessStatus::ActiveEnded {
+        return Err(NeutronError::Std(StdError::generic_err(
+            "Era process not end",
+        )));
+    }
+
     let (pool_ica_info, _, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
     if pool_info.paused {
         return Err(NeutronError::Std(StdError::generic_err("Pool is paused")));
@@ -158,7 +174,7 @@ pub fn sudo_stake_lsm_callback(deps: DepsMut, payload: SudoPayload) -> StdResult
 
     let token_amount = match token_amount_str.parse::<u128>() {
         Ok(amount) => amount,
-        _ => {
+        Err(_) => {
             return Err(StdError::generic_err(format!(
                 "unsupported  message {}",
                 payload.message
@@ -167,7 +183,7 @@ pub fn sudo_stake_lsm_callback(deps: DepsMut, payload: SudoPayload) -> StdResult
     };
     let share_token_amount = match share_token_amount_str.parse::<u128>() {
         Ok(amount) => amount,
-        _ => {
+        Err(_) => {
             return Err(StdError::generic_err(format!(
                 "unsupported  message {}",
                 payload.message
@@ -180,13 +196,11 @@ pub fn sudo_stake_lsm_callback(deps: DepsMut, payload: SudoPayload) -> StdResult
     // cal
     let token_amount_use = Uint128::new(token_amount);
     pool_info.active = pool_info.active.add(token_amount_use);
-    let rtoken_amount = token_amount_use
-        .mul(Uint128::new(1_000_000))
-        .div(pool_info.rate);
+    let rtoken_amount = token_amount_use.mul(CAL_BASE).div(pool_info.rate);
 
     // mint
     let msg = WasmMsg::Execute {
-        contract_addr: pool_info.rtoken.to_string(),
+        contract_addr: pool_info.lsd_token.to_string(),
         msg: to_json_binary(
             &(rtoken::msg::ExecuteMsg::Mint {
                 recipient: staker_neutron_addr.to_string(),
@@ -222,7 +236,7 @@ pub fn sudo_stake_lsm_failed_callback(payload: SudoPayload) -> StdResult<Respons
 
     let share_token_amount = match share_token_amount_str.parse::<u128>() {
         Ok(amount) => amount,
-        _ => {
+        Err(_) => {
             return Err(StdError::generic_err(format!(
                 "unsupported  message {}",
                 payload.message

@@ -53,6 +53,15 @@ pub fn execute_config_pool(
     if let Some(paused) = param.paused {
         pool_info.paused = paused;
     }
+    if let Some(lsm_support) = param.lsm_support {
+        pool_info.lsm_support = lsm_support;
+    }
+    if let Some(lsm_pending_limit) = param.lsm_pending_limit {
+        pool_info.lsm_pending_limit = lsm_pending_limit;
+    }
+    if let Some(rate_change_limit) = param.rate_change_limit {
+        pool_info.rate_change_limit = rate_change_limit;
+    }
 
     POOLS.save(deps.storage, param.pool_addr.clone(), &pool_info)?;
 

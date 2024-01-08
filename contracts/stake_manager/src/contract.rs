@@ -1,83 +1,48 @@
-use std::vec;
-
 use cosmwasm_std::{
-    entry_point, from_json, to_json_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo,
-    Reply, Response, StdError, StdResult, SubMsg, Uint128,
+    entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response,
+    StdError, StdResult, Uint128,
 };
 use cw2::set_contract_version;
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 
-use neutron_sdk::sudo::msg::{RequestPacket, SudoMsg};
+use neutron_sdk::sudo::msg::SudoMsg;
 use neutron_sdk::{
-    bindings::{
-        msg::{MsgIbcTransferResponse, NeutronMsg},
-        query::NeutronQuery,
-    },
+    bindings::{msg::NeutronMsg, query::NeutronQuery},
     interchain_queries::get_registered_query,
     NeutronResult,
 };
 
+use crate::execute_era_bond::execute_era_bond;
 use crate::execute_era_update::execute_era_update;
 use crate::execute_open_channel::execute_open_channel;
 use crate::execute_pool_rm_validators::execute_rm_pool_validators;
+use crate::execute_pool_update_validator::execute_pool_update_validator;
 use crate::execute_register_pool::{execute_register_pool, sudo_open_ack};
-use crate::execute_register_query::{register_balance_query, register_delegations_query};
 use crate::execute_stake::execute_stake;
 use crate::execute_stake_lsm::execute_stake_lsm;
 use crate::execute_unstake::execute_unstake;
-use crate::execute_withdraw::{
-    execute_withdraw, sudo_withdraw_callback, sudo_withdraw_failed_callback,
-};
+use crate::execute_withdraw::execute_withdraw;
+use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
+use crate::query::query_user_unstake_index;
 use crate::query::{
     query_acknowledgement_result, query_errors_queue, query_interchain_address,
     query_interchain_address_contract, query_pool_info, query_user_unstake,
 };
-use crate::query_callback::{
-    write_balance_query_id_to_reply_id, write_delegation_query_id_to_reply_id,
-    write_validator_query_id_to_reply_id,
-};
+use crate::query_callback::write_reply_id_to_query_id;
 use crate::state::{
-    PlatformInfo, State, IBC_SUDO_ID_RANGE_END, IBC_SUDO_ID_RANGE_START, PLATFORM_INFO,
-    QUERY_BALANCES_REPLY_ID_END, QUERY_DELEGATIONS_REPLY_ID_END, QUERY_VALIDATOR_REPLY_ID_END,
-    QUERY_VALIDATOR_REPLY_ID_RANGE_START, STATE,
+    PlatformInfo, State, PLATFORM_INFO, QUERY_REPLY_ID_RANGE_END, QUERY_REPLY_ID_RANGE_START,
+    REPLY_ID_RANGE_END, REPLY_ID_RANGE_START, STATE,
 };
+use crate::tx_callback::{prepare_sudo_payload, sudo_error, sudo_response, sudo_timeout};
 use crate::{execute_config_pool::execute_config_pool, query::query_balance_by_addr};
 use crate::{execute_era_active::execute_era_active, query::query_delegation_by_addr};
 use crate::{
-    execute_era_bond::execute_era_bond,
-    execute_pool_update_validator::{
-        sudo_update_validators_callback, sudo_update_validators_failed_callback,
-    },
-};
-use crate::{
-    execute_era_bond::sudo_era_bond_callback,
-    execute_era_bond::sudo_era_bond_failed_callback,
-    execute_era_collect_withdraw::{
-        execute_era_collect_withdraw, sudo_era_collect_withdraw_callback,
-        sudo_era_collect_withdraw_failed_callback,
-    },
-    execute_era_update::sudo_era_update_callback,
-    execute_era_update::sudo_era_update_failed_callback,
+    execute_era_collect_withdraw::execute_era_collect_withdraw,
     execute_init_pool::execute_init_pool,
 };
 use crate::{
     execute_era_restake::execute_era_restake,
     execute_pool_add_validators::execute_add_pool_validators,
     execute_redeem_token_for_share::execute_redeem_token_for_share, query::query_era_snapshot,
-};
-use crate::{execute_era_restake::sudo_era_restake_callback, query::query_user_unstake_index};
-use crate::{
-    execute_era_restake::sudo_era_restake_failed_callback,
-    execute_pool_update_validator::execute_pool_update_validator,
-};
-use crate::{
-    msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
-    state::{
-        read_reply_payload, read_sudo_payload, save_reply_payload, save_sudo_payload,
-        LATEST_BALANCES_REPLY_ID, LATEST_DELEGATIONS_REPLY_ID, QUERY_BALANCES_REPLY_ID_RANGE_START,
-        QUERY_DELEGATIONS_REPLY_ID_RANGE_START,
-    },
 };
 
 // Default timeout for IbcTransfer is 10000000 blocks
@@ -95,30 +60,6 @@ pub const DEFAULT_UPDATE_PERIOD: u64 = 6;
 const CONTRACT_NAME: &str = concat!("crates.io:neutron-sdk__", env!("CARGO_PKG_NAME"));
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum TxType {
-    SetWithdrawAddr,
-    UpdateValidators,
-    AddValidator,
-    UserWithdraw,
-    EraUpdate,
-    EraBond,
-    EraCollectWithdraw,
-    EraRestake,
-    RedeemTokenForShare,
-    StakeLsm,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub struct SudoPayload {
-    pub message: String,
-    pub pool_addr: String,
-    pub port_id: String,
-    pub tx_type: TxType,
-}
-
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
@@ -134,9 +75,6 @@ pub fn instantiate(
             owner: info.sender.clone(),
         }),
     )?;
-
-    LATEST_BALANCES_REPLY_ID.save(deps.storage, &QUERY_BALANCES_REPLY_ID_RANGE_START)?;
-    LATEST_DELEGATIONS_REPLY_ID.save(deps.storage, &QUERY_DELEGATIONS_REPLY_ID_RANGE_START)?;
 
     PLATFORM_INFO.save(
         deps.storage,
@@ -231,18 +169,6 @@ pub fn execute(
         ExecuteMsg::RedeemTokenForShare { pool_addr, tokens } => {
             execute_redeem_token_for_share(deps, info, pool_addr, tokens)
         }
-        ExecuteMsg::RegisterBalanceQuery {
-            connection_id,
-            addr,
-            denom,
-            update_period,
-        } => register_balance_query(connection_id, addr, denom, update_period),
-        ExecuteMsg::RegisterDelegatorDelegationsQuery {
-            connection_id,
-            delegator,
-            validators,
-            update_period,
-        } => register_delegations_query(connection_id, delegator, validators, update_period),
         ExecuteMsg::Stake {
             neutron_address,
             pool_addr,
@@ -255,8 +181,8 @@ pub fn execute(
         } => execute_withdraw(deps, env, info, pool_addr, receiver, unstake_index_list),
         ExecuteMsg::PoolRmValidators {
             pool_addr,
-            validator_addrs,
-        } => execute_rm_pool_validators(deps, env, info, pool_addr, validator_addrs),
+            validator_addr,
+        } => execute_rm_pool_validators(deps, env, info, pool_addr, validator_addr),
         ExecuteMsg::PoolAddValidators {
             pool_addr,
             validator_addrs,
@@ -288,16 +214,11 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> StdResult<Response> {
         .debug(format!("WASMDEBUG: reply msg: {:?}", msg).as_str());
     match msg.id {
         // It's convenient to use range of ID's to handle multiple reply messages
-        IBC_SUDO_ID_RANGE_START..=IBC_SUDO_ID_RANGE_END => prepare_sudo_payload(deps, env, msg),
-        QUERY_BALANCES_REPLY_ID_RANGE_START..=QUERY_BALANCES_REPLY_ID_END => {
-            write_balance_query_id_to_reply_id(deps, msg)
+        REPLY_ID_RANGE_START..=REPLY_ID_RANGE_END => prepare_sudo_payload(deps, env, msg),
+        QUERY_REPLY_ID_RANGE_START..=QUERY_REPLY_ID_RANGE_END => {
+            write_reply_id_to_query_id(deps, msg)
         }
-        QUERY_DELEGATIONS_REPLY_ID_RANGE_START..=QUERY_DELEGATIONS_REPLY_ID_END => {
-            write_delegation_query_id_to_reply_id(deps, msg)
-        }
-        QUERY_VALIDATOR_REPLY_ID_RANGE_START..=QUERY_VALIDATOR_REPLY_ID_END => {
-            write_validator_query_id_to_reply_id(deps, msg)
-        }
+
         _ => Err(StdError::generic_err(format!(
             "unsupported reply message id {}",
             msg.id
@@ -335,132 +256,4 @@ pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> StdResult<Response> {
 
         _ => Ok(Response::default()),
     }
-}
-
-fn sudo_callback(deps: DepsMut, env: Env, payload: SudoPayload) -> StdResult<Response> {
-    match payload.tx_type {
-        TxType::EraUpdate => sudo_era_update_callback(deps, payload),
-        TxType::EraBond => sudo_era_bond_callback(deps, env, payload),
-        TxType::EraCollectWithdraw => sudo_era_collect_withdraw_callback(deps, env, payload),
-        TxType::EraRestake => sudo_era_restake_callback(deps, env, payload),
-        TxType::UserWithdraw => sudo_withdraw_callback(deps, payload),
-        TxType::UpdateValidators => sudo_update_validators_callback(deps, payload),
-
-        _ => Ok(Response::new()),
-    }
-}
-
-fn sudo_err_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
-    match payload.tx_type {
-        TxType::EraUpdate => sudo_era_update_failed_callback(deps, payload),
-        TxType::EraBond => sudo_era_bond_failed_callback(deps, payload),
-        TxType::EraCollectWithdraw => sudo_era_collect_withdraw_failed_callback(deps, payload),
-        TxType::EraRestake => sudo_era_restake_failed_callback(deps, payload),
-        TxType::UserWithdraw => sudo_withdraw_failed_callback(deps, payload),
-        TxType::UpdateValidators => sudo_update_validators_failed_callback(deps, payload),
-        _ => Ok(Response::new()),
-    }
-}
-
-// saves payload to process later to the storage and returns a SubmitTX Cosmos SubMsg with necessary reply id
-pub fn msg_with_sudo_callback<C: Into<CosmosMsg<T>>, T>(
-    deps: DepsMut<NeutronQuery>,
-    msg: C,
-    payload: SudoPayload,
-) -> StdResult<SubMsg<T>> {
-    let id = save_reply_payload(deps.storage, payload)?;
-    Ok(SubMsg::reply_on_success(msg, id))
-}
-
-// prepare_sudo_payload is called from reply handler
-// The method is used to extract sequence id and channel from SubmitTxResponse to process sudo payload defined in msg_with_sudo_callback later in Sudo handler.
-// Such flow msg_with_sudo_callback() -> reply() -> prepare_sudo_payload() -> sudo() allows you "attach" some payload to your Transfer message
-// and process this payload when an acknowledgement for the SubmitTx message is received in Sudo handler
-fn prepare_sudo_payload(mut deps: DepsMut, _env: Env, msg: Reply) -> StdResult<Response> {
-    let payload = read_reply_payload(deps.storage, msg.id)?;
-
-    let resp: MsgIbcTransferResponse = from_json(
-        msg.result
-            .into_result()
-            .map_err(StdError::generic_err)?
-            .data
-            .ok_or_else(|| StdError::generic_err("no result"))?,
-    )
-    .map_err(|e| StdError::generic_err(format!("failed to parse response: {:?}", e)))?;
-
-    let seq_id = resp.sequence_id;
-    let channel_id = resp.channel;
-    save_sudo_payload(deps.branch().storage, channel_id, seq_id, payload)?;
-    Ok(Response::new())
-}
-
-fn sudo_error(deps: DepsMut, req: RequestPacket, data: String) -> StdResult<Response> {
-    deps.api.debug(
-        format!(
-            "WASMDEBUG: sudo_error: sudo error received: {:?} {}",
-            req, data
-        )
-        .as_str(),
-    );
-
-    let seq_id = req
-        .sequence
-        .ok_or_else(|| StdError::generic_err("sequence not found"))?;
-    let channel_id = req
-        .source_channel
-        .ok_or_else(|| StdError::generic_err("channel_id not found"))?;
-
-    if let Ok(payload) = read_sudo_payload(deps.storage, channel_id, seq_id) {
-        return sudo_err_callback(deps, payload);
-    }
-
-    Ok(Response::new())
-}
-
-fn sudo_timeout(deps: DepsMut, req: RequestPacket) -> StdResult<Response> {
-    deps.api.debug(
-        format!(
-            "WASMDEBUG: sudo_timeout: sudo timeout ack received: {:?}",
-            req
-        )
-        .as_str(),
-    );
-
-    let seq_id = req
-        .sequence
-        .ok_or_else(|| StdError::generic_err("sequence not found"))?;
-    let channel_id = req
-        .source_channel
-        .ok_or_else(|| StdError::generic_err("channel_id not found"))?;
-
-    if let Ok(payload) = read_sudo_payload(deps.storage, channel_id, seq_id) {
-        return sudo_err_callback(deps, payload);
-    }
-
-    Ok(Response::new())
-}
-
-fn sudo_response(deps: DepsMut, env: Env, req: RequestPacket, data: Binary) -> StdResult<Response> {
-    deps.api.debug(
-        format!(
-            "WASMDEBUG: sudo_response: sudo received: {:?} {}",
-            req, data
-        )
-        .as_str(),
-    );
-
-    let seq_id = req
-        .sequence
-        .ok_or_else(|| StdError::generic_err("sequence not found"))?;
-    let channel_id = req
-        .source_channel
-        .ok_or_else(|| StdError::generic_err("channel_id not found"))?;
-
-    if let Ok(payload) = read_sudo_payload(deps.storage, channel_id, seq_id) {
-        return sudo_callback(deps, env, payload);
-    }
-
-    Err(StdError::generic_err("Error message"))
-    // at this place we can safely remove the data under (channel_id, seq_id) key
-    // but it costs an extra gas, so its on you how to use the storage
 }

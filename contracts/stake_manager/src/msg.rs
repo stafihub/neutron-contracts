@@ -62,8 +62,9 @@ pub struct InitPoolParams {
     pub validator_addrs: Vec<String>,
     pub era: u64,
     pub rate: Uint128,
-    pub rtoken: String,
+    pub lsd_token: String,
     pub protocol_fee_receiver: String,
+    pub pending_share_tokens: Vec<Coin>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
@@ -80,6 +81,9 @@ pub struct ConfigPoolParams {
     pub era_seconds: Option<u64>,
     pub offset: Option<u64>,
     pub paused: Option<bool>,
+    pub lsm_support: Option<bool>,
+    pub lsm_pending_limit: Option<u64>,
+    pub rate_change_limit: Option<Uint128>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
@@ -101,18 +105,6 @@ pub enum ExecuteMsg {
         pool_addr: String,
         tokens: Vec<Coin>,
     },
-    RegisterBalanceQuery {
-        connection_id: String,
-        update_period: u64,
-        addr: String,
-        denom: String,
-    },
-    RegisterDelegatorDelegationsQuery {
-        delegator: String,
-        validators: Vec<String>,
-        connection_id: String,
-        update_period: u64,
-    },
     Stake {
         neutron_address: String,
         pool_addr: String,
@@ -128,7 +120,7 @@ pub enum ExecuteMsg {
     },
     PoolRmValidators {
         pool_addr: String,
-        validator_addrs: Vec<String>,
+        validator_addr: String,
     },
     PoolAddValidators {
         pool_addr: String,

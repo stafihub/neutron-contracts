@@ -13,11 +13,13 @@ use neutron_sdk::{
     NeutronError, NeutronResult,
 };
 
-use crate::contract::{msg_with_sudo_callback, SudoPayload, TxType, DEFAULT_TIMEOUT_SECONDS};
+use crate::contract::DEFAULT_TIMEOUT_SECONDS;
 use crate::helper::min_ntrn_ibc_fee;
 use crate::state::{
-    WithdrawStatus, INFO_OF_ICA_ID, POOLS, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX,
+    SudoPayload, TxType, WithdrawStatus, INFO_OF_ICA_ID, POOLS, UNSTAKES_INDEX_FOR_USER,
+    UNSTAKES_OF_INDEX,
 };
+use crate::tx_callback::msg_with_sudo_callback;
 
 pub fn execute_withdraw(
     mut deps: DepsMut<NeutronQuery>,
@@ -150,7 +152,13 @@ pub fn execute_withdraw(
 
 pub fn sudo_withdraw_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
     let parts: Vec<String> = payload.message.split('_').map(String::from).collect();
-    let user_addr = Addr::unchecked(parts.first().unwrap_or(&String::new()));
+    if parts.len() <= 1 {
+        return Err(StdError::generic_err(format!(
+            "unsupported  message {}",
+            payload.message
+        )));
+    }
+    let user_addr = Addr::unchecked(parts.get(0).unwrap());
 
     if let Some(mut unstakes) = UNSTAKES_INDEX_FOR_USER
         .may_load(deps.storage, (user_addr.clone(), payload.pool_addr.clone()))?
@@ -193,7 +201,9 @@ pub fn sudo_withdraw_failed_callback(deps: DepsMut, payload: SudoPayload) -> Std
             let index = index_str.parse::<u64>().unwrap();
             let mut unstake_info =
                 UNSTAKES_OF_INDEX.load(deps.storage, (payload.pool_addr.clone(), index))?;
+
             unstake_info.status = WithdrawStatus::Default;
+
             UNSTAKES_OF_INDEX.save(
                 deps.storage,
                 (payload.pool_addr.clone(), index),

@@ -14,12 +14,11 @@ pub mod execute_init_pool;
 pub mod execute_pool_add_validators;
 pub mod execute_pool_rm_validators;
 pub mod execute_pool_update_validator;
-pub mod execute_update_delegations_query;
 pub mod execute_register_pool;
-pub mod execute_register_query;
 pub mod execute_stake;
 pub mod execute_stake_lsm;
 pub mod execute_unstake;
+pub mod execute_update_delegations_query;
 pub mod execute_withdraw;
 
 pub mod error_conversion;
@@ -28,3 +27,4 @@ pub mod execute_redeem_token_for_share;
 pub mod helper;
 pub mod query;
 pub mod query_callback;
+pub mod tx_callback;

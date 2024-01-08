@@ -1,0 +1,245 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "QueryMsg",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": [
+        "get_registered_query"
+      ],
+      "properties": {
+        "get_registered_query": {
+          "type": "object",
+          "required": [
+            "query_id"
+          ],
+          "properties": {
+            "query_id": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "balance"
+      ],
+      "properties": {
+        "balance": {
+          "type": "object",
+          "required": [
+            "ica_addr"
+          ],
+          "properties": {
+            "ica_addr": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "delegations"
+      ],
+      "properties": {
+        "delegations": {
+          "type": "object",
+          "required": [
+            "pool_addr"
+          ],
+          "properties": {
+            "pool_addr": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "pool_info"
+      ],
+      "properties": {
+        "pool_info": {
+          "type": "object",
+          "required": [
+            "pool_addr"
+          ],
+          "properties": {
+            "pool_addr": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "era_snapshot"
+      ],
+      "properties": {
+        "era_snapshot": {
+          "type": "object",
+          "required": [
+            "pool_addr"
+          ],
+          "properties": {
+            "pool_addr": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "this query goes to neutron and get stored ICA with a specific query",
+      "type": "object",
+      "required": [
+        "interchain_account_address"
+      ],
+      "properties": {
+        "interchain_account_address": {
+          "type": "object",
+          "required": [
+            "connection_id",
+            "interchain_account_id"
+          ],
+          "properties": {
+            "connection_id": {
+              "type": "string"
+            },
+            "interchain_account_id": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "interchain_account_address_from_contract"
+      ],
+      "properties": {
+        "interchain_account_address_from_contract": {
+          "type": "object",
+          "required": [
+            "interchain_account_id"
+          ],
+          "properties": {
+            "interchain_account_id": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "acknowledgement_result"
+      ],
+      "properties": {
+        "acknowledgement_result": {
+          "type": "object",
+          "required": [
+            "interchain_account_id",
+            "sequence_id"
+          ],
+          "properties": {
+            "interchain_account_id": {
+              "type": "string"
+            },
+            "sequence_id": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "user_unstake"
+      ],
+      "properties": {
+        "user_unstake": {
+          "type": "object",
+          "required": [
+            "pool_addr",
+            "user_neutron_addr"
+          ],
+          "properties": {
+            "pool_addr": {
+              "type": "string"
+            },
+            "user_neutron_addr": {
+              "$ref": "#/definitions/Addr"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "user_unstake_index"
+      ],
+      "properties": {
+        "user_unstake_index": {
+          "type": "object",
+          "required": [
+            "pool_addr",
+            "user_neutron_addr"
+          ],
+          "properties": {
+            "pool_addr": {
+              "type": "string"
+            },
+            "user_neutron_addr": {
+              "$ref": "#/definitions/Addr"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "errors_queue"
+      ],
+      "properties": {
+        "errors_queue": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "definitions": {
+    "Addr": {
+      "description": "A human readable address.\n\nIn Cosmos, this is typically bech32 encoded. But for multi-chain smart contracts no assumptions should be made other than being UTF-8 encoded and of reasonable length.\n\nThis type represents a validated address. It can be created in the following ways 1. Use `Addr::unchecked(input)` 2. Use `let checked: Addr = deps.api.addr_validate(input)?` 3. Use `let checked: Addr = deps.api.addr_humanize(canonical_addr)?` 4. Deserialize from JSON. This must only be done from JSON that was validated before such as a contract's state. `Addr` must not be used in messages sent by the user because this would result in unvalidated instances.\n\nThis type is immutable. If you really need to mutate it (Really? Are you sure?), create a mutable copy using `let mut mutable = Addr::to_string()` and operate on that `String` instance.",
+      "type": "string"
+    }
+  }
+}

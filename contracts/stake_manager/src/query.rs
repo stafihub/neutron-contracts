@@ -18,8 +18,8 @@ use neutron_sdk::{
     interchain_txs::helpers::get_port_id,
 };
 
-use crate::state::{read_errors_from_queue, ACKNOWLEDGEMENT_RESULTS, ADDR_BALANCES_REPLY_ID};
-use crate::state::{ADDR_DELEGATIONS_REPLY_ID, INFO_OF_ICA_ID};
+use crate::state::{read_errors_from_queue, ACKNOWLEDGEMENT_RESULTS, ADDRESS_TO_REPLY_ID};
+use crate::state::{QueryKind, INFO_OF_ICA_ID};
 use crate::state::{POOLS, REPLY_ID_TO_QUERY_ID, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX};
 
 pub fn query_user_unstake(
@@ -56,7 +56,8 @@ pub fn query_balance_by_addr(
     deps: Deps<NeutronQuery>,
     addr: String,
 ) -> NeutronResult<BalanceResponse> {
-    let contract_query_id = ADDR_BALANCES_REPLY_ID.load(deps.storage, addr)?;
+    let contract_query_id =
+        ADDRESS_TO_REPLY_ID.load(deps.storage, (addr, QueryKind::Balances.to_string()))?;
     let registered_query_id = REPLY_ID_TO_QUERY_ID.load(deps.storage, contract_query_id)?;
     // get info about the query
     let registered_query = get_registered_query(deps, registered_query_id)?;
@@ -95,7 +96,8 @@ pub fn query_delegation_by_addr(
     deps: Deps<NeutronQuery>,
     addr: String,
 ) -> NeutronResult<DelegatorDelegationsResponse> {
-    let contract_query_id = ADDR_DELEGATIONS_REPLY_ID.load(deps.storage, addr)?;
+    let contract_query_id =
+        ADDRESS_TO_REPLY_ID.load(deps.storage, (addr, QueryKind::Delegations.to_string()))?;
     let registered_query_id = REPLY_ID_TO_QUERY_ID.load(deps.storage, contract_query_id)?;
     // get info about the query
     let registered_query: neutron_sdk::bindings::query::QueryRegisteredQueryResponse =
@@ -135,7 +137,8 @@ pub fn query_validator_by_addr(
     deps: Deps<NeutronQuery>,
     addr: String,
 ) -> NeutronResult<ValidatorResponse> {
-    let contract_query_id = ADDR_DELEGATIONS_REPLY_ID.load(deps.storage, addr)?;
+    let contract_query_id =
+        ADDRESS_TO_REPLY_ID.load(deps.storage, (addr, QueryKind::Validators.to_string()))?;
     let registered_query_id = REPLY_ID_TO_QUERY_ID.load(deps.storage, contract_query_id)?;
     // get info about the query
     let registered_query: neutron_sdk::bindings::query::QueryRegisteredQueryResponse =

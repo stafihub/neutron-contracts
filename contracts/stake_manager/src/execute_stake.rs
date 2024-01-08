@@ -2,13 +2,14 @@ use std::ops::{Add, Div, Mul};
 use std::vec;
 
 use cosmwasm_std::{
-    to_json_binary, CosmosMsg, DepsMut, Env, MessageInfo, Response, StdError, Uint128, WasmMsg,
+    to_json_binary, CosmosMsg, DepsMut, Env, MessageInfo, Response, StdError, WasmMsg,
 };
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     NeutronError, NeutronResult,
 };
 
+use crate::helper::CAL_BASE;
 use crate::state::POOLS;
 
 pub fn execute_stake(
@@ -41,12 +42,10 @@ pub fn execute_stake(
     pool_info.active = pool_info.active.add(token_amount);
     pool_info.bond = pool_info.bond.add(token_amount);
 
-    let rtoken_amount = token_amount
-        .mul(Uint128::new(1_000_000))
-        .div(pool_info.rate);
+    let rtoken_amount = token_amount.mul(CAL_BASE).div(pool_info.rate);
 
     let msg = WasmMsg::Execute {
-        contract_addr: pool_info.rtoken.to_string(),
+        contract_addr: pool_info.lsd_token.to_string(),
         msg: to_json_binary(
             &(rtoken::msg::ExecuteMsg::Mint {
                 recipient: neutron_address.to_string(),
