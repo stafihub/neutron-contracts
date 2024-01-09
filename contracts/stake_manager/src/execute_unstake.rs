@@ -69,7 +69,7 @@ pub fn execute_unstake(
                 msg: to_json_binary(
                     &(rtoken::msg::ExecuteMsg::TransferFrom {
                         owner: info.sender.to_string(),
-                        recipient: pool_info.protocol_fee_receiver.to_string(),
+                        recipient: pool_info.platform_fee_receiver.to_string(),
                         amount: cms_fee,
                     }),
                 )?,

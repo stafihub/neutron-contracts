@@ -3,7 +3,9 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-pub struct InstantiateMsg {}
+pub struct InstantiateMsg {
+    pub stack_fee_receiver: Addr,
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -62,7 +64,8 @@ pub struct InitPoolParams {
     pub validator_addrs: Vec<String>,
     pub era: u64,
     pub rate: Uint128,
-    pub protocol_fee_receiver: String,
+    pub total_platform_fee: Uint128,
+    pub platform_fee_receiver: String,
     pub pending_share_tokens: Vec<Coin>,
     pub lsd_token_name: String,
     pub lsd_token_symbol: String,
@@ -70,21 +73,33 @@ pub struct InitPoolParams {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
+pub struct ConfigStackParams {
+    pub stack_fee_receiver: Option<Addr>,
+    pub new_admin: Option<Addr>,
+    pub stack_fee_commission: Option<Uint128>,
+    pub total_stack_fee: Option<Uint128>,
+    pub add_operator: Option<Addr>,
+    pub rm_operator: Option<Addr>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
 pub struct ConfigPoolParams {
     pub pool_addr: String,
-    pub protocol_fee_receiver: Option<String>,
+    pub platform_fee_receiver: Option<String>,
     pub minimal_stake: Option<Uint128>,
     pub unstake_times_limit: Option<u64>,
     pub next_unstake_index: Option<u64>,
     pub unbonding_period: Option<u64>,
     pub unbond_commission: Option<Uint128>,
-    pub protocol_fee_commission: Option<Uint128>,
+    pub platform_fee_commission: Option<Uint128>,
     pub era_seconds: Option<u64>,
     pub offset: Option<u64>,
     pub paused: Option<bool>,
     pub lsm_support: Option<bool>,
     pub lsm_pending_limit: Option<u64>,
     pub rate_change_limit: Option<Uint128>,
+    pub new_admin: Option<Addr>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
@@ -97,6 +112,7 @@ pub enum ExecuteMsg {
     },
     InitPool(Box<InitPoolParams>),
     ConfigPool(Box<ConfigPoolParams>),
+    ConfigStack(Box<ConfigStackParams>),
     OpenChannel {
         pool_addr: String,
         closed_channel_id: String,
@@ -148,7 +164,7 @@ pub enum ExecuteMsg {
         pool_addr: String,
     },
     UpdateLsdTokenCodeId {
-        code_id: u64
+        code_id: u64,
     },
     StakeLsm {
         neutron_address: String,

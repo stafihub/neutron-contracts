@@ -505,7 +505,7 @@
         "pool_addr": {
           "type": "string"
         },
-        "protocol_fee_commission": {
+        "platform_fee_commission": {
           "anyOf": [
             {
               "$ref": "#/definitions/Uint128"
@@ -515,7 +515,7 @@
             }
           ]
         },
-        "protocol_fee_receiver": {
+        "platform_fee_receiver": {
           "type": [
             "string",
             "null"
@@ -571,7 +571,7 @@
         "lsd_token_name",
         "lsd_token_symbol",
         "pending_share_tokens",
-        "protocol_fee_receiver",
+        "platform_fee_receiver",
         "rate",
         "remote_denom",
         "unbond",
@@ -610,7 +610,7 @@
             "$ref": "#/definitions/Coin"
           }
         },
-        "protocol_fee_receiver": {
+        "platform_fee_receiver": {
           "type": "string"
         },
         "rate": {

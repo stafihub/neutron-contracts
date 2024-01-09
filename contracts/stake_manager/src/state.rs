@@ -12,11 +12,16 @@ pub const QUERY_REPLY_ID_RANGE_SIZE: u64 = 1_000_000;
 pub const QUERY_REPLY_ID_RANGE_END: u64 = QUERY_REPLY_ID_RANGE_START + QUERY_REPLY_ID_RANGE_SIZE;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct State {
-    pub owner: Addr,
+pub struct Stack {
+    pub admin: Addr,
+    pub stack_fee_receiver: Addr,
+    pub stack_fee_commission: Uint128,
+    pub total_stack_fee: Uint128,
+    pub operators: Vec<Addr>,
+    pub pools: Vec<String>,
 }
 
-pub const STATE: Item<State> = Item::new("state");
+pub const STACK: Item<Stack> = Item::new("stack");
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct EraSnapshot {
@@ -50,8 +55,9 @@ pub struct PoolInfo {
     pub era_process_status: EraProcessStatus,
     pub validator_update_status: ValidatorUpdateStatus,
     pub unbond_commission: Uint128,
-    pub protocol_fee_commission: Uint128,
-    pub protocol_fee_receiver: Addr,
+    pub platform_fee_commission: Uint128,
+    pub total_platform_fee: Uint128,
+    pub platform_fee_receiver: Addr,
     pub admin: Addr,
     pub pending_share_tokens: Vec<cosmwasm_std::Coin>,
     pub era_snapshot: EraSnapshot,
@@ -119,12 +125,11 @@ pub const INFO_OF_ICA_ID: Map<String, (IcaInfo, IcaInfo, Addr)> = Map::new("info
 pub const UNSTAKES_INDEX_FOR_USER: Map<(Addr, String), Vec<u64>> =
     Map::new("unstakes_index_for_user");
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct PlatformInfo {
-    pub platform_fee_receiver: Addr,
-    pub platform_fee_commission: Uint128,
-}
-pub const PLATFORM_INFO: Item<PlatformInfo> = Item::new("platform_info");
+// #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+// pub struct StackInfo {
+
+// }
+// pub const STACK_INFO: Item<StackInfo> = Item::new("stack_info");
 
 // contains query kinds that we expect to handle in `sudo_kv_query_result`
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]

@@ -11,6 +11,7 @@ use neutron_sdk::{
     NeutronResult,
 };
 
+use crate::execute_config_stack::execute_config_stack;
 use crate::execute_era_bond::execute_era_bond;
 use crate::execute_era_update::execute_era_update;
 use crate::execute_open_channel::execute_open_channel;
@@ -30,8 +31,8 @@ use crate::query::{
 };
 use crate::query_callback::write_reply_id_to_query_id;
 use crate::state::{
-    PlatformInfo, State, PLATFORM_INFO, QUERY_REPLY_ID_RANGE_END, QUERY_REPLY_ID_RANGE_START,
-    REPLY_ID_RANGE_END, REPLY_ID_RANGE_START, STATE,
+    Stack, QUERY_REPLY_ID_RANGE_END, QUERY_REPLY_ID_RANGE_START, REPLY_ID_RANGE_END,
+    REPLY_ID_RANGE_START, STACK,
 };
 use crate::tx_callback::{prepare_sudo_payload, sudo_error, sudo_response, sudo_timeout};
 use crate::{execute_config_pool::execute_config_pool, query::query_balance_by_addr};
@@ -66,22 +67,19 @@ pub fn instantiate(
     deps: DepsMut,
     _: Env,
     info: MessageInfo,
-    _: InstantiateMsg,
+    instantiate_msg: InstantiateMsg,
 ) -> NeutronResult<Response<NeutronMsg>> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    STATE.save(
+    STACK.save(
         deps.storage,
-        &(State {
-            owner: info.sender.clone(),
-        }),
-    )?;
-
-    PLATFORM_INFO.save(
-        deps.storage,
-        &(PlatformInfo {
-            platform_fee_receiver: info.sender,
-            platform_fee_commission: Uint128::new(100_000),
+        &(Stack {
+            admin: info.sender.clone(),
+            stack_fee_receiver: instantiate_msg.stack_fee_receiver,
+            stack_fee_commission: Uint128::new(100_000),
+            total_stack_fee: Uint128::zero(),
+            operators: vec![],
+            pools: vec![],
         }),
     )?;
 
@@ -162,6 +160,7 @@ pub fn execute(
         ),
         ExecuteMsg::InitPool(params) => execute_init_pool(deps, env, info, *params),
         ExecuteMsg::ConfigPool(params) => execute_config_pool(deps, info, *params),
+        ExecuteMsg::ConfigStack(params) => execute_config_stack(deps, info, *params),
         ExecuteMsg::OpenChannel {
             pool_addr,
             closed_channel_id,

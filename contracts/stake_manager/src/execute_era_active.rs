@@ -12,7 +12,7 @@ use neutron_sdk::{
 use crate::state::POOLS;
 use crate::state::{
     EraProcessStatus::{ActiveEnded, RestakeEnded},
-    PLATFORM_INFO,
+    STACK,
 };
 use crate::{helper::CAL_BASE, query::query_delegation_by_addr};
 
@@ -82,18 +82,18 @@ pub fn execute_era_active(
             msg: to_json_binary(&token_info_msg)?,
         }))?;
 
-    let platform_info = PLATFORM_INFO.load(deps.storage)?;
+    let mut stack_info = STACK.load(deps.storage)?;
     // calculate protocol fee
-    let (protocol_fee, platform_fee) = if total_amount.amount > pool_info.era_snapshot.active {
+    let (platform_fee, stack_fee) = if total_amount.amount > pool_info.era_snapshot.active {
         let reward = total_amount.amount.sub(pool_info.era_snapshot.active);
-        let protocol_fee_raw = reward
-            .mul(pool_info.protocol_fee_commission)
+        let platform_fee_raw = reward
+            .mul(pool_info.platform_fee_commission)
             .div(pool_info.rate);
 
-        let platform_fee = protocol_fee_raw
-            .mul(platform_info.platform_fee_commission)
+        let platform_fee = platform_fee_raw
+            .mul(stack_info.stack_fee_commission)
             .div(CAL_BASE);
-        (protocol_fee_raw.sub(platform_fee), platform_fee)
+        (platform_fee_raw.sub(platform_fee), platform_fee)
     } else {
         (Uint128::zero(), Uint128::zero())
     };
@@ -101,7 +101,7 @@ pub fn execute_era_active(
     deps.as_ref().api.debug(
         format!(
             "WASMDEBUG: execute_era_active protocol_fee is: {:?}, total_amount is: {:?}, token_info is: {:?}",
-            protocol_fee,total_amount,token_info
+            platform_fee,total_amount,token_info
         )
         .as_str(),
     );
@@ -113,7 +113,7 @@ pub fn execute_era_active(
         Uint128::zero()
     };
 
-    let total_rtoken_amount = token_info.total_supply.add(protocol_fee).add(platform_fee);
+    let total_rtoken_amount = token_info.total_supply.add(platform_fee).add(stack_fee);
     let new_rate = if total_rtoken_amount.u128() > 0 {
         new_active.mul(CAL_BASE).div(total_rtoken_amount)
     } else {
@@ -145,35 +145,38 @@ pub fn execute_era_active(
     pool_info.unbond = Uint128::zero();
     pool_info.active = new_active;
 
-    POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
-
     let mut resp = Response::new().add_attribute("new_rate", pool_info.rate);
-    if !protocol_fee.is_zero() {
-        let msg = WasmMsg::Execute {
-            contract_addr: pool_info.lsd_token.to_string(),
-            msg: to_json_binary(
-                &(rtoken::msg::ExecuteMsg::Mint {
-                    recipient: pool_info.protocol_fee_receiver.to_string(),
-                    amount: protocol_fee,
-                }),
-            )?,
-            funds: vec![],
-        };
-        resp = resp.add_message(msg);
-    }
     if !platform_fee.is_zero() {
         let msg = WasmMsg::Execute {
             contract_addr: pool_info.lsd_token.to_string(),
             msg: to_json_binary(
                 &(rtoken::msg::ExecuteMsg::Mint {
-                    recipient: platform_info.platform_fee_receiver.to_string(),
+                    recipient: pool_info.platform_fee_receiver.to_string(),
                     amount: platform_fee,
                 }),
             )?,
             funds: vec![],
         };
         resp = resp.add_message(msg);
+        pool_info.total_platform_fee = pool_info.total_platform_fee.add(platform_fee);
     }
+    if !stack_fee.is_zero() {
+        let msg = WasmMsg::Execute {
+            contract_addr: pool_info.lsd_token.to_string(),
+            msg: to_json_binary(
+                &(rtoken::msg::ExecuteMsg::Mint {
+                    recipient: stack_info.stack_fee_receiver.to_string(),
+                    amount: stack_fee,
+                }),
+            )?,
+            funds: vec![],
+        };
+        resp = resp.add_message(msg);
+        stack_info.total_stack_fee = stack_info.total_stack_fee.add(stack_fee);
+    }
+
+    POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
+    STACK.save(deps.storage, &stack_info)?;
 
     Ok(resp)
 }
