@@ -67,7 +67,7 @@ pub fn instantiate(
     deps: DepsMut,
     _: Env,
     info: MessageInfo,
-    instantiate_msg: InstantiateMsg,
+    _: InstantiateMsg,
 ) -> NeutronResult<Response<NeutronMsg>> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
@@ -75,7 +75,7 @@ pub fn instantiate(
         deps.storage,
         &(Stack {
             admin: info.sender.clone(),
-            stack_fee_receiver: instantiate_msg.stack_fee_receiver,
+            stack_fee_receiver: info.sender.clone(),
             stack_fee_commission: Uint128::new(100_000),
             total_stack_fee: Uint128::zero(),
             operators: vec![],
