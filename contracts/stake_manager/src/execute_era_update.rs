@@ -8,8 +8,11 @@ use neutron_sdk::{
     NeutronError, NeutronResult,
 };
 
-use crate::state::EraProcessStatus::{ActiveEnded, EraUpdateEnded, EraUpdateStarted};
 use crate::state::EraSnapshot;
+use crate::state::{
+    EraProcessStatus::{ActiveEnded, EraUpdateEnded, EraUpdateStarted},
+    ValidatorUpdateStatus,
+};
 use crate::state::{INFO_OF_ICA_ID, POOLS};
 use crate::{
     helper::min_ntrn_ibc_fee,
@@ -27,7 +30,9 @@ pub fn execute_era_update(
         return Err(NeutronError::Std(StdError::generic_err("Pool is paused")));
     }
     // check era state
-    if pool_info.era_process_status != ActiveEnded {
+    if pool_info.era_process_status != ActiveEnded
+        && pool_info.validator_update_status != ValidatorUpdateStatus::Success
+    {
         deps.as_ref()
             .api
             .debug(format!("WASMDEBUG: execute_era_update skip pool: {:?}", pool_addr).as_str());

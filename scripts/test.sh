@@ -5,9 +5,15 @@ set -euo pipefail
 IFS=$'\n\t'
 
 # create stake-manager contract -> create rtoken contract --> send gas to stake manager -> test stake -> test unstake -> test new era
+ARCH=$(uname -m)
+CONTRACT_PATH="artifacts/stake_manager.wasm"
+RTOKEN_CONTRACT_PATH="artifacts/rtoken.wasm"
 
-CONTRACT_PATH="artifacts/stake_manager-aarch64.wasm"
-RTOKEN_CONTRACT_PATH="artifacts/rtoken-aarch64.wasm"
+if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+    CONTRACT_PATH="artifacts/stake_manager-aarch64.wasm"
+    RTOKEN_CONTRACT_PATH="artifacts/rtoken-aarch64.wasm"
+fi
+
 CHAIN_ID_1="test-1"
 CHAIN_ID_2="test-2"
 #NEUTRON_DIR="${NEUTRON_DIR:-/var/lib/docker/volumes/neutron-testing-data/_data}"
@@ -128,9 +134,9 @@ echo "Code ID: $code_id"
 
 msg=$(printf '{
   "update_lsd_token_code_id": {
-    "era": %d
+    "code_id": %d
   }
-}' $code_id)
+}' "$code_id")
 
 # echo "the msg is: $msg"
 
