@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use cosmwasm_std::{DepsMut, MessageInfo, Response, StdError, StdResult};
 
 use neutron_sdk::{
@@ -24,26 +26,44 @@ pub fn execute_redeem_token_for_share(
 ) -> NeutronResult<Response<NeutronMsg>> {
     if tokens.len() == 0 || tokens.len() > 10 {
         return Err(NeutronError::Std(StdError::generic_err(
-            "tokens len not match",
+            "Tokens len not match",
         )));
     }
-
-    let pool_info = POOLS.load(deps.as_ref().storage, pool_addr.clone())?;
+    let mut pool_info = POOLS.load(deps.as_ref().storage, pool_addr.clone())?;
     let (pool_ica_info, _, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
-    let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
-    let denoms: Vec<String> = tokens.iter().map(|token| token.denom.clone()).collect();
 
+    let mut denom_set: HashSet<String> = HashSet::new();
+    let mut denoms = vec![];
+    let mut msgs = vec![];
+
+    for token in &tokens {
+        if !pool_info.share_tokens.contains(token) {
+            return Err(NeutronError::Std(StdError::generic_err(
+                "Share token not exist",
+            )));
+        }
+        denom_set.insert(token.denom.clone());
+        denoms.push(token.denom.clone());
+        pool_info
+            .redeemming_share_token_denom
+            .push(token.denom.clone());
+
+        msgs.push(redeem_token_for_share_msg(
+            pool_ica_info.ica_addr.clone(),
+            token.clone(),
+        ));
+    }
+    if denoms.len() != denom_set.len() {
+        return Err(NeutronError::Std(StdError::generic_err("Duplicate token")));
+    }
+
+    let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
     let submsg = msg_with_sudo_callback(
         deps.branch(),
         NeutronMsg::submit_tx(
             pool_ica_info.ctrl_connection_id,
             pool_info.ica_id.clone(),
-            tokens
-                .iter()
-                .map(|token| {
-                    redeem_token_for_share_msg(pool_ica_info.ica_addr.clone(), token.clone())
-                })
-                .collect(),
+            msgs,
             "".to_string(),
             DEFAULT_TIMEOUT_SECONDS,
             fee,
@@ -69,8 +89,29 @@ pub fn sudo_redeem_token_for_share_callback(
     let will_removed_denoms: Vec<String> = payload.message.split(",").map(String::from).collect();
 
     pool_info
-        .pending_share_tokens
+        .share_tokens
         .retain(|token| !will_removed_denoms.contains(&token.denom));
+
+    pool_info
+        .redeemming_share_token_denom
+        .retain(|denom| !will_removed_denoms.contains(denom));
+
+    POOLS.save(deps.storage, payload.pool_addr, &pool_info)?;
+
+    Ok(Response::new())
+}
+
+pub fn sudo_redeem_token_for_share_failed_callback(
+    deps: DepsMut,
+    payload: SudoPayload,
+) -> StdResult<Response> {
+    let mut pool_info = POOLS.load(deps.as_ref().storage, payload.pool_addr.clone())?;
+
+    let will_removed_denoms: Vec<String> = payload.message.split(",").map(String::from).collect();
+
+    pool_info
+        .redeemming_share_token_denom
+        .retain(|denom| !will_removed_denoms.contains(denom));
 
     POOLS.save(deps.storage, payload.pool_addr, &pool_info)?;
 

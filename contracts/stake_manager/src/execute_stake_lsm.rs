@@ -34,7 +34,7 @@ pub fn execute_stake_lsm(
             "Lsm stake not support",
         )));
     }
-    if pool_info.pending_share_tokens.len() >= pool_info.lsm_pending_limit as usize {
+    if pool_info.share_tokens.len() >= pool_info.lsm_pending_limit as usize {
         return Err(NeutronError::Std(StdError::generic_err(
             "Lsm pending stake over limit",
         )));
@@ -210,12 +210,12 @@ pub fn sudo_stake_lsm_callback(deps: DepsMut, payload: SudoPayload) -> StdResult
         funds: vec![],
     };
 
-    pool_info.pending_share_tokens.push(Coin {
+    pool_info.share_tokens.push(Coin {
         denom: share_token_denom.to_string(),
         amount: Uint128::new(share_token_amount),
     });
 
-    // pool_info.pending_share_tokens
+    // pool_info.share_tokens
     POOLS.save(deps.storage, payload.pool_addr, &pool_info)?;
 
     Ok(Response::new().add_message(msg))

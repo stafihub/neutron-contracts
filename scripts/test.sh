@@ -185,7 +185,7 @@ msg=$(printf '{
     "rate": "1000000",
     "lsd_token_name": "1000000",
     "lsd_token_symbol": "1000000",
-    "pending_share_tokens": []
+    "share_tokens": []
   }
 }' "$ADDRESS_1")
 

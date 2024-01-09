@@ -29,7 +29,7 @@ pub fn execute_era_active(
         return Err(NeutronError::Std(StdError::generic_err("status not allow")));
     }
 
-    if pool_info.pending_share_tokens.len() > 0 {
+    if pool_info.share_tokens.len() > 0 {
         return Err(NeutronError::Std(StdError::generic_err(
             "Pending share token not empty",
         )));

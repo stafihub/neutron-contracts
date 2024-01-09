@@ -10,7 +10,9 @@ use crate::execute_era_restake::sudo_era_restake_failed_callback;
 use crate::execute_pool_update_validator::{
     sudo_update_validators_callback, sudo_update_validators_failed_callback,
 };
-use crate::execute_redeem_token_for_share::sudo_redeem_token_for_share_callback;
+use crate::execute_redeem_token_for_share::{
+    sudo_redeem_token_for_share_callback, sudo_redeem_token_for_share_failed_callback,
+};
 use crate::execute_stake_lsm::{sudo_stake_lsm_callback, sudo_stake_lsm_failed_callback};
 use crate::execute_withdraw::{sudo_withdraw_callback, sudo_withdraw_failed_callback};
 use crate::state::{
@@ -167,6 +169,7 @@ fn sudo_failed_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Respon
         TxType::UserWithdraw => sudo_withdraw_failed_callback(deps, payload),
         TxType::UpdateValidators => sudo_update_validators_failed_callback(deps, payload),
         TxType::StakeLsm => sudo_stake_lsm_failed_callback(payload),
+        TxType::RedeemTokenForShare => sudo_redeem_token_for_share_failed_callback(deps, payload),
 
         _ => Ok(Response::new()),
     }

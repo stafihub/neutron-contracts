@@ -66,7 +66,7 @@ pub struct InitPoolParams {
     pub rate: Uint128,
     pub total_platform_fee: Uint128,
     pub platform_fee_receiver: String,
-    pub pending_share_tokens: Vec<Coin>,
+    pub share_tokens: Vec<Coin>,
     pub lsd_token_name: String,
     pub lsd_token_symbol: String,
 }

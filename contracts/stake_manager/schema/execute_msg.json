@@ -570,7 +570,7 @@
         "interchain_account_id",
         "lsd_token_name",
         "lsd_token_symbol",
-        "pending_share_tokens",
+        "share_tokens",
         "platform_fee_receiver",
         "rate",
         "remote_denom",
@@ -604,7 +604,7 @@
         "lsd_token_symbol": {
           "type": "string"
         },
-        "pending_share_tokens": {
+        "share_tokens": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/Coin"

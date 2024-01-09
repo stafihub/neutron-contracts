@@ -207,7 +207,8 @@ pub fn sudo_open_ack(
                 admin: admin.clone(),
                 era_seconds: 0,
                 offset: 0,
-                pending_share_tokens: vec![],
+                share_tokens: vec![],
+                redeemming_share_token_denom: vec![],
                 era_snapshot: EraSnapshot {
                     era: 0,
                     bond: Uint128::zero(),

@@ -109,7 +109,7 @@ pub fn execute_init_pool(
     pool_info.validator_addrs = param.validator_addrs.clone();
     pool_info.platform_fee_receiver = Addr::unchecked(param.platform_fee_receiver);
     pool_info.lsd_token = contract_addr;
-    pool_info.pending_share_tokens = param.pending_share_tokens;
+    pool_info.share_tokens = param.share_tokens;
     pool_info.total_platform_fee = param.total_platform_fee;
 
     // default
