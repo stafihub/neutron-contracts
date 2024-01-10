@@ -18,7 +18,7 @@ use neutron_sdk::{
     interchain_txs::helpers::get_port_id,
 };
 
-use crate::state::{read_errors_from_queue, ACKNOWLEDGEMENT_RESULTS, ADDRESS_TO_REPLY_ID};
+use crate::state::{read_errors_from_queue, ACKNOWLEDGEMENT_RESULTS, ADDRESS_TO_REPLY_ID, STACK};
 use crate::state::{QueryKind, INFO_OF_ICA_ID};
 use crate::state::{POOLS, REPLY_ID_TO_QUERY_ID, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX};
 
@@ -182,6 +182,14 @@ pub fn query_pool_info(
     let pool_info = POOLS.load(deps.storage, pool_addr)?;
 
     Ok(to_json_binary(&pool_info)?)
+}
+
+pub fn query_stack_info(
+    deps: Deps<NeutronQuery>,
+) -> NeutronResult<Binary> {
+    let stack_info = STACK.load(deps.storage)?;
+
+    Ok(to_json_binary(&stack_info)?)
 }
 
 pub fn query_era_snapshot(

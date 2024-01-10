@@ -20,6 +20,9 @@ pub enum QueryMsg {
     PoolInfo {
         pool_addr: String,
     },
+    StackInfo{
+
+    },
     EraSnapshot {
         pool_addr: String,
     },
