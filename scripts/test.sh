@@ -255,7 +255,7 @@ msg=$(printf '{
     "offset": 100
   }
 }' "$pool_address" "$rtoken_contract_address" "$ADDRESS_1")
-echo $msg
+
 # echo "config pool msg is: $msg"
 tx_result="$(neutrond tx wasm execute "$contract_address" "$msg" \
     --amount 2000000untrn \
@@ -276,6 +276,12 @@ for i in $(seq 10); do
 done
 echo " done"
 
+echo "--------------------------query stack info-------------------------------------"
+query="$(printf '{"stack_info": {}}')"
+echo "stack_info after config is: "
+neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq
+
+echo "--------------------------query pool info-------------------------------------"
 query="$(printf '{"pool_info": {"pool_addr": "%s"}}' "$pool_address")"
 echo "pool_info after config is: "
 neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq
@@ -420,6 +426,8 @@ echo " done"
 
 echo "-------------------------- query ica atom balance -------------------------------------"
 gaiad query bank balances "$pool_address" | jq
+
+echo "-------------------------- query pool delegations -------------------------------------"
 
 echo "-------------------------- era bond -------------------------------------"
 # era_bond round 1

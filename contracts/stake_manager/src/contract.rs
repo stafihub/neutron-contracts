@@ -1,3 +1,5 @@
+use std::env;
+
 use cosmwasm_std::{
     entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response,
     StdError, StdResult, Uint128,
@@ -11,7 +13,6 @@ use neutron_sdk::{
     NeutronResult,
 };
 
-use crate::execute_era_bond::execute_era_bond;
 use crate::execute_era_update::execute_era_update;
 use crate::execute_open_channel::execute_open_channel;
 use crate::execute_pool_rm_validators::execute_rm_pool_validators;
@@ -40,6 +41,7 @@ use crate::{
     execute_update_delegations_query::execute_update_delegations_query,
 };
 use crate::{execute_era_active::execute_era_active, query::query_delegation_by_addr};
+use crate::{execute_era_bond::execute_era_bond, query::query_stack_info};
 use crate::{
     execute_era_collect_withdraw::execute_era_collect_withdraw,
     execute_init_pool::execute_init_pool,
@@ -112,6 +114,7 @@ pub fn query(deps: Deps<NeutronQuery>, env: Env, msg: QueryMsg) -> NeutronResult
             Ok(to_json_binary(&query_delegation_by_addr(deps, pool_addr)?)?)
         }
         QueryMsg::PoolInfo { pool_addr } => query_pool_info(deps, env, pool_addr),
+        QueryMsg::StackInfo {} => query_stack_info(deps),
         QueryMsg::EraSnapshot { pool_addr } => query_era_snapshot(deps, env, pool_addr),
         QueryMsg::InterchainAccountAddress {
             interchain_account_id,
@@ -208,7 +211,7 @@ pub fn execute(
         ExecuteMsg::EraRestake { pool_addr } => execute_era_restake(deps, env, pool_addr),
         ExecuteMsg::EraActive { pool_addr } => execute_era_active(deps, pool_addr),
         ExecuteMsg::UpdateLsdTokenCodeId { code_id } => {
-            execute_update_lsd_token_code_id(deps,info, code_id)
+            execute_update_lsd_token_code_id(deps, info, code_id)
         }
         ExecuteMsg::StakeLsm {
             neutron_address,
