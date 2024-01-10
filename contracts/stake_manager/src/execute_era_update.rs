@@ -92,7 +92,7 @@ pub fn execute_era_update(
     let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
     let msg: NeutronMsg = NeutronMsg::IbcTransfer {
         source_port: "transfer".to_string(),
-        source_channel: pool_info.channel_id_of_ibc_denom,
+        source_channel: pool_info.channel_id_of_ibc_denom.clone(),
         sender: env.contract.address.to_string(),
         receiver: pool_addr.clone(),
         token: tx_coin,
@@ -110,7 +110,7 @@ pub fn execute_era_update(
         .api
         .debug(format!("WASMDEBUG: IbcTransfer msg: {:?}", msg).as_str());
 
-    let (pool_ica_info, _, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id)?;
+    let (pool_ica_info, _, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
 
     let submsg_pool_ibc_send = msg_with_sudo_callback(
         deps.branch(),
@@ -130,11 +130,15 @@ pub fn execute_era_update(
         )
         .as_str(),
     );
-
+    POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
     Ok(Response::default().add_submessage(submsg_pool_ibc_send))
 }
 
 pub fn sudo_era_update_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
+    deps.as_ref()
+        .api
+        .debug("WASMDEBUG: sudo_era_update_callback");
+
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
     pool_info.era_process_status = EraUpdateEnded;
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
@@ -143,6 +147,10 @@ pub fn sudo_era_update_callback(deps: DepsMut, payload: SudoPayload) -> StdResul
 }
 
 pub fn sudo_era_update_failed_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
+    deps.as_ref()
+        .api
+        .debug("WASMDEBUG: sudo_era_update_failed_callback");
+
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
     pool_info.era = pool_info.era.sub(1);
     pool_info.era_process_status = ActiveEnded;

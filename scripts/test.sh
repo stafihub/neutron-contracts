@@ -57,17 +57,28 @@ wait_tx_gaia() {
     done
 }
 echo "--------------------------deploy stakemanager-------------------------------------"
-code_id="$(neutrond tx wasm store "$CONTRACT_PATH" \
+stake_manager_code_id="$(neutrond tx wasm store "$CONTRACT_PATH" \
     --from "$ADDRESS_1" --gas 50000000 --chain-id "$CHAIN_ID_1" \
     --broadcast-mode=sync --gas-prices 0.0025untrn -y \
     --output json --keyring-backend=test --home "$HOME_1" \
     --node "$NEUTRON_NODE" |
     wait_tx | jq -r '.logs[0].events[] | select(.type == "store_code").attributes[] | select(.key == "code_id").value')"
-echo "Code ID: $code_id"
+echo "stake manager Code ID: $stake_manager_code_id"
+
+echo "--------------------------depoly lsd token -------------------------------------"
+
+lsd_code_id="$(neutrond tx wasm store "$RTOKEN_CONTRACT_PATH" \
+    --from "$ADDRESS_1" --gas 50000000 --chain-id "$CHAIN_ID_1" \
+    --broadcast-mode=sync --gas-prices 0.0025untrn -y \
+    --output json --keyring-backend=test --home "$HOME_1" \
+    --node "$NEUTRON_NODE" |
+    wait_tx | jq -r '.logs[0].events[] | select(.type == "store_code").attributes[] | select(.key == "code_id").value')"
+echo "lsd token Code ID: $lsd_code_id"
+
 
 echo "--------------------------instantiate stake manager-------------------------------------"
 
-contract_address=$(neutrond tx wasm instantiate "$code_id" '{}' \
+contract_address=$(neutrond tx wasm instantiate "$stake_manager_code_id" '{}' \
     --from "$ADDRESS_1" --admin "$ADMIN" -y --chain-id "$CHAIN_ID_1" \
     --output json --broadcast-mode=sync --label "init" \
     --keyring-backend=test --gas-prices 0.0025untrn --gas auto \
@@ -115,6 +126,26 @@ for i in $(seq 10); do
 done
 echo " done"
 
+echo "-------------------------- update lsd token code id-------------------------------------"
+
+msg=$(printf '{
+  "update_lsd_token_code_id": {
+    "code_id": %d
+  }
+}' "$lsd_code_id")
+
+# echo "the msg is: $msg"
+
+tx_result="$(neutrond tx wasm execute "$contract_address" "$msg" \
+    --amount 2000000untrn \
+    --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
+    --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \
+    --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"
+code="$(echo "$tx_result" | jq '.code')"
+if [[ "$code" -ne 0 ]]; then
+    echo "Failed to update lsd code id: $(echo "$tx_result" | jq '.raw_log')" && exit 1
+fi
+
 echo "--------------------------register pool-------------------------------------"
 
 msg='{"register_pool":{
@@ -139,25 +170,26 @@ if [[ "$code" -ne 0 ]]; then
     echo "Failed to register interchain account: $(echo "$tx_result" | jq '.raw_log')" && exit 1
 fi
 
-echo "Waiting 10 seconds for interchain account (sometimes it takes a lot of time)…"
+echo "Waiting 15 seconds for interchain account (sometimes it takes a lot of time)…"
 
 # shellcheck disable=SC2034
-for i in $(seq 10); do
+for i in $(seq 15); do
     sleep 1
     echo -n .
 done
 echo " done"
 
+
 query='{"interchain_account_address_from_contract":{"interchain_account_id":"test1"}}'
 echo "info of pool ica id is: "
 neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq
-pool_address=$(neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq ".data" | jq '.[0].ica_addr' | sed 's/\"//g')
-withdraw_addr=$(neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq ".data" | jq '.[1].ica_addr' | sed 's/\"//g')
+pool_address=$(neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json  | jq '.data[0].ica_addr' | sed  's/\"//g' )
+withdraw_addr=$(neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq '.data[1].ica_addr'| sed  's/\"//g' )
 
 echo "ICA(Pool) address: $pool_address"
 echo "withdraw_addr: $withdraw_addr"
 
-echo "--------------------------store lsd token -------------------------------------"
+echo "--------------------------depoly lsd token -------------------------------------"
 
 code_id="$(neutrond tx wasm store "$RTOKEN_CONTRACT_PATH" \
     --from "$ADDRESS_1" --gas 50000000 --chain-id "$CHAIN_ID_1" \
@@ -167,6 +199,7 @@ code_id="$(neutrond tx wasm store "$RTOKEN_CONTRACT_PATH" \
     wait_tx | jq -r '.logs[0].events[] | select(.type == "store_code").attributes[] | select(.key == "code_id").value')"
 echo "lsd token Code ID: $code_id"
 
+
 echo "-------------------------- update lsd token code id-------------------------------------"
 
 msg=$(printf '{
@@ -174,6 +207,8 @@ msg=$(printf '{
     "code_id": %d
   }
 }' "$code_id")
+
+# echo "the msg is: $msg"
 
 tx_result="$(neutrond tx wasm execute "$contract_address" "$msg" \
     --amount 2000000untrn \
@@ -194,7 +229,7 @@ msg=$(printf '{
     "unbond": "0",
     "active": "0",
     "bond": "0",
-    "ibc_denom": "ibc/9117A26BA81E29FA4F78F57DC2BD90CD3D26848101BA880445F119B22A1E254E",
+    "ibc_denom": "ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2",
     "channel_id_of_ibc_denom": "channel-0",
     "remote_denom": "uatom",
     "validator_addrs": ["cosmosvaloper18hl5c9xn5dze2g50uaw0l2mr02ew57zk0auktn"],
@@ -394,8 +429,8 @@ echo "--------------------------query pool info by grpc-------------------------
 echo "DelegatorWithdrawAddress Query"
 grpcurl -plaintext -d "{\"delegator_address\":\"$pool_address\"}" localhost:9090 cosmos.distribution.v1beta1.Query/DelegatorWithdrawAddress | jq
 
-echo "-------------------------- query contract_address balance -------------------------------------"
-neutrond query bank balances "$contract_address" | jq
+echo "contract_address balance Query"
+neutrond query bank balances "$contract_address" --node "$NEUTRON_NODE" --output json | jq
 
 echo "-------------------------- era update -------------------------------------"
 # era_update round 1
@@ -424,10 +459,13 @@ for i in $(seq 10); do
 done
 echo " done"
 
-echo "-------------------------- query ica atom balance -------------------------------------"
-gaiad query bank balances "$pool_address" | jq
+echo "query ica atom balance"
+gaiad query bank balances "$pool_address" --node "$GAIA_NODE" --output json | jq
 
-echo "-------------------------- query pool delegations -------------------------------------"
+query="$(printf '{"pool_info": {"pool_addr": "%s"}}' "$pool_address")"
+echo "pool_info is: "
+echo "$query"
+neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq
 
 echo "-------------------------- era bond -------------------------------------"
 # era_bond round 1
@@ -456,16 +494,15 @@ for i in $(seq 10); do
 done
 echo " done"
 
-echo "-------------------------- query staking delegations by cli -------------------------------------"
-gaiad query staking delegations "$pool_address" | jq
+gaiad query staking delegations "$pool_address" --node "$GAIA_NODE" --output json | jq
 
-echo "-------------------------- query pool balance by cli -------------------------------------"
-gaiad query bank balances "$pool_address" | jq
+gaiad query bank balances "$pool_address" --node "$GAIA_NODE" --output json | jq
 
 echo "-------------------------- query pool info by -------------------------------------"
 query="$(printf '{"pool_info": {"pool_addr": "%s"}}' "$pool_address")"
 echo "pool_info is: "
 neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq
+
 
 echo "--------------------------collect withdraw -------------------------------------"
 # era_collect_withdraw_msg round 1
@@ -494,6 +531,11 @@ for i in $(seq 10); do
 done
 echo " done"
 
+query="$(printf '{"pool_info": {"pool_addr": "%s"}}' "$pool_address")"
+echo "pool_info is: "
+echo "$query"
+neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq
+
 echo "-------------------------- era restake-------------------------------------"
 era_restake_msg=$(printf '{
   "era_restake": {
@@ -520,8 +562,12 @@ for i in $(seq 10); do
 done
 echo " done"
 
-echo "-------------------------- query pool atom balances by cli -------------------------------------"
-gaiad query bank balances "$pool_address" | jq
+gaiad query bank balances "$pool_address" --node "$GAIA_NODE" --output json | jq
+
+query="$(printf '{"pool_info": {"pool_addr": "%s"}}' "$pool_address")"
+echo "pool_info is: "
+echo "$query"
+neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq
 
 echo "--------------------------era active-------------------------------------"
 # era_active_msg round 1
@@ -550,20 +596,19 @@ for i in $(seq 10); do
 done
 echo " done"
 
-echo "-------------------------- query pool info -------------------------------------"
-query="{\"pool_info\":{\"pool_addr\":\"$pool_address\"}}"
-query_b64_urlenc="$(echo -n "$query" | base64 | tr -d '\n' | jq -sRr '@uri')"
-url="http://127.0.0.1:1317/wasm/contract/$contract_address/smart/$query_b64_urlenc?encoding=base64"
-pool_info=$(curl -s "$url" | jq -r '.result.smart' | base64 -d | jq)
-echo "pool_info is: $pool_info"
+query="$(printf '{"pool_info": {"pool_addr": "%s"}}' "$pool_address")"
+echo "pool_info is: "
+echo "$query"
+neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq
 
 echo "-------------------------- query pool delegations -------------------------------------"
 query="$(printf '{"delegations": {"pool_addr": "%s"}}' "$pool_address")"
 echo "the query is $query"
 neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq
 
-# todo: Only one validator on the local cosmos hub test network is not good for testing, and the neutron online test network will be tested later
-# echo "-------------------------- query pool delegations -------------------------------------"
+# withdraw_addr="cosmos10h9stc5v6ntgeygf5xf945njqq5h32r53uquvw"query_id=3
+echo "---------------------------------------------------------------"
+
 # echo "testnet add validator should success, localdev should Failed"
 # pool_add_validator_msg=$(printf '{
 #   "pool_add_validator": {
@@ -583,21 +628,27 @@ neutrond query wasm contract-state smart "$contract_address" "$query" --node "$N
 #     echo "Failed to pool_add_validator msg: $(echo "$tx_result" | jq '.raw_log')" && exit 1
 # fi
 
-# echo "Waiting 10 seconds for pool_add_validator (sometimes it takes a lot of time)…"
-# # shellcheck disable=SC2034
-# for i in $(seq 5); do
-#     sleep 1
-#     echo -n .
-# done
-# echo " done"
+echo "Waiting 10 seconds for pool_add_validator (sometimes it takes a lot of time)…"
+# shellcheck disable=SC2034
+for i in $(seq 5); do
+    sleep 1
+    echo -n .
+done
+echo " done"
 
-# echo "rm validator should success"
-# pool_rm_validator_msg=$(printf '{
-#   "pool_rm_validator": {
-#     "pool_addr": "%s",
-#     "validator_addr": "cosmosvaloper18ruzecmqj9pv8ac0gvkgryuc7u004te9rh7w5s"
-#   }
-# }' "$pool_address")
+query="{\"pool_info\":{\"pool_addr\":\"$pool_address\"}}"
+query_b64_urlenc="$(echo -n "$query" | base64 | tr -d '\n' | jq -sRr '@uri')"
+url="http://127.0.0.1:1317/wasm/contract/$contract_address/smart/$query_b64_urlenc?encoding=base64"
+pool_info=$(curl -s "$url" | jq -r '.result.smart' | base64 -d | jq)
+echo "pool_info is: $pool_info"
+
+echo "rm validator should success"
+pool_rm_validator_msg=$(printf '{
+  "pool_rm_validator": {
+    "pool_addr": "%s",
+    "validator_addr": "cosmosvaloper18ruzecmqj9pv8ac0gvkgryuc7u004te9rh7w5s"
+  }
+}' "$pool_address")
 
 # tx_result="$(neutrond tx wasm execute "$contract_address" "$pool_rm_validator_msg" \
 #     --amount 2000000untrn \
@@ -610,21 +661,27 @@ neutrond query wasm contract-state smart "$contract_address" "$query" --node "$N
 #     echo "Failed to pool_rm_validator_msg msg: $(echo "$tx_result" | jq '.raw_log')" && exit 1
 # fi
 
-# echo "Waiting 10 seconds for pool_rm_validator_msg (sometimes it takes a lot of time)…"
-# # shellcheck disable=SC2034
-# for i in $(seq 5); do
-#     sleep 1
-#     echo -n .
-# done
-# echo " done"
+echo "Waiting 10 seconds for pool_rm_validator_msg (sometimes it takes a lot of time)…"
+# shellcheck disable=SC2034
+for i in $(seq 5); do
+    sleep 1
+    echo -n .
+done
+echo " done"
 
-# echo "add validator should Failed"
-# pool_add_validator_msg=$(printf '{
-#   "pool_add_validator": {
-#     "pool_addr": "%s",
-#     "validator_addrs": ["cosmosvaloper18ruzecmqj9pv8ac0gvkgryuc7u004te9rh7w5s"]
-#   }
-# }' "$pool_address")
+query="{\"pool_info\":{\"pool_addr\":\"$pool_address\"}}"
+query_b64_urlenc="$(echo -n "$query" | base64 | tr -d '\n' | jq -sRr '@uri')"
+url="http://127.0.0.1:1317/wasm/contract/$contract_address/smart/$query_b64_urlenc?encoding=base64"
+pool_info=$(curl -s "$url" | jq -r '.result.smart' | base64 -d | jq)
+echo "pool_info is: $pool_info"
+
+echo "add validator should Failed"
+pool_add_validator_msg=$(printf '{
+  "pool_add_validator": {
+    "pool_addr": "%s",
+    "validator_addrs": ["cosmosvaloper18ruzecmqj9pv8ac0gvkgryuc7u004te9rh7w5s"]
+  }
+}' "$pool_address")
 
 # tx_result="$(neutrond tx wasm execute "$contract_address" "$pool_add_validator_msg" \
 #     --amount 2000000untrn \
@@ -637,10 +694,16 @@ neutrond query wasm contract-state smart "$contract_address" "$query" --node "$N
 #     echo "Failed to pool_add_validator msg: $(echo "$tx_result" | jq '.raw_log')" && exit 1
 # fi
 
-# echo "Waiting 10 seconds for pool_add_validator (sometimes it takes a lot of time)…"
-# # shellcheck disable=SC2034
-# for i in $(seq 5); do
-#     sleep 1
-#     echo -n .
-# done
-# echo " done"
+echo "Waiting 10 seconds for pool_add_validator (sometimes it takes a lot of time)…"
+# shellcheck disable=SC2034
+for i in $(seq 5); do
+    sleep 1
+    echo -n .
+done
+echo " done"
+
+query="{\"pool_info\":{\"pool_addr\":\"$pool_address\"}}"
+query_b64_urlenc="$(echo -n "$query" | base64 | tr -d '\n' | jq -sRr '@uri')"
+url="http://127.0.0.1:1317/wasm/contract/$contract_address/smart/$query_b64_urlenc?encoding=base64"
+pool_info=$(curl -s "$url" | jq -r '.result.smart' | base64 -d | jq)
+echo "pool_info is: $pool_info"
