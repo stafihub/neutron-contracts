@@ -156,8 +156,8 @@ echo " done"
 query='{"interchain_account_address_from_contract":{"interchain_account_id":"test1"}}'
 echo "info of pool ica id is: "
 neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq
-pool_address=$(neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq ".data" | jq '.[0].ica_addr' | sed  's/\"//g' )
-withdraw_addr=$(neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq ".data" | jq '.[1].ica_addr'| sed  's/\"//g' )
+pool_address=$(neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq ".data" | jq '.[0].ica_addr' | sed 's/\"//g')
+withdraw_addr=$(neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq ".data" | jq '.[1].ica_addr' | sed 's/\"//g')
 
 # pool_address=$(curl -s "$url" | jq -r '.result.smart' | base64 -d | jq -r '.[0].ica_addr')
 # withdraw_addr=$(curl -s "$url" | jq -r '.result.smart' | base64 -d | jq -r '.[1].ica_addr')
@@ -173,7 +173,6 @@ code_id="$(neutrond tx wasm store "$RTOKEN_CONTRACT_PATH" \
     --node "$NEUTRON_NODE" |
     wait_tx | jq -r '.logs[0].events[] | select(.type == "store_code").attributes[] | select(.key == "code_id").value')"
 echo "lsd token Code ID: $code_id"
-
 
 echo "-------------------------- update lsd token code id-------------------------------------"
 
@@ -205,7 +204,7 @@ msg=$(printf '{
     "active": "0",
     "bond": "0",
     "ibc_denom": "ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2",
-    "channel_id_of_ibc_denom": "ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2",
+    "channel_id_of_ibc_denom": "channel-0",
     "remote_denom": "uatom",
     "validator_addrs": ["cosmosvaloper18hl5c9xn5dze2g50uaw0l2mr02ew57zk0auktn"],
     "era": 1,
@@ -243,7 +242,7 @@ query="$(printf '{"pool_info": {"pool_addr": "%s"}}' "$pool_address")"
 echo "pool_info is: "
 echo "$query"
 neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq
-rtoken_contract_address=$(neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq .data.lsd_token | sed  's/\"//g')
+rtoken_contract_address=$(neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq .data.lsd_token | sed 's/\"//g')
 echo "rtoken_contract_address: $rtoken_contract_address"
 
 echo "-------------------------- config pool -------------------------------------"
