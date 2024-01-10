@@ -41,8 +41,8 @@ pub fn execute_init_pool(
 
     deps.as_ref().api.debug(
         format!(
-            "WASMDEBUG: execute_init_pool get_ica delegator: {:?}, connection_id: {:?}",
-            pool_ica_info.ica_addr, pool_ica_info.ctrl_connection_id
+            "WASMDEBUG: execute_init_pool pool_ica_info: {:?}",
+            pool_ica_info
         )
         .as_str(),
     );
@@ -63,14 +63,20 @@ pub fn execute_init_pool(
 
     // create lsd token
     let code_id = LSD_TOKEN_CODE_ID.load(deps.storage)?;
-    let salt = pool_ica_info.ica_addr.clone();
+    let salt = &pool_ica_info.ica_addr.clone()[..40];
 
     let code_info = deps.querier.query_wasm_code_info(code_id)?;
     let creator_cannonical = deps.api.addr_canonicalize(env.contract.address.as_str())?;
 
     let i2_address =
-        instantiate2_address(&code_info.checksum, &creator_cannonical, salt.as_bytes())
-            .map_err(|_| NeutronError::Std(StdError::generic_err("instantiate2_address failed")))?;
+        instantiate2_address(&code_info.checksum, &creator_cannonical, salt.as_bytes()).map_err(
+            |e| {
+                NeutronError::Std(StdError::generic_err(format!(
+                    "instantiate2_address failed, err: {}",
+                    e
+                )))
+            },
+        )?;
 
     let contract_addr = deps
         .api
@@ -193,7 +199,7 @@ pub fn execute_init_pool(
     }
 
     let cosmos_msg = NeutronMsg::submit_tx(
-        pool_ica_info.ctrl_channel_id.clone(),
+        pool_ica_info.ctrl_connection_id.clone(),
         param.interchain_account_id.clone(),
         vec![ProtobufAny {
             type_url: "/cosmos.distribution.v1beta1.MsgSetWithdrawAddress".to_string(),

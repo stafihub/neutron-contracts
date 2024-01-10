@@ -18,7 +18,8 @@ CHAIN_ID_1="test-1"
 CHAIN_ID_2="test-2"
 #NEUTRON_DIR="${NEUTRON_DIR:-/var/lib/docker/volumes/neutron-testing-data/_data}"
 #HOME_1="${NEUTRON_DIR}/test-1/"
-NEUTRON_DIR="${NEUTRON_DIR:-/Users/wang/OrbStack/docker/volumes}"
+NEUTRON_DIR="${NEUTRON_DIR:-/Users/tpkeeper/OrbStack/docker/volumes}"
+echo $NEUTRON_DIR
 HOME_1="${NEUTRON_DIR}/neutron-testing-data/test-1/"
 HOME_2="${NEUTRON_DIR}/neutron-testing-data/test-2/"
 NEUTRON_NODE="tcp://127.0.0.1:26657"
@@ -39,7 +40,7 @@ wait_tx() {
             echo "tx $txhash still not included in block" 1>&2
             exit 1
         }
-        sleep 0.1
+        sleep 0.5
     done
 }
 
@@ -53,7 +54,7 @@ wait_tx_gaia() {
             echo "tx $txhash still not included in block" 1>&2
             exit 1
         }
-        sleep 0.1
+        sleep 0.5
     done
 }
 
@@ -85,19 +86,47 @@ if [[ "$code" -ne 0 ]]; then
 fi
 echo "Sent money to contract to pay fees"
 
+
+msg=$(printf '{
+  "config_stack": {
+    "add_operator": "%s"
+  }
+}' "$ADDRESS_1")
+
+# echo "the msg is: $msg"
+tx_result="$(neutrond tx wasm execute "$contract_address" "$msg" \
+    --amount 2000000untrn \
+    --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
+    --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \
+    --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"
+
+code="$(echo "$tx_result" | jq '.code')"
+if [[ "$code" -ne 0 ]]; then
+    echo "Failed to config stack: $(echo "$tx_result" | jq '.raw_log')" && exit 1
+fi
+
+echo "Waiting 10 seconds for config stack (sometimes it takes a lot of time)…"
+# shellcheck disable=SC2034
+for i in $(seq 10); do
+    sleep 1
+    echo -n .
+done
+echo " done"
+
+
 msg='{"register_pool":{
   "connection_id": "connection-0",
   "interchain_account_id": "test1",
   "register_fee":[
     {
         "denom":"untrn",
-        "amount": "300000000"
+        "amount": "30000000"
     }
   ]
 }}'
 
 tx_result="$(neutrond tx wasm execute "$contract_address" "$msg" \
-    --amount 300000untrn \
+    --amount 300000000untrn \
     --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
     --broadcast-mode=sync --gas-prices 0.0055untrn --gas 2000000 \
     --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"
@@ -108,6 +137,7 @@ if [[ "$code" -ne 0 ]]; then
 fi
 
 echo "Waiting 10 seconds for interchain account (sometimes it takes a lot of time)…"
+
 # shellcheck disable=SC2034
 for i in $(seq 10); do
     sleep 1
@@ -115,12 +145,19 @@ for i in $(seq 10); do
 done
 echo " done"
 
+# query_b64_urlenc="$(echo -n "$query" | base64 | tr -d '\n' | jq -sRr '@uri')"
+# url="http://127.0.0.1:1317/wasm/contract/$contract_address/smart/$query_b64_urlenc?encoding=base64"
+# echo "interchain_account_address_from_contract query url is: $url"
+
 query='{"interchain_account_address_from_contract":{"interchain_account_id":"test1"}}'
-query_b64_urlenc="$(echo -n "$query" | base64 | tr -d '\n' | jq -sRr '@uri')"
-url="http://127.0.0.1:1317/wasm/contract/$contract_address/smart/$query_b64_urlenc?encoding=base64"
-echo "interchain_account_address_from_contract query url is: $url"
-pool_address=$(curl -s "$url" | jq -r '.result.smart' | base64 -d | jq -r '.[0].ica_addr')
-withdraw_addr=$(curl -s "$url" | jq -r '.result.smart' | base64 -d | jq -r '.[1].ica_addr')
+echo "pool_info is: "
+echo "$query"
+neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq
+pool_address=$(neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq ".data" | jq '.[0].ica_addr' | sed  's/\"//g' )
+withdraw_addr=$(neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq ".data" | jq '.[1].ica_addr'| sed  's/\"//g' )
+
+# pool_address=$(curl -s "$url" | jq -r '.result.smart' | base64 -d | jq -r '.[0].ica_addr')
+# withdraw_addr=$(curl -s "$url" | jq -r '.result.smart' | base64 -d | jq -r '.[1].ica_addr')
 echo "ICA(Pool) address: $pool_address"
 echo "withdraw_addr: $withdraw_addr"
 
@@ -182,9 +219,10 @@ msg=$(printf '{
     "validator_addrs": ["cosmosvaloper18hl5c9xn5dze2g50uaw0l2mr02ew57zk0auktn"],
     "era": 1,
     "platform_fee_receiver": "%s",
+    "total_platform_fee": "0",
     "rate": "1000000",
-    "lsd_token_name": "1000000",
-    "lsd_token_symbol": "1000000",
+    "lsd_token_name": "lsdTokenNameX",
+    "lsd_token_symbol": "symbolX",
     "share_tokens": []
   }
 }' "$ADDRESS_1")
@@ -212,8 +250,9 @@ echo " done"
 
 query="$(printf '{"pool_info": {"pool_addr": "%s"}}' "$pool_address")"
 echo "pool_info is: "
+echo "$query"
 neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq
-rtoken_contract_address=$(neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq .lsd_token)
+rtoken_contract_address=$(neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq .data.lsd_token)
 
 msg=$(printf '{
   "config_pool": {
@@ -253,6 +292,10 @@ for i in $(seq 10); do
     echo -n .
 done
 echo " done"
+
+query="$(printf '{"pool_info": {"pool_addr": "%s"}}' "$pool_address")"
+echo "pool_info is: "
+neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq
 
 msg=$(
     cat <<EOF
