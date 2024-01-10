@@ -208,7 +208,7 @@ pub fn execute(
         ExecuteMsg::EraRestake { pool_addr } => execute_era_restake(deps, env, pool_addr),
         ExecuteMsg::EraActive { pool_addr } => execute_era_active(deps, pool_addr),
         ExecuteMsg::UpdateLsdTokenCodeId { code_id } => {
-            execute_update_lsd_token_code_id(deps, code_id)
+            execute_update_lsd_token_code_id(deps,info, code_id)
         }
         ExecuteMsg::StakeLsm {
             neutron_address,
