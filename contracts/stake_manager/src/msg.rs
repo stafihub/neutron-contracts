@@ -146,6 +146,9 @@ pub enum ExecuteMsg {
         old_validator: String,
         new_validator: String,
     },
+    PoolUpdateDelegationsQuery{
+        pool_addr: String,
+    },
     EraUpdate {
         pool_addr: String,
     },
