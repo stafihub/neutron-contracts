@@ -157,7 +157,7 @@ withdraw_addr=$(neutrond query wasm contract-state smart "$contract_address" "$q
 echo "ICA(Pool) address: $pool_address"
 echo "withdraw_addr: $withdraw_addr"
 
-echo "--------------------------depoly lsd token -------------------------------------"
+echo "--------------------------store lsd token -------------------------------------"
 
 code_id="$(neutrond tx wasm store "$RTOKEN_CONTRACT_PATH" \
     --from "$ADDRESS_1" --gas 50000000 --chain-id "$CHAIN_ID_1" \
@@ -194,7 +194,7 @@ msg=$(printf '{
     "unbond": "0",
     "active": "0",
     "bond": "0",
-    "ibc_denom": "ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2",
+    "ibc_denom": "ibc/9117A26BA81E29FA4F78F57DC2BD90CD3D26848101BA880445F119B22A1E254E",
     "channel_id_of_ibc_denom": "channel-0",
     "remote_denom": "uatom",
     "validator_addrs": ["cosmosvaloper18hl5c9xn5dze2g50uaw0l2mr02ew57zk0auktn"],

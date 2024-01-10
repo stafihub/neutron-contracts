@@ -97,6 +97,8 @@ pub fn instantiate(
     _info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
+    deps.as_ref().api.debug(format!("WASMDEBUG: rtoken instantiate msg is {:?}", msg).as_str());
+
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     // check valid token info
     msg.validate()?;
