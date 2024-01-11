@@ -33,14 +33,6 @@ EOF
     fi
     echo "$tx_hash"
 
-    echo "Waiting 10 seconds for rtoken mint (sometimes it takes a lot of time)…"
-    # shellcheck disable=SC2034
-    for i in $(seq 10); do
-        sleep 1
-        echo -n .
-    done
-    echo " done"
-
     query="$(printf '{"balance": {"address": "%s"}}' "$ADDRESS_1")"
     neutrond query wasm contract-state smart "$rtoken_contract_address" "$query" --output json | jq
 
@@ -62,13 +54,10 @@ user_allowance() {
         --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \
         --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"
 
-    echo "Waiting 10 seconds for rtoken allow msg (sometimes it takes a lot of time)…"
-    # shellcheck disable=SC2034
-    for i in $(seq 10); do
-        sleep 1
-        echo -n .
-    done
-    echo " done"
+    code="$(echo "$tx_result" | jq '.code')"
+    if [[ "$code" -ne 0 ]]; then
+        echo "Failed to unstake msg: $(echo "$tx_result" | jq '.raw_log')" && exit 1
+    fi
 }
 
 user_unstake() {
@@ -90,14 +79,6 @@ user_unstake() {
         echo "Failed to unstake msg: $(echo "$tx_result" | jq '.raw_log')" && exit 1
     fi
 
-    echo "Waiting 10 seconds for unstake (sometimes it takes a lot of time)…"
-    # shellcheck disable=SC2034
-    for i in $(seq 10); do
-        sleep 1
-        echo -n .
-    done
-    echo " done"
-
     query="$(printf '{"balance": {"address": "%s"}}' "$ADDRESS_1")"
     neutrond query wasm contract-state smart "$rtoken_contract_address" "$query" --output json | jq
     echo "---------------------------------------------------------------"
@@ -106,9 +87,6 @@ user_unstake() {
     echo "pool_info is: "
     echo "$query"
     neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq
-
-    echo "DelegatorWithdrawAddress Query"
-    grpcurl -plaintext -d "{\"delegator_address\":\"$pool_address\"}" localhost:9090 cosmos.distribution.v1beta1.Query/DelegatorWithdrawAddress | jq
 
     echo "contract_address balance Query"
     neutrond query bank balances "$contract_address" --node "$NEUTRON_NODE" --output json | jq

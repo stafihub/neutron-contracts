@@ -29,14 +29,6 @@ use crate::{
     execute_era_update::sudo_era_update_failed_callback,
 };
 
-// Default timeout for IbcTransfer is 10000000 blocks
-pub const DEFAULT_TIMEOUT_HEIGHT: u64 = 10000000;
-
-// Default timeout for SubmitTX is two weeks
-pub const DEFAULT_TIMEOUT_SECONDS: u64 = 60 * 60 * 24 * 7 * 2;
-
-pub const DEFAULT_UPDATE_PERIOD: u64 = 6;
-
 // saves payload to process later to the storage and returns a SubmitTX Cosmos SubMsg with necessary reply id
 pub fn msg_with_sudo_callback<C: Into<CosmosMsg<T>>, T>(
     deps: DepsMut<NeutronQuery>,
