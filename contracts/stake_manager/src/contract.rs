@@ -263,8 +263,6 @@ pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> StdResult<Response> {
         ),
 
         _ => {
-            deps.api
-                .debug(format!("WASMDEBUG: sudo: other received: {:?}", msg).as_str());
             Ok(Response::default())
         }
     }
