@@ -157,3 +157,95 @@ user_withdraw() {
     echo "pool_address balance Query"
     gaiad query bank balances "$pool_address" --node "$GAIA_NODE" --output json | jq
 }
+
+user_stake_lsm() {
+    echo "--------------------------user stake lsm-------------------------------------"
+    tx_result=$(gaiad tx staking delegate "$VALIDATOR" 10000uatom \
+        --gas auto --gas-adjustment 1.4 \
+        --fees 10000uatom --from $ADDRESS_2 \
+        --keyring-backend=test --home="$HOME_2" \
+        --chain-id="$CHAIN_ID_2" --node "$GAIA_NODE" \
+        -y --output json | wait_tx_gaia)
+
+    code="$(echo "$tx_result" | jq '.code')"
+    tx_hash="$(echo "$tx_result" | jq '.txhash')"
+    if [[ "$code" -ne 0 ]]; then
+        echo "Failed to send ibc hook to contract: $(echo "$tx_result" | jq '.raw_log')" && exit 1
+    fi
+    echo "$tx_hash"
+
+    echo "Waiting 5 seconds for delegate  (sometimes it takes a lot of time)…"
+    # shellcheck disable=SC2034
+    for i in $(seq 5); do
+        sleep 1
+        echo -n .
+    done
+    echo " done"
+
+    tx_result=$(gaiad tx staking tokenize-share "$VALIDATOR" 6000uatom "$ADDRESS_2" \
+        --gas auto --gas-adjustment 1.4 \
+        --fees 10000uatom --from $ADDRESS_2 \
+        --keyring-backend=test --home="$HOME_2" \
+        --chain-id="$CHAIN_ID_2" --node "$GAIA_NODE" \
+        -y --output json | wait_tx_gaia)
+    code="$(echo "$tx_result" | jq '.code')"
+    tx_hash="$(echo "$tx_result" | jq '.txhash')"
+    if [[ "$code" -ne 0 ]]; then
+        echo "Failed to send ibc hook to contract: $(echo "$tx_result" | jq '.raw_log')" && exit 1
+    fi
+    echo "$tx_hash"
+
+    echo "Waiting 5 seconds for tokenize  (sometimes it takes a lot of time)…"
+    # shellcheck disable=SC2034
+    for i in $(seq 5); do
+        sleep 1
+        echo -n .
+    done
+    echo " done"
+
+    share_token_denom=$(gaiad q bank balances $ADDRESS_2 --output json | jq ".balances[0].denom" | sed 's/\"//g')
+    share_token_amount=$(gaiad q bank balances $ADDRESS_2 --output json | jq ".balances[0].amount" | sed 's/\"//g')
+
+    msg=$(
+        cat <<EOF
+{
+    "wasm": {
+        "contract": "$contract_address",
+        "msg": {
+            "stake_lsm": {
+                "neutron_address": "$ADDRESS_1",
+                "pool_addr": "$pool_address"
+            }
+        }
+    }
+}
+EOF
+    )
+    tx_result=$(gaiad tx ibc-transfer transfer transfer channel-0 \
+        "$contract_address" $share_token_amount$share_token_denom \
+        --memo "$msg" \
+        --gas auto --gas-adjustment 1.4 \
+        --fees 1000uatom --from $ADDRESS_2 \
+        --keyring-backend=test --home="$HOME_2" \
+        --chain-id="$CHAIN_ID_2" --node "$GAIA_NODE" \
+        -y --output json | wait_tx_gaia)
+
+    #echo "$tx_result" | jq .
+    code="$(echo "$tx_result" | jq '.code')"
+    tx_hash="$(echo "$tx_result" | jq '.txhash')"
+    if [[ "$code" -ne 0 ]]; then
+        echo "Failed to send ibc hook to contract: $(echo "$tx_result" | jq '.raw_log')" && exit 1
+    fi
+    echo "$tx_hash"
+
+    echo "Waiting 10 seconds for rtoken mint (sometimes it takes a lot of time)…"
+    # shellcheck disable=SC2034
+    for i in $(seq 10); do
+        sleep 1
+        echo -n .
+    done
+    echo " done"
+
+    query="$(printf '{"balance": {"address": "%s"}}' "$ADDRESS_1")"
+    neutrond query wasm contract-state smart "$rtoken_contract_address" "$query" --output json | jq
+}

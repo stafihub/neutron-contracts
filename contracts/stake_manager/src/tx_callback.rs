@@ -168,7 +168,7 @@ fn sudo_failed_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Respon
         TxType::EraRestake => sudo_era_restake_failed_callback(deps, payload),
         TxType::UserWithdraw => sudo_withdraw_failed_callback(deps, payload),
         TxType::UpdateValidators => sudo_update_validators_failed_callback(deps, payload),
-        TxType::StakeLsm => sudo_stake_lsm_failed_callback(payload),
+        TxType::StakeLsm => sudo_stake_lsm_failed_callback(deps, payload),
         TxType::RedeemTokenForShare => sudo_redeem_token_for_share_failed_callback(deps, payload),
 
         _ => Ok(Response::new()),

@@ -44,6 +44,9 @@ pub fn execute_stake_lsm(
             "Era process not end",
         )));
     }
+    deps.as_ref()
+        .api
+        .debug(format!("WASMDEBUG: pool_info {:?}", pool_info).as_str());
 
     let (pool_ica_info, _, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
     if pool_info.paused {
@@ -55,6 +58,10 @@ pub fn execute_stake_lsm(
             "funds not match"
         ))));
     }
+
+    deps.as_ref()
+        .api
+        .debug(format!("WASMDEBUG: funds {:?}", info.funds[0]).as_str());
     let share_token_amount = info.funds[0].amount;
     if share_token_amount < pool_info.minimal_stake {
         return Err(NeutronError::Std(StdError::generic_err(
@@ -66,9 +73,15 @@ pub fn execute_stake_lsm(
     if denom_parts.len() != 2 {
         return Err(NeutronError::Std(StdError::generic_err("denom not match")));
     }
+    deps.as_ref()
+        .api
+        .debug(format!("WASMDEBUG: denom_parts {:?}", denom_parts).as_str());
 
     let denom_hash = denom_parts.get(1).unwrap();
     let denom_trace = query_denom_trace(deps.as_ref(), denom_hash.to_string())?;
+    deps.as_ref()
+        .api
+        .debug(format!("WASMDEBUG: denom_trace {:?}", denom_trace).as_str());
 
     let share_token_ibc_denom = info.funds[0].denom.to_string();
     let share_token_denom = denom_trace.denom_trace.base_denom;
@@ -90,7 +103,7 @@ pub fn execute_stake_lsm(
             "denom trace not match",
         )));
     }
-    let channel_id_of_share_token = denom_trace_parts.get(1).unwrap();
+    let channel_id_of_share_token = path_parts.get(1).unwrap();
     let validator_addr = denom_trace_parts.get(0).unwrap();
     if !pool_info.validator_addrs.contains(validator_addr) {
         return Err(NeutronError::Std(StdError::generic_err(
@@ -98,6 +111,10 @@ pub fn execute_stake_lsm(
         )));
     }
     let validators = query_validator_by_addr(deps.as_ref(), pool_addr.clone())?;
+    deps.as_ref()
+        .api
+        .debug(format!("WASMDEBUG: validators {:?}", validators).as_str());
+
     let sub_msg;
     if let Some(validator) = validators
         .validator
@@ -106,11 +123,17 @@ pub fn execute_stake_lsm(
         .find(|val| val.operator_address == validator_addr.to_string())
     {
         let val_token_amount = Uint128::from_str(&validator.tokens)?;
-        let val_share_amount = Uint128::from_str(&validator.delegator_shares)?;
+        let val_share_amount = Uint128::from_str(&validator.delegator_shares)?
+            .div(Uint128::from(1_000_000_000_000_000_000u128));
 
         let token_amount = share_token_amount
             .mul(val_token_amount)
             .div(val_share_amount);
+        if token_amount.is_zero() {
+            return Err(NeutronError::Std(StdError::generic_err(
+                "token amount zero",
+            )));
+        }
 
         let fee: neutron_sdk::bindings::msg::IbcFee =
             min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
@@ -150,6 +173,9 @@ pub fn execute_stake_lsm(
             },
         )?;
     } else {
+        deps.as_ref()
+            .api
+            .debug(format!("WASMDEBUG: no validator info").as_str());
         return Err(NeutronError::Std(StdError::generic_err(
             "no validator info",
         )));
@@ -159,6 +185,9 @@ pub fn execute_stake_lsm(
 }
 
 pub fn sudo_stake_lsm_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
+    deps.as_ref()
+        .api
+        .debug(format!("WASMDEBUG: sudo_stake_lsm_callback payload {:?}", payload).as_str());
     let parts: Vec<String> = payload.message.split('_').map(String::from).collect();
     if parts.len() != 5 {
         return Err(StdError::generic_err(format!(
@@ -221,7 +250,15 @@ pub fn sudo_stake_lsm_callback(deps: DepsMut, payload: SudoPayload) -> StdResult
     Ok(Response::new().add_message(msg))
 }
 
-pub fn sudo_stake_lsm_failed_callback(payload: SudoPayload) -> StdResult<Response> {
+pub fn sudo_stake_lsm_failed_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
+    deps.as_ref().api.debug(
+        format!(
+            "WASMDEBUG: sudo_stake_lsm_failed_callback payload {:?}",
+            payload
+        )
+        .as_str(),
+    );
+
     let parts: Vec<String> = payload.message.split('_').map(String::from).collect();
     if parts.len() != 5 {
         return Err(StdError::generic_err(format!(
