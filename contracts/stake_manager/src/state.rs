@@ -85,10 +85,9 @@ pub enum EraProcessStatus {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum ValidatorUpdateStatus {
-    Pending,
+    Start,
     WaitQueryUpdate,
-    Success,
-    Failed,
+    End,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -212,7 +211,8 @@ pub fn get_next_query_reply_id(store: &mut dyn Storage) -> StdResult<u64> {
 #[serde(rename_all = "snake_case")]
 pub enum TxType {
     SetWithdrawAddr,
-    UpdateValidators,
+    UpdateValidator,
+    RmValidator,
     AddValidator,
     UserWithdraw,
     EraUpdate,

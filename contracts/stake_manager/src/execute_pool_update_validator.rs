@@ -44,8 +44,18 @@ pub fn execute_pool_update_validator(
         .as_str(),
     );
 
-    if pool_info.validator_update_status == ValidatorUpdateStatus::Pending {
+    if pool_info.validator_update_status != ValidatorUpdateStatus::End {
         return Err(NeutronError::Std(StdError::generic_err("status not allow")));
+    }
+    if !pool_info.validator_addrs.contains(&old_validator) {
+        return Err(NeutronError::Std(StdError::generic_err(
+            "old valdiator not exist",
+        )));
+    }
+    if pool_info.validator_addrs.contains(&new_validator) {
+        return Err(NeutronError::Std(StdError::generic_err(
+            "new valdiator already exist",
+        )));
     }
 
     let delegations = query_delegation_by_addr(deps.as_ref(), pool_addr.clone())?;
@@ -57,10 +67,9 @@ pub fn execute_pool_update_validator(
         .as_str(),
     );
 
-    pool_info
-        .validator_addrs
-        .retain(|x| x.as_str() != old_validator);
-    pool_info.validator_addrs.push(new_validator.clone());
+    let mut new_validators = pool_info.validator_addrs.clone();
+    new_validators.retain(|x| x.as_str() != old_validator);
+    new_validators.push(new_validator.clone());
 
     let mut msgs = vec![];
 
@@ -91,35 +100,30 @@ pub fn execute_pool_update_validator(
 
     if !msgs.is_empty() {
         let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
-        let cosmos_msg = NeutronMsg::submit_tx(
-            pool_ica_info.ctrl_connection_id.clone(),
-            pool_info.ica_id.clone(),
-            msgs,
-            "".to_string(),
-            DEFAULT_TIMEOUT_SECONDS,
-            fee.clone(),
-        );
-
-        let new_validator_list_str = pool_info
-            .validator_addrs
-            .clone()
-            .iter()
-            .map(|index| index.to_string())
-            .collect::<Vec<String>>()
-            .join("_");
 
         let submsg_redelegate = msg_with_sudo_callback(
             deps.branch(),
-            cosmos_msg,
+            NeutronMsg::submit_tx(
+                pool_ica_info.ctrl_connection_id.clone(),
+                pool_info.ica_id.clone(),
+                msgs,
+                "".to_string(),
+                DEFAULT_TIMEOUT_SECONDS,
+                fee.clone(),
+            ),
             SudoPayload {
                 port_id: pool_ica_info.ctrl_port_id,
                 pool_addr: pool_ica_info.ica_addr.clone(),
-                message: new_validator_list_str,
-                tx_type: TxType::UpdateValidators,
+                message: new_validators
+                    .into_iter()
+                    .map(|index| index.to_string())
+                    .collect::<Vec<String>>()
+                    .join("_"),
+                tx_type: TxType::UpdateValidator,
             },
         )?;
 
-        pool_info.validator_update_status = ValidatorUpdateStatus::Pending;
+        pool_info.validator_update_status = ValidatorUpdateStatus::Start;
 
         resp = resp.add_submessage(submsg_redelegate)
     } else {
@@ -131,7 +135,7 @@ pub fn execute_pool_update_validator(
     Ok(resp)
 }
 
-pub fn sudo_update_validators_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
+pub fn sudo_update_validator_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
 
     let new_validators: Vec<String> = payload.message.split('_').map(String::from).collect();
@@ -144,13 +148,13 @@ pub fn sudo_update_validators_callback(deps: DepsMut, payload: SudoPayload) -> S
     Ok(Response::new())
 }
 
-pub fn sudo_update_validators_failed_callback(
+pub fn sudo_update_validator_failed_callback(
     deps: DepsMut,
     payload: SudoPayload,
 ) -> StdResult<Response> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
 
-    pool_info.validator_update_status = ValidatorUpdateStatus::Failed;
+    pool_info.validator_update_status = ValidatorUpdateStatus::End;
 
     POOLS.save(deps.storage, payload.pool_addr, &pool_info)?;
 

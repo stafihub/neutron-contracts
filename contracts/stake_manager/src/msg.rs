@@ -20,9 +20,7 @@ pub enum QueryMsg {
     PoolInfo {
         pool_addr: String,
     },
-    StackInfo{
-
-    },
+    StackInfo {},
     EraSnapshot {
         pool_addr: String,
     },
@@ -136,20 +134,20 @@ pub enum ExecuteMsg {
         receiver: Addr,
         unstake_index_list: Vec<u64>,
     },
-    PoolRmValidators {
+    PoolRmValidator {
         pool_addr: String,
         validator_addr: String,
     },
-    PoolAddValidators {
+    PoolAddValidator {
         pool_addr: String,
-        validator_addrs: Vec<String>,
+        validator_addr: String,
     },
     PoolUpdateValidator {
         pool_addr: String,
         old_validator: String,
         new_validator: String,
     },
-    PoolUpdateDelegationsQuery{
+    PoolUpdateDelegationsQuery {
         pool_addr: String,
     },
     EraUpdate {

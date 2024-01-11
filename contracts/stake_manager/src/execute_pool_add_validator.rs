@@ -23,7 +23,7 @@ pub fn execute_add_pool_validators(
     _: Env,
     info: MessageInfo,
     pool_addr: String,
-    validator_addrs: Vec<String>,
+    validator_addr: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
 
@@ -36,21 +36,19 @@ pub fn execute_add_pool_validators(
         )));
     }
 
-    if validator_addrs.len() + pool_info.validator_addrs.len() > 5 {
+    if pool_info.validator_addrs.len() >= 5 {
         return Err(NeutronError::Std(StdError::generic_err(
             "Validator addresses list must contain between 1 and 5 addresses.",
         )));
     }
-
-    let mut result = validator_addrs
-        .clone()
-        .into_iter()
-        .collect::<std::collections::HashSet<_>>();
-    result.extend(pool_info.validator_addrs.clone().into_iter());
-    pool_info.validator_addrs = result.into_iter().collect();
+    if pool_info.validator_addrs.contains(&validator_addr) {
+        return Err(NeutronError::Std(StdError::generic_err(
+            "validator already exit",
+        )));
+    }
+    pool_info.validator_addrs.push(validator_addr);
 
     // todo: remove old query wait for test in testnet Testing the network locally would cause ICQ to be completely unavailable
-
     let (pool_ica_info, _, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
 
     let register_delegation_submsg = register_query_submsg(
@@ -73,7 +71,7 @@ pub fn execute_add_pool_validators(
             DEFAULT_UPDATE_PERIOD,
         )?,
         pool_ica_info.ica_addr.clone(),
-        QueryKind::Balances,
+        QueryKind::Validators,
     )?;
 
     POOLS.save(deps.storage, pool_addr, &pool_info)?;

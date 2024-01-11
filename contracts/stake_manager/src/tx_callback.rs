@@ -1,14 +1,10 @@
-use cosmwasm_std::{
-    from_json, Binary, CosmosMsg, DepsMut, Env, Reply, Response, StdError, StdResult, SubMsg,
-};
-
-use neutron_sdk::bindings::{msg::MsgIbcTransferResponse, query::NeutronQuery};
-use neutron_sdk::sudo::msg::RequestPacket;
-
 use crate::execute_era_restake::sudo_era_restake_callback;
 use crate::execute_era_restake::sudo_era_restake_failed_callback;
+use crate::execute_pool_rm_validator::{
+    sudo_rm_validator_callback, sudo_rm_validator_failed_callback,
+};
 use crate::execute_pool_update_validator::{
-    sudo_update_validators_callback, sudo_update_validators_failed_callback,
+    sudo_update_validator_callback, sudo_update_validator_failed_callback,
 };
 use crate::execute_redeem_token_for_share::{
     sudo_redeem_token_for_share_callback, sudo_redeem_token_for_share_failed_callback,
@@ -28,6 +24,11 @@ use crate::{
     execute_era_update::sudo_era_update_callback,
     execute_era_update::sudo_era_update_failed_callback,
 };
+use cosmwasm_std::{
+    from_json, Binary, CosmosMsg, DepsMut, Env, Reply, Response, StdError, StdResult, SubMsg,
+};
+use neutron_sdk::bindings::{msg::MsgIbcTransferResponse, query::NeutronQuery};
+use neutron_sdk::sudo::msg::RequestPacket;
 
 // saves payload to process later to the storage and returns a SubmitTX Cosmos SubMsg with necessary reply id
 pub fn msg_with_sudo_callback<C: Into<CosmosMsg<T>>, T>(
@@ -144,7 +145,8 @@ fn sudo_callback(deps: DepsMut, env: Env, payload: SudoPayload) -> StdResult<Res
         TxType::EraCollectWithdraw => sudo_era_collect_withdraw_callback(deps, env, payload),
         TxType::EraRestake => sudo_era_restake_callback(deps, env, payload),
         TxType::UserWithdraw => sudo_withdraw_callback(deps, payload),
-        TxType::UpdateValidators => sudo_update_validators_callback(deps, payload),
+        TxType::UpdateValidator => sudo_update_validator_callback(deps, payload),
+        TxType::RmValidator => sudo_rm_validator_callback(deps, payload),
         TxType::StakeLsm => sudo_stake_lsm_callback(deps, payload),
         TxType::RedeemTokenForShare => sudo_redeem_token_for_share_callback(deps, payload),
 
@@ -159,7 +161,8 @@ fn sudo_failed_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Respon
         TxType::EraCollectWithdraw => sudo_era_collect_withdraw_failed_callback(deps, payload),
         TxType::EraRestake => sudo_era_restake_failed_callback(deps, payload),
         TxType::UserWithdraw => sudo_withdraw_failed_callback(deps, payload),
-        TxType::UpdateValidators => sudo_update_validators_failed_callback(deps, payload),
+        TxType::UpdateValidator => sudo_update_validator_failed_callback(deps, payload),
+        TxType::RmValidator => sudo_rm_validator_failed_callback(deps, payload),
         TxType::StakeLsm => sudo_stake_lsm_failed_callback(deps, payload),
         TxType::RedeemTokenForShare => sudo_redeem_token_for_share_failed_callback(deps, payload),
 

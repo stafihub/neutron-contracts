@@ -199,7 +199,7 @@ pub fn sudo_open_ack(
                 next_unstake_index: 0,
                 unbonding_period: 0,
                 era_process_status: EraProcessStatus::ActiveEnded,
-                validator_update_status: ValidatorUpdateStatus::Success,
+                validator_update_status: ValidatorUpdateStatus::End,
                 platform_fee_commission: Uint128::zero(),
                 total_platform_fee: Uint128::zero(),
                 unbond_commission: Uint128::zero(),

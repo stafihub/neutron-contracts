@@ -15,7 +15,7 @@ use neutron_sdk::{
 
 use crate::execute_era_update::execute_era_update;
 use crate::execute_open_channel::execute_open_channel;
-use crate::execute_pool_rm_validators::execute_rm_pool_validators;
+use crate::execute_pool_rm_validator::execute_rm_pool_validator;
 use crate::execute_pool_update_validator::execute_pool_update_validator;
 use crate::execute_register_pool::{execute_register_pool, sudo_open_ack};
 use crate::execute_stake::execute_stake;
@@ -48,7 +48,7 @@ use crate::{
 };
 use crate::{
     execute_era_restake::execute_era_restake,
-    execute_pool_add_validators::execute_add_pool_validators,
+    execute_pool_add_validator::execute_add_pool_validators,
     execute_redeem_token_for_share::execute_redeem_token_for_share, query::query_era_snapshot,
 };
 
@@ -181,14 +181,14 @@ pub fn execute(
             receiver,
             unstake_index_list,
         } => execute_withdraw(deps, env, info, pool_addr, receiver, unstake_index_list),
-        ExecuteMsg::PoolRmValidators {
+        ExecuteMsg::PoolRmValidator {
             pool_addr,
             validator_addr,
-        } => execute_rm_pool_validators(deps, env, info, pool_addr, validator_addr),
-        ExecuteMsg::PoolAddValidators {
+        } => execute_rm_pool_validator(deps, env, info, pool_addr, validator_addr),
+        ExecuteMsg::PoolAddValidator {
             pool_addr,
-            validator_addrs,
-        } => execute_add_pool_validators(deps, env, info, pool_addr, validator_addrs),
+            validator_addr,
+        } => execute_add_pool_validators(deps, env, info, pool_addr, validator_addr),
         ExecuteMsg::PoolUpdateValidator {
             pool_addr,
             old_validator,
@@ -262,8 +262,6 @@ pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> StdResult<Response> {
             counterparty_version,
         ),
 
-        _ => {
-            Ok(Response::default())
-        }
+        _ => Ok(Response::default()),
     }
 }

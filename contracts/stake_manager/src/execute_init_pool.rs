@@ -131,7 +131,7 @@ pub fn execute_init_pool(
     pool_info.lsm_support = false;
     pool_info.lsm_pending_limit = 100;
     pool_info.rate_change_limit = Uint128::new(5000);
-    pool_info.validator_update_status = ValidatorUpdateStatus::Success;
+    pool_info.validator_update_status = ValidatorUpdateStatus::End;
 
     deps.as_ref()
         .api
