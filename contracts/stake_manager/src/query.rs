@@ -146,7 +146,7 @@ pub fn query_validator_by_addr(
 
     deps.api.debug(
         format!(
-            "WASMDEBUG: query_delegation_by_addr contract_query_id is {:?} registered_query_id is: {:?} registered_query is:{:?}",
+            "WASMDEBUG: query_validator_by_addr contract_query_id is {:?} registered_query_id is: {:?} registered_query is:{:?}",
             contract_query_id, registered_query_id, registered_query
         )
             .as_str(),

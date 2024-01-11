@@ -18,7 +18,7 @@ pub mod execute_register_pool;
 pub mod execute_stake;
 pub mod execute_stake_lsm;
 pub mod execute_unstake;
-pub mod execute_update_delegations_query;
+pub mod execute_update_query;
 mod execute_update_lsd_token_code_id;
 pub mod execute_withdraw;
 

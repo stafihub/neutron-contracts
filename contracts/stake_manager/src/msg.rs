@@ -20,9 +20,7 @@ pub enum QueryMsg {
     PoolInfo {
         pool_addr: String,
     },
-    StackInfo{
-
-    },
+    StackInfo {},
     EraSnapshot {
         pool_addr: String,
     },
@@ -68,6 +66,7 @@ pub struct InitPoolParams {
     pub total_platform_fee: Uint128,
     pub platform_fee_receiver: String,
     pub share_tokens: Vec<Coin>,
+    pub lsd_code_id: Option<u64>,
     pub lsd_token_name: String,
     pub lsd_token_symbol: String,
 }
@@ -149,7 +148,7 @@ pub enum ExecuteMsg {
         old_validator: String,
         new_validator: String,
     },
-    PoolUpdateDelegationsQuery{
+    PoolUpdateQuery {
         pool_addr: String,
     },
     EraUpdate {

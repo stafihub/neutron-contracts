@@ -95,17 +95,6 @@ user_unstake() {
 user_withdraw() {
     echo "--------------------------user withdraw-------------------------------------"
 
-    tx_result=$(gaiad tx bank send $ADDRESS_2 \
-        "$pool_address" 5550000uatom \
-        --gas auto --gas-adjustment 1.4 \
-        --fees 1000uatom --from $ADDRESS_2 \
-        --keyring-backend=test --home="$HOME_2" \
-        --chain-id="$CHAIN_ID_2" --node "$GAIA_NODE" \
-        -y --output json | wait_tx_gaia)
-
-    echo "pool_address balance Query"
-    gaiad query bank balances "$pool_address" --node "$GAIA_NODE" --output json | jq
-
     withdraw_msg=$(printf '{
   "withdraw": {
     "pool_addr": "%s",

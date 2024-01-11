@@ -4,13 +4,15 @@ use crate::state::QueryKind;
 use crate::state::{ValidatorUpdateStatus, POOLS};
 use crate::{contract::DEFAULT_UPDATE_PERIOD, state::INFO_OF_ICA_ID};
 use cosmwasm_std::{DepsMut, Env, MessageInfo, Response, StdError};
-use neutron_sdk::interchain_queries::v045::new_register_delegator_delegations_query_msg;
+use neutron_sdk::interchain_queries::v045::{
+    new_register_delegator_delegations_query_msg, new_register_staking_validators_query_msg,
+};
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     NeutronError, NeutronResult,
 };
 
-pub fn execute_update_delegations_query(
+pub fn execute_update_query(
     mut deps: DepsMut<NeutronQuery>,
     _env: Env,
     info: MessageInfo,
@@ -40,9 +42,22 @@ pub fn execute_update_delegations_query(
         QueryKind::Delegations,
     )?;
 
+    let register_validator_submsg = register_query_submsg(
+        deps.branch(),
+        new_register_staking_validators_query_msg(
+            pool_ica_info.ctrl_connection_id.clone(),
+            pool_info.validator_addrs.clone(),
+            DEFAULT_UPDATE_PERIOD,
+        )?,
+        pool_ica_info.ica_addr.clone(),
+        QueryKind::Validators,
+    )?;
+
     pool_info.validator_update_status = ValidatorUpdateStatus::Success;
 
     POOLS.save(deps.storage, pool_addr, &pool_info)?;
 
-    Ok(Response::default().add_submessage(register_delegation_submsg))
+    Ok(Response::default()
+        .add_submessage(register_delegation_submsg)
+        .add_submessage(register_validator_submsg))
 }

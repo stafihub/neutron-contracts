@@ -61,8 +61,10 @@ pub fn execute_init_pool(
         return Err(NeutronError::Std(StdError::generic_err("Rate is zero")));
     }
 
-    // create lsd token
-    let code_id = LSD_TOKEN_CODE_ID.load(deps.storage)?;
+    let code_id = match param.lsd_code_id {
+        Some(lsd_code_id) => lsd_code_id,
+        None => LSD_TOKEN_CODE_ID.load(deps.storage)?,
+    };
     let salt = &pool_ica_info.ica_addr.clone()[..40];
 
     let code_info = deps.querier.query_wasm_code_info(code_id)?;
