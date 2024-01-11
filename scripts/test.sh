@@ -12,14 +12,8 @@ set -euo pipefail
 IFS=$'\n\t'
 
 # create stake-manager contract -> create rtoken contract --> send gas to stake manager -> test stake -> test unstake -> test new era
-ARCH=$(uname -m)
-CONTRACT_PATH="artifacts/stake_manager.wasm"
-RTOKEN_CONTRACT_PATH="artifacts/rtoken.wasm"
-
-if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
-    CONTRACT_PATH="artifacts/stake_manager-aarch64.wasm"
-    RTOKEN_CONTRACT_PATH="artifacts/rtoken-aarch64.wasm"
-fi
+CONTRACT_PATH="artifacts/stake_manager-aarch64.wasm"
+RTOKEN_CONTRACT_PATH="artifacts/rtoken-aarch64.wasm"
 
 CHAIN_ID_1="test-1"
 CHAIN_ID_2="test-2"

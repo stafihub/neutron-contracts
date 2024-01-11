@@ -9,7 +9,7 @@ config_pool() {
   "register_fee":[
     {
         "denom":"untrn",
-        "amount": "30000000"
+        "amount": "2500000"
     }
   ]
 }}'
@@ -125,15 +125,10 @@ config_pool() {
         echo "Failed to config pool: $(echo "$tx_result" | jq '.raw_log')" && exit 1
     fi
 
-    echo "Waiting 10 seconds for config pool (sometimes it takes a lot of time)…"
-    # shellcheck disable=SC2034
-    for i in $(seq 10); do
-        sleep 1
-        echo -n .
-    done
-    echo " done"
-
     query="$(printf '{"pool_info": {"pool_addr": "%s"}}' "$pool_address")"
     echo "pool_info after config is: "
     neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq
+
+    echo "DelegatorWithdrawAddress Query"
+    grpcurl -plaintext -d "{\"delegator_address\":\"$pool_address\"}" localhost:9090 cosmos.distribution.v1beta1.Query/DelegatorWithdrawAddress | jq
 }

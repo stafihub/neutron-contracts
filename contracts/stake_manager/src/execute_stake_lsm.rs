@@ -15,6 +15,7 @@ use neutron_sdk::{
 };
 
 use crate::{
+    contract::DEFAULT_TIMEOUT_SECONDS,
     helper::{min_ntrn_ibc_fee, query_denom_trace, CAL_BASE},
     query::query_validator_by_addr,
     state::{EraProcessStatus, SudoPayload, TxType, INFO_OF_ICA_ID, POOLS},
@@ -122,11 +123,10 @@ pub fn execute_stake_lsm(
             receiver: pool_addr.clone(),
             token: info.funds.get(0).unwrap().to_owned(),
             timeout_height: RequestPacketTimeoutHeight {
-                // todo: revision_number from param?
-                revision_number: Some(2),
-                revision_height: Some(crate::contract::DEFAULT_TIMEOUT_HEIGHT),
+                revision_number: None,
+                revision_height: None,
             },
-            timeout_timestamp: 0,
+            timeout_timestamp: env.block.time.nanos() + DEFAULT_TIMEOUT_SECONDS * 1_000_000_000,
             memo: "".to_string(),
             fee: fee.clone(),
         };

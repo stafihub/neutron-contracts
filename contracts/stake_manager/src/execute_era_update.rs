@@ -8,12 +8,12 @@ use neutron_sdk::{
     NeutronError, NeutronResult,
 };
 
-use crate::state::EraSnapshot;
 use crate::state::{
     EraProcessStatus::{ActiveEnded, EraUpdateEnded, EraUpdateStarted},
     ValidatorUpdateStatus,
 };
 use crate::state::{INFO_OF_ICA_ID, POOLS};
+use crate::{contract::DEFAULT_TIMEOUT_SECONDS, state::EraSnapshot};
 use crate::{
     helper::min_ntrn_ibc_fee,
     state::{SudoPayload, TxType},
@@ -97,11 +97,10 @@ pub fn execute_era_update(
         receiver: pool_addr.clone(),
         token: tx_coin,
         timeout_height: RequestPacketTimeoutHeight {
-            // todo: revision_number from param?
-            revision_number: Some(2),
-            revision_height: Some(crate::contract::DEFAULT_TIMEOUT_HEIGHT),
+            revision_number: None,
+            revision_height: None,
         },
-        timeout_timestamp: 0,
+        timeout_timestamp: env.block.time.nanos() + DEFAULT_TIMEOUT_SECONDS * 1_000_000_000,
         memo: "".to_string(),
         fee: fee.clone(),
     };

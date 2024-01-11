@@ -55,16 +55,12 @@ use crate::{
 // Default timeout for IbcTransfer is 10000000 blocks
 pub const DEFAULT_TIMEOUT_HEIGHT: u64 = 10000000;
 
-// Default timeout for SubmitTX is two weeks
-pub const DEFAULT_TIMEOUT_SECONDS: u64 = 60 * 60 * 24 * 7 * 2;
+// Default timeout for SubmitTX is 600s
+pub const DEFAULT_TIMEOUT_SECONDS: u64 = 60 * 10;
 
 pub const DEFAULT_UPDATE_PERIOD: u64 = 6;
 
-// config by instantiate
-// const UATOM_IBC_DENOM: &str =
-// 	"ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2";
-
-const CONTRACT_NAME: &str = concat!("crates.io:neutron-sdk__", env!("CARGO_PKG_NAME"));
+const CONTRACT_NAME: &str = env!("CARGO_PKG_NAME");
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -266,6 +262,10 @@ pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> StdResult<Response> {
             counterparty_version,
         ),
 
-        _ => Ok(Response::default()),
+        _ => {
+            deps.api
+                .debug(format!("WASMDEBUG: sudo: other received: {:?}", msg).as_str());
+            Ok(Response::default())
+        }
     }
 }

@@ -13,7 +13,7 @@ config_stack() {
 
   echo "--------------Sent money to contract to pay fees---------------------------"
 
-  tx_result="$(neutrond tx bank send demowallet1 "$contract_address" 1000000untrn \
+  tx_result="$(neutrond tx bank send demowallet1 "$contract_address" 10000000untrn \
     --chain-id "$CHAIN_ID_1" --home "$HOME_1" --node "$NEUTRON_NODE" \
     --keyring-backend=test -y --gas-prices 0.0025untrn \
     --broadcast-mode=sync --output json | wait_tx)"
@@ -42,14 +42,6 @@ config_stack() {
   if [[ "$code" -ne 0 ]]; then
     echo "Failed to config stack: $(echo "$tx_result" | jq '.raw_log')" && exit 1
   fi
-
-  echo "Waiting 10 seconds for config stack (sometimes it takes a lot of time)…"
-  # shellcheck disable=SC2034
-  for i in $(seq 10); do
-    sleep 1
-    echo -n .
-  done
-  echo " done"
 
   echo "-------------------------- update lsd token code id-------------------------------------"
 
