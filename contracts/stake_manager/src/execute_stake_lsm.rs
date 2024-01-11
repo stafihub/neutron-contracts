@@ -18,7 +18,7 @@ use crate::{
     contract::DEFAULT_TIMEOUT_SECONDS,
     helper::{min_ntrn_ibc_fee, query_denom_trace, CAL_BASE},
     query::query_validator_by_addr,
-    state::{EraProcessStatus, SudoPayload, TxType, INFO_OF_ICA_ID, POOLS},
+    state::{EraProcessStatus, SudoPayload, TxType, ValidatorUpdateStatus, INFO_OF_ICA_ID, POOLS},
     tx_callback::msg_with_sudo_callback,
 };
 
@@ -43,6 +43,11 @@ pub fn execute_stake_lsm(
     if pool_info.era_process_status != EraProcessStatus::ActiveEnded {
         return Err(NeutronError::Std(StdError::generic_err(
             "Era process not end",
+        )));
+    }
+    if pool_info.validator_update_status != ValidatorUpdateStatus::End {
+        return Err(NeutronError::Std(StdError::generic_err(
+            "Pool icq not updated",
         )));
     }
     deps.as_ref()

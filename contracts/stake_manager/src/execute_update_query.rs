@@ -12,7 +12,7 @@ use neutron_sdk::{
     NeutronError, NeutronResult,
 };
 
-pub fn execute_update_delegations_query(
+pub fn execute_update_query(
     mut deps: DepsMut<NeutronQuery>,
     _env: Env,
     info: MessageInfo,

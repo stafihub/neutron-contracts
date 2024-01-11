@@ -38,7 +38,7 @@ use crate::tx_callback::{prepare_sudo_payload, sudo_error, sudo_response, sudo_t
 use crate::{execute_config_pool::execute_config_pool, query::query_balance_by_addr};
 use crate::{
     execute_config_stack::execute_config_stack,
-    execute_update_delegations_query::execute_update_delegations_query,
+    execute_update_query::execute_update_query,
 };
 use crate::{execute_era_active::execute_era_active, query::query_delegation_by_addr};
 use crate::{execute_era_bond::execute_era_bond, query::query_stack_info};
@@ -196,8 +196,8 @@ pub fn execute(
         } => {
             execute_pool_update_validator(deps, env, info, pool_addr, old_validator, new_validator)
         }
-        ExecuteMsg::PoolUpdateDelegationsQuery { pool_addr } => {
-            execute_update_delegations_query(deps, env, info, pool_addr)
+        ExecuteMsg::PoolUpdateQuery { pool_addr } => {
+            execute_update_query(deps, env, info, pool_addr)
         }
         ExecuteMsg::EraUpdate { pool_addr } => execute_era_update(deps, env, pool_addr),
         ExecuteMsg::EraBond { pool_addr } => execute_era_bond(deps, env, pool_addr),

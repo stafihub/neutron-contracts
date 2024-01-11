@@ -49,6 +49,24 @@ pub fn execute_add_pool_validators(
     pool_info.validator_addrs.push(validator_addr);
 
     // todo: remove old query wait for test in testnet Testing the network locally would cause ICQ to be completely unavailable
+    // let old_reply_id_delegations = ADDRESS_TO_REPLY_ID.load(
+    //     deps.storage,
+    //     (pool_addr.clone(), QueryKind::Delegations.to_string()),
+    // )?;
+    // let need_rm_query_id_delegations =
+    //     REPLY_ID_TO_QUERY_ID.load(deps.storage, old_reply_id_delegations)?;
+    // let remove_icq_msg_delegations =
+    //     NeutronMsg::remove_interchain_query(need_rm_query_id_delegations);
+
+    // let old_reply_id_validators = ADDRESS_TO_REPLY_ID.load(
+    //     deps.storage,
+    //     (pool_addr.clone(), QueryKind::Validators.to_string()),
+    // )?;
+    // let need_rm_query_id_validators =
+    //     REPLY_ID_TO_QUERY_ID.load(deps.storage, old_reply_id_validators)?;
+    // let remove_icq_msg_validators =
+    //     NeutronMsg::remove_interchain_query(need_rm_query_id_validators);
+
     let (pool_ica_info, _, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
 
     let register_delegation_submsg = register_query_submsg(
@@ -60,7 +78,7 @@ pub fn execute_add_pool_validators(
             DEFAULT_UPDATE_PERIOD,
         )?,
         pool_ica_info.ica_addr.clone(),
-        QueryKind::Balances,
+        QueryKind::Delegations,
     )?;
 
     let register_validator_submsg = register_query_submsg(
@@ -77,7 +95,8 @@ pub fn execute_add_pool_validators(
     POOLS.save(deps.storage, pool_addr, &pool_info)?;
 
     Ok(Response::new()
-        // .add_message(remove_icq_msg)
+        // .add_message(remove_icq_msg_delegations)
+        // .add_message(remove_icq_msg_validators)
         .add_submessage(register_delegation_submsg)
         .add_submessage(register_validator_submsg))
 }
