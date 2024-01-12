@@ -18,13 +18,13 @@ use crate::state::{
 pub fn execute_unstake(
     deps: DepsMut<NeutronQuery>,
     info: MessageInfo,
-    rtoken_amount: Uint128,
+    lsd_token_amount: Uint128,
     pool_addr: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
-    if rtoken_amount == Uint128::zero() {
+    if lsd_token_amount == Uint128::zero() {
         return Err(NeutronError::Std(StdError::generic_err(format!(
             "Encode error: {}",
-            "rtoken amount is zero"
+            "lsd_token amount is zero"
         ))));
     }
 
@@ -58,16 +58,18 @@ pub fn execute_unstake(
 
     let mut rsp = Response::new();
     // cal fee
-    let mut will_burn_rtoken_amount = rtoken_amount;
+    let mut will_burn_lsd_token_amount = lsd_token_amount;
     if pool_info.unbond_commission > Uint128::zero() {
-        let cms_fee = rtoken_amount.mul(pool_info.unbond_commission).div(CAL_BASE);
-        will_burn_rtoken_amount = rtoken_amount.sub(cms_fee);
+        let cms_fee = lsd_token_amount
+            .mul(pool_info.unbond_commission)
+            .div(CAL_BASE);
+        will_burn_lsd_token_amount = lsd_token_amount.sub(cms_fee);
 
         if cms_fee.u128() > 0 {
             let mint_msg = WasmMsg::Execute {
                 contract_addr: pool_info.lsd_token.to_string(),
                 msg: to_json_binary(
-                    &(rtoken::msg::ExecuteMsg::TransferFrom {
+                    &(lsd_token::msg::ExecuteMsg::TransferFrom {
                         owner: info.sender.to_string(),
                         recipient: pool_info.platform_fee_receiver.to_string(),
                         amount: cms_fee,
@@ -81,20 +83,20 @@ pub fn execute_unstake(
 
         deps.as_ref().api.debug(
             format!(
-                "WASMDEBUG: execute_unstake cms_fee: {:?} rtoken_amount: {:?}",
-                cms_fee, rtoken_amount
+                "WASMDEBUG: execute_unstake cms_fee: {:?} lsd_token_amount: {:?}",
+                cms_fee, lsd_token_amount
             )
             .as_str(),
         );
     }
-    if will_burn_rtoken_amount.is_zero() {
+    if will_burn_lsd_token_amount.is_zero() {
         return Err(NeutronError::Std(StdError::generic_err(
-            "Burn rtoken amount is zero",
+            "Burn lsd_token amount is zero",
         )));
     }
 
     // Calculate the number of tokens(atom)
-    let token_amount = will_burn_rtoken_amount.mul(pool_info.rate).div(CAL_BASE);
+    let token_amount = will_burn_lsd_token_amount.mul(pool_info.rate).div(CAL_BASE);
 
     deps.as_ref().api.debug(
         format!(
@@ -113,13 +115,16 @@ pub fn execute_unstake(
     let burn_msg = WasmMsg::Execute {
         contract_addr: pool_info.lsd_token.to_string(),
         msg: to_json_binary(
-            &(rtoken::msg::ExecuteMsg::BurnFrom {
+            &(lsd_token::msg::ExecuteMsg::BurnFrom {
                 owner: info.sender.to_string(),
-                amount: will_burn_rtoken_amount,
+                amount: will_burn_lsd_token_amount,
             }),
         )?,
         funds: vec![],
     };
+    pool_info.total_lsd_token_amount = pool_info
+        .total_lsd_token_amount
+        .sub(will_burn_lsd_token_amount);
 
     // update unstake info
     let will_use_unstake_index = pool_info.next_unstake_index;
@@ -151,6 +156,6 @@ pub fn execute_unstake(
         .add_attribute("action", "unstake")
         .add_attribute("from", info.sender.to_string())
         .add_attribute("token_amount", token_amount.to_string())
-        .add_attribute("rtoken_amount", rtoken_amount.to_string())
+        .add_attribute("lsd_token_amount", lsd_token_amount.to_string())
         .add_attribute("unstake_index", will_use_unstake_index.to_string()))
 }

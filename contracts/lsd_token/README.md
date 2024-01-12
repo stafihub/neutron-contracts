@@ -29,7 +29,7 @@ Once you are happy with the content, you can compile it to wasm via:
 
 ```sh {"id":"01HJFZ3QYTBN64SW4CT5M6YNSY"}
 RUSTFLAGS='-C link-arg=-s' cargo wasm
-cp ../../target/wasm32-unknown-unknown/release/rtoken.wasm .
-ls -l rtoken.wasm
-sha256sum rtoken.wasm
+cp ../../target/wasm32-unknown-unknown/release/lsd_token.wasm .
+ls -l lsd_token.wasm
+sha256sum lsd_token.wasm
 ```

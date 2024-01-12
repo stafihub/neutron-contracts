@@ -42,22 +42,23 @@ pub fn execute_stake(
     pool_info.active = pool_info.active.add(token_amount);
     pool_info.bond = pool_info.bond.add(token_amount);
 
-    let rtoken_amount = token_amount.mul(CAL_BASE).div(pool_info.rate);
+    let lsd_token_amount = token_amount.mul(CAL_BASE).div(pool_info.rate);
 
     let msg = WasmMsg::Execute {
         contract_addr: pool_info.lsd_token.to_string(),
         msg: to_json_binary(
-            &(rtoken::msg::ExecuteMsg::Mint {
+            &(lsd_token::msg::ExecuteMsg::Mint {
                 recipient: neutron_address.to_string(),
-                amount: rtoken_amount,
+                amount: lsd_token_amount,
             }),
         )?,
         funds: vec![],
     };
+    pool_info.total_lsd_token_amount = pool_info.total_lsd_token_amount.add(lsd_token_amount);
 
     POOLS.save(deps.storage, pool_addr, &pool_info)?;
 
     Ok(Response::new()
         .add_message(CosmosMsg::Wasm(msg))
-        .add_attribute("mint", rtoken_amount.to_string()))
+        .add_attribute("mint", lsd_token_amount.to_string()))
 }

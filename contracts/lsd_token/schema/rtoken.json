@@ -1,5 +1,5 @@
 {
-  "contract_name": "rtoken",
+  "contract_name": "lsd_token",
   "contract_version": "0.1.0",
   "idl_version": "1.0.0",
   "instantiate": {

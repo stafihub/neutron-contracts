@@ -4,7 +4,7 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-CONTRACT_PATH="artifacts/rtoken.wasm"
+CONTRACT_PATH="artifacts/lsd_token.wasm"
 CHAIN_ID_1="test-1"
 NEUTRON_DIR="${NEUTRON_DIR:-/Users/wang/OrbStack/docker/volumes}"
 HOME_1="${NEUTRON_DIR}/neutron-testing-data/test-1/"

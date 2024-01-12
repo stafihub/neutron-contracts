@@ -45,6 +45,9 @@ pub fn execute_config_stack(
     if let Some(new_admin) = param.new_admin {
         stack.admin = new_admin;
     }
+    if let Some(lsd_token_code_id) = param.lsd_token_code_id {
+        stack.lsd_token_code_id = lsd_token_code_id;
+    }
 
     STACK.save(deps.storage, &stack)?;
 

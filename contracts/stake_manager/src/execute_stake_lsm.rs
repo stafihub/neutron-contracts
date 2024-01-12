@@ -230,19 +230,20 @@ pub fn sudo_stake_lsm_callback(deps: DepsMut, payload: SudoPayload) -> StdResult
     // cal
     let token_amount_use = Uint128::new(token_amount);
     pool_info.active = pool_info.active.add(token_amount_use);
-    let rtoken_amount = token_amount_use.mul(CAL_BASE).div(pool_info.rate);
+    let lsd_token_amount = token_amount_use.mul(CAL_BASE).div(pool_info.rate);
 
     // mint
     let msg = WasmMsg::Execute {
         contract_addr: pool_info.lsd_token.to_string(),
         msg: to_json_binary(
-            &(rtoken::msg::ExecuteMsg::Mint {
+            &(lsd_token::msg::ExecuteMsg::Mint {
                 recipient: staker_neutron_addr.to_string(),
-                amount: rtoken_amount,
+                amount: lsd_token_amount,
             }),
         )?,
         funds: vec![],
     };
+    pool_info.total_lsd_token_amount = pool_info.total_lsd_token_amount.add(lsd_token_amount);
 
     pool_info.share_tokens.push(Coin {
         denom: share_token_denom.to_string(),

@@ -32,15 +32,22 @@ EOF
         echo "Failed to send ibc hook to contract: $(echo "$tx_result" | jq '.raw_log')" && exit 1
     fi
     echo "$tx_hash"
+    echo "Waiting 10 seconds for stake (sometimes it takes a lot of time)…"
+    # shellcheck disable=SC2034
+    for i in $(seq 10); do
+        sleep 1
+        echo -n .
+    done
+    echo " done"
 
     query="$(printf '{"balance": {"address": "%s"}}' "$ADDRESS_1")"
-    neutrond query wasm contract-state smart "$rtoken_contract_address" "$query" --output json | jq
+    neutrond query wasm contract-state smart "$lsd_token_contract_address" "$query" --output json | jq
 
 }
 
 user_allowance() {
     echo "--------------------------user allowance-------------------------------------"
-    echo "rtoken allowance"
+    echo "lsd_token allowance"
     allow_msg=$(printf '{
   "increase_allowance": {
     "amount": "11111119999950000",
@@ -48,7 +55,7 @@ user_allowance() {
   }
 }' "$contract_address")
 
-    tx_result="$(neutrond tx wasm execute "$rtoken_contract_address" "$allow_msg" \
+    tx_result="$(neutrond tx wasm execute "$lsd_token_contract_address" "$allow_msg" \
         --amount 2000000untrn \
         --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
         --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \
@@ -80,7 +87,7 @@ user_unstake() {
     fi
 
     query="$(printf '{"balance": {"address": "%s"}}' "$ADDRESS_1")"
-    neutrond query wasm contract-state smart "$rtoken_contract_address" "$query" --output json | jq
+    neutrond query wasm contract-state smart "$lsd_token_contract_address" "$query" --output json | jq
     echo "---------------------------------------------------------------"
 
     query="$(printf '{"pool_info": {"pool_addr": "%s"}}' "$pool_address")"
@@ -205,7 +212,7 @@ EOF
     fi
     echo "$tx_hash"
 
-    echo "Waiting 10 seconds for rtoken mint (sometimes it takes a lot of time)…"
+    echo "Waiting 10 seconds for lsd_token mint (sometimes it takes a lot of time)…"
     # shellcheck disable=SC2034
     for i in $(seq 10); do
         sleep 1
@@ -214,5 +221,5 @@ EOF
     echo " done"
 
     query="$(printf '{"balance": {"address": "%s"}}' "$ADDRESS_1")"
-    neutrond query wasm contract-state smart "$rtoken_contract_address" "$query" --output json | jq
+    neutrond query wasm contract-state smart "$lsd_token_contract_address" "$query" --output json | jq
 }

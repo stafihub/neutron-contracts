@@ -21,7 +21,6 @@ use crate::execute_register_pool::{execute_register_pool, sudo_open_ack};
 use crate::execute_stake::execute_stake;
 use crate::execute_stake_lsm::execute_stake_lsm;
 use crate::execute_unstake::execute_unstake;
-use crate::execute_update_lsd_token_code_id::execute_update_lsd_token_code_id;
 use crate::execute_withdraw::execute_withdraw;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
 use crate::query::query_user_unstake_index;
@@ -37,8 +36,7 @@ use crate::state::{
 use crate::tx_callback::{prepare_sudo_payload, sudo_error, sudo_response, sudo_timeout};
 use crate::{execute_config_pool::execute_config_pool, query::query_balance_by_addr};
 use crate::{
-    execute_config_stack::execute_config_stack,
-    execute_update_query::execute_update_query,
+    execute_config_stack::execute_config_stack, execute_update_query::execute_update_query,
 };
 use crate::{execute_era_active::execute_era_active, query::query_delegation_by_addr};
 use crate::{execute_era_bond::execute_era_bond, query::query_stack_info};
@@ -81,6 +79,7 @@ pub fn instantiate(
             total_stack_fee: Uint128::zero(),
             operators: vec![],
             pools: vec![],
+            lsd_token_code_id: 0,
         }),
     )?;
 
@@ -206,9 +205,6 @@ pub fn execute(
         }
         ExecuteMsg::EraRestake { pool_addr } => execute_era_restake(deps, env, pool_addr),
         ExecuteMsg::EraActive { pool_addr } => execute_era_active(deps, pool_addr),
-        ExecuteMsg::UpdateLsdTokenCodeId { code_id } => {
-            execute_update_lsd_token_code_id(deps, info, code_id)
-        }
         ExecuteMsg::StakeLsm {
             neutron_address,
             pool_addr,

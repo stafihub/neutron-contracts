@@ -1,3 +1,4 @@
+use std::ops::{Div, Mul};
 use std::vec;
 
 use cosmos_sdk_proto::cosmos::distribution::v1beta1::MsgSetWithdrawAddress;
@@ -19,11 +20,11 @@ use neutron_sdk::{
 
 use crate::contract::{DEFAULT_TIMEOUT_SECONDS, DEFAULT_UPDATE_PERIOD};
 use crate::error_conversion::ContractError;
-use crate::helper::DEFAULT_DECIMALS;
+use crate::helper::{CAL_BASE, DEFAULT_DECIMALS};
 use crate::msg::InitPoolParams;
 use crate::query_callback::register_query_submsg;
-use crate::state::INFO_OF_ICA_ID;
-use crate::state::{QueryKind, SudoPayload, TxType, LSD_TOKEN_CODE_ID, POOLS};
+use crate::state::{QueryKind, SudoPayload, TxType, POOLS};
+use crate::state::{INFO_OF_ICA_ID, STACK};
 use crate::tx_callback::msg_with_sudo_callback;
 use crate::{helper::min_ntrn_ibc_fee, state::ValidatorUpdateStatus};
 
@@ -63,7 +64,7 @@ pub fn execute_init_pool(
 
     let code_id = match param.lsd_code_id {
         Some(lsd_code_id) => lsd_code_id,
-        None => LSD_TOKEN_CODE_ID.load(deps.storage)?,
+        None => STACK.load(deps.storage)?.lsd_token_code_id,
     };
     let salt = &pool_ica_info.ica_addr.clone()[..40];
 
@@ -89,7 +90,7 @@ pub fn execute_init_pool(
         admin: Option::from(info.sender.to_string()),
         code_id,
         msg: to_json_binary(
-            &(rtoken::msg::InstantiateMsg {
+            &(lsd_token::msg::InstantiateMsg {
                 name: param.lsd_token_name.clone(),
                 symbol: param.lsd_token_symbol,
                 decimals: DEFAULT_DECIMALS,
@@ -119,6 +120,9 @@ pub fn execute_init_pool(
     pool_info.lsd_token = contract_addr;
     pool_info.share_tokens = param.share_tokens;
     pool_info.total_platform_fee = param.total_platform_fee;
+    if let Some(total_lsd_token_amount) = param.total_lsd_token_amount {
+        pool_info.total_lsd_token_amount = total_lsd_token_amount;
+    }
 
     // default
     pool_info.minimal_stake = Uint128::new(10_000);
@@ -134,6 +138,18 @@ pub fn execute_init_pool(
     pool_info.lsm_pending_limit = 100;
     pool_info.rate_change_limit = Uint128::new(5000);
     pool_info.validator_update_status = ValidatorUpdateStatus::End;
+
+    let cal_rate = if pool_info.total_lsd_token_amount.is_zero() {
+        CAL_BASE
+    } else {
+        pool_info
+            .active
+            .mul(CAL_BASE)
+            .div(pool_info.total_lsd_token_amount)
+    };
+    if cal_rate != pool_info.rate {
+        return Err(NeutronError::Std(StdError::generic_err("Rate not match")));
+    }
 
     deps.as_ref()
         .api

@@ -90,8 +90,8 @@ config_pool() {
     echo "pool_info is: "
     echo "$query"
     neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq
-    rtoken_contract_address=$(neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq .data.lsd_token | sed 's/\"//g')
-    echo "rtoken_contract_address: $rtoken_contract_address"
+    lsd_token_contract_address=$(neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq .data.lsd_token | sed 's/\"//g')
+    echo "lsd_token_contract_address: $lsd_token_contract_address"
 
     echo "-------------------------- config pool -------------------------------------"
 
@@ -111,7 +111,7 @@ config_pool() {
     "lsm_pending_limit": 60,
     "offset": 26657
   }
-}' "$pool_address" "$rtoken_contract_address" "$ADDRESS_1")
+}' "$pool_address" "$lsd_token_contract_address" "$ADDRESS_1")
     # echo $msg
     # echo "config pool msg is: $msg"
     tx_result="$(neutrond tx wasm execute "$contract_address" "$msg" \

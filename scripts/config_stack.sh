@@ -27,9 +27,10 @@ config_stack() {
 
   msg=$(printf '{
   "config_stack": {
-    "add_operator": "%s"
+    "add_operator": "%s",
+    "lsd_token_code_id": %d
   }
-}' "$ADDRESS_1")
+}' "$ADDRESS_1" "$lsd_code_id")
 
   # echo "the msg is: $msg"
   tx_result="$(neutrond tx wasm execute "$contract_address" "$msg" \
@@ -41,25 +42,5 @@ config_stack() {
   code="$(echo "$tx_result" | jq '.code')"
   if [[ "$code" -ne 0 ]]; then
     echo "Failed to config stack: $(echo "$tx_result" | jq '.raw_log')" && exit 1
-  fi
-
-  echo "-------------------------- update lsd token code id-------------------------------------"
-
-  msg=$(printf '{
-  "update_lsd_token_code_id": {
-    "code_id": %d
-  }
-}' "$lsd_code_id")
-
-  # echo "the msg is: $msg"
-
-  tx_result="$(neutrond tx wasm execute "$contract_address" "$msg" \
-    --amount 2000000untrn \
-    --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
-    --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \
-    --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"
-  code="$(echo "$tx_result" | jq '.code')"
-  if [[ "$code" -ne 0 ]]; then
-    echo "Failed to update lsd code id: $(echo "$tx_result" | jq '.raw_log')" && exit 1
   fi
 }

@@ -1,9 +1,7 @@
 use core::ops::{Mul, Sub};
 use std::ops::{Add, Div};
 
-use cosmwasm_std::{
-    to_json_binary, DepsMut, QueryRequest, Response, StdError, Uint128, WasmMsg, WasmQuery,
-};
+use cosmwasm_std::{to_json_binary, DepsMut, Response, StdError, Uint128, WasmMsg};
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     NeutronError, NeutronResult,
@@ -75,13 +73,6 @@ pub fn execute_era_active(
         }
     }
 
-    let token_info_msg = rtoken::msg::QueryMsg::TokenInfo {};
-    let token_info: cw20::TokenInfoResponse =
-        deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-            contract_addr: pool_info.lsd_token.to_string(),
-            msg: to_json_binary(&token_info_msg)?,
-        }))?;
-
     let mut stack_info = STACK.load(deps.storage)?;
     // calculate protocol fee
     let (platform_fee, stack_fee) = if total_amount.amount > pool_info.era_snapshot.active {
@@ -90,18 +81,18 @@ pub fn execute_era_active(
             .mul(pool_info.platform_fee_commission)
             .div(pool_info.rate);
 
-        let platform_fee = platform_fee_raw
+        let stack_fee = platform_fee_raw
             .mul(stack_info.stack_fee_commission)
             .div(CAL_BASE);
-        (platform_fee_raw.sub(platform_fee), platform_fee)
+        (platform_fee_raw.sub(stack_fee), stack_fee)
     } else {
         (Uint128::zero(), Uint128::zero())
     };
 
     deps.as_ref().api.debug(
         format!(
-            "WASMDEBUG: execute_era_active protocol_fee is: {:?}, total_amount is: {:?}, token_info is: {:?}",
-            platform_fee,total_amount,token_info
+            "WASMDEBUG: execute_era_active protocol_fee is: {:?}, total_amount is: {:?}",
+            platform_fee, total_amount
         )
         .as_str(),
     );
@@ -113,9 +104,14 @@ pub fn execute_era_active(
         Uint128::zero()
     };
 
-    let total_rtoken_amount = token_info.total_supply.add(platform_fee).add(stack_fee);
-    let new_rate = if total_rtoken_amount.u128() > 0 {
-        new_active.mul(CAL_BASE).div(total_rtoken_amount)
+    pool_info.total_lsd_token_amount = pool_info
+        .total_lsd_token_amount
+        .add(platform_fee)
+        .add(stack_fee);
+    let new_rate = if pool_info.total_lsd_token_amount.u128() > 0 {
+        new_active
+            .mul(CAL_BASE)
+            .div(pool_info.total_lsd_token_amount)
     } else {
         CAL_BASE
     };
@@ -150,7 +146,7 @@ pub fn execute_era_active(
         let msg = WasmMsg::Execute {
             contract_addr: pool_info.lsd_token.to_string(),
             msg: to_json_binary(
-                &(rtoken::msg::ExecuteMsg::Mint {
+                &(lsd_token::msg::ExecuteMsg::Mint {
                     recipient: pool_info.platform_fee_receiver.to_string(),
                     amount: platform_fee,
                 }),
@@ -158,13 +154,14 @@ pub fn execute_era_active(
             funds: vec![],
         };
         resp = resp.add_message(msg);
+
         pool_info.total_platform_fee = pool_info.total_platform_fee.add(platform_fee);
     }
     if !stack_fee.is_zero() {
         let msg = WasmMsg::Execute {
             contract_addr: pool_info.lsd_token.to_string(),
             msg: to_json_binary(
-                &(rtoken::msg::ExecuteMsg::Mint {
+                &(lsd_token::msg::ExecuteMsg::Mint {
                     recipient: stack_info.stack_fee_receiver.to_string(),
                     amount: stack_fee,
                 }),
@@ -172,6 +169,7 @@ pub fn execute_era_active(
             funds: vec![],
         };
         resp = resp.add_message(msg);
+
         stack_info.total_stack_fee = stack_info.total_stack_fee.add(stack_fee);
     }
 

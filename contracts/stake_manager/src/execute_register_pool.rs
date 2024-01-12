@@ -202,6 +202,7 @@ pub fn sudo_open_ack(
                 validator_update_status: ValidatorUpdateStatus::End,
                 platform_fee_commission: Uint128::zero(),
                 total_platform_fee: Uint128::zero(),
+                total_lsd_token_amount: Uint128::zero(),
                 unbond_commission: Uint128::zero(),
                 platform_fee_receiver: Addr::unchecked(""),
                 admin: admin.clone(),

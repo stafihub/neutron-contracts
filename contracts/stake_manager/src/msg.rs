@@ -64,6 +64,7 @@ pub struct InitPoolParams {
     pub era: u64,
     pub rate: Uint128,
     pub total_platform_fee: Uint128,
+    pub total_lsd_token_amount: Option<Uint128>,
     pub platform_fee_receiver: String,
     pub share_tokens: Vec<Coin>,
     pub lsd_code_id: Option<u64>,
@@ -80,6 +81,7 @@ pub struct ConfigStackParams {
     pub total_stack_fee: Option<Uint128>,
     pub add_operator: Option<Addr>,
     pub rm_operator: Option<Addr>,
+    pub lsd_token_code_id: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
@@ -165,9 +167,6 @@ pub enum ExecuteMsg {
     },
     EraActive {
         pool_addr: String,
-    },
-    UpdateLsdTokenCodeId {
-        code_id: u64,
     },
     StakeLsm {
         neutron_address: String,

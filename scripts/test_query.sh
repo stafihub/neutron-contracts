@@ -42,10 +42,10 @@ neutrond query wasm contract-state smart "$contract_address" "$query" --node "$N
 echo "---------------------------------------------------------------"
 
 
-rtoken_contract_address="neutron1v6a0pv0pd3etcd7atyr06efg4q56p4czu30lfycff7sf0n55ed8qhvfcl2"
+lsd_token_contract_address="neutron1v6a0pv0pd3etcd7atyr06efg4q56p4czu30lfycff7sf0n55ed8qhvfcl2"
 ADDRESS_1="neutron1m9l358xunhhwds0568za49mzhvuxx9ux8xafx2"
 query="$(printf '{"balance": {"address": "%s"}}' "$ADDRESS_1")"
-neutrond query wasm contract-state smart "$rtoken_contract_address" "$query" --output json | jq
+neutrond query wasm contract-state smart "$lsd_token_contract_address" "$query" --output json | jq
 # withdraw_addr="cosmos10h9stc5v6ntgeygf5xf945njqq5h32r53uquvw"query_id=3
 echo "---------------------------------------------------------------"
 

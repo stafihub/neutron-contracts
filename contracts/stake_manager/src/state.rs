@@ -19,6 +19,7 @@ pub struct Stack {
     pub total_stack_fee: Uint128,
     pub operators: Vec<Addr>,
     pub pools: Vec<String>,
+    pub lsd_token_code_id: u64,
 }
 
 pub const STACK: Item<Stack> = Item::new("stack");
@@ -57,6 +58,7 @@ pub struct PoolInfo {
     pub unbond_commission: Uint128,
     pub platform_fee_commission: Uint128,
     pub total_platform_fee: Uint128,
+    pub total_lsd_token_amount: Uint128,
     pub platform_fee_receiver: Addr,
     pub admin: Addr,
     pub share_tokens: Vec<cosmwasm_std::Coin>,
@@ -270,5 +272,3 @@ pub const ADDRESS_TO_REPLY_ID: Map<(String, String), u64> =
     Map::new("address_querykind_to_reply_id");
 
 pub const REPLY_ID_TO_QUERY_ID: Map<u64, u64> = Map::new("reply_id_to_query_id");
-
-pub const LSD_TOKEN_CODE_ID: Item<u64> = Item::new("lsp_token_code_id");
