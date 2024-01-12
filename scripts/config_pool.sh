@@ -104,11 +104,11 @@ config_pool() {
     "unstake_times_limit": 10,
     "unbonding_period": 1,
     "platform_fee_commission": "100000",
-    "era_seconds": 60,
     "lsm_support": true,
     "paused": false,
     "rate_change_limit": "500000",
     "lsm_pending_limit": 60,
+    "era_seconds": 60,
     "offset": 26657
   }
 }' "$pool_address" "$lsd_token_contract_address" "$ADDRESS_1")

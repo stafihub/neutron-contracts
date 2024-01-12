@@ -120,8 +120,22 @@ pub fn execute_init_pool(
     pool_info.lsd_token = contract_addr;
     pool_info.share_tokens = param.share_tokens;
     pool_info.total_platform_fee = param.total_platform_fee;
+
+    // option
     if let Some(total_lsd_token_amount) = param.total_lsd_token_amount {
         pool_info.total_lsd_token_amount = total_lsd_token_amount;
+    } else {
+        pool_info.total_lsd_token_amount = Uint128::zero();
+    }
+    if let Some(era_seconds) = param.era_seconds {
+        pool_info.era_seconds = era_seconds;
+    } else {
+        pool_info.era_seconds = 24 * 60 * 60;
+    }
+    if let Some(offset) = param.offset {
+        pool_info.offset = offset;
+    } else {
+        pool_info.offset = 0;
     }
 
     // default
@@ -131,8 +145,6 @@ pub fn execute_init_pool(
     pool_info.unstake_times_limit = 20;
     pool_info.unbond_commission = Uint128::zero();
     pool_info.platform_fee_commission = Uint128::new(100_000);
-    pool_info.era_seconds = 24 * 60 * 60;
-    pool_info.offset = 0;
     pool_info.paused = true;
     pool_info.lsm_support = false;
     pool_info.lsm_pending_limit = 100;

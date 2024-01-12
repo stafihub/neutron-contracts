@@ -70,6 +70,8 @@ pub struct InitPoolParams {
     pub lsd_code_id: Option<u64>,
     pub lsd_token_name: String,
     pub lsd_token_symbol: String,
+    pub era_seconds: Option<u64>,
+    pub offset: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
