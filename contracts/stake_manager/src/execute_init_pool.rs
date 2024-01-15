@@ -145,7 +145,7 @@ pub fn execute_init_pool(
     pool_info.unstake_times_limit = 20;
     pool_info.unbond_commission = Uint128::zero();
     pool_info.platform_fee_commission = Uint128::new(100_000);
-    pool_info.paused = true;
+    pool_info.paused = false;
     pool_info.lsm_support = false;
     pool_info.lsm_pending_limit = 100;
     pool_info.rate_change_limit = Uint128::new(5000);

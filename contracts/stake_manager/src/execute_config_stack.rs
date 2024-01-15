@@ -1,8 +1,8 @@
-use cosmwasm_std::{DepsMut, MessageInfo, Response, StdError};
+use cosmwasm_std::{DepsMut, MessageInfo, Response};
 
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
-    NeutronError, NeutronResult,
+    NeutronResult,
 };
 
 use crate::state::STACK;
@@ -20,22 +20,6 @@ pub fn execute_config_stack(
     if let Some(stack_fee_receiver) = param.stack_fee_receiver {
         stack.stack_fee_receiver = stack_fee_receiver
     }
-    if let Some(add_operator) = param.add_operator {
-        if stack.operators.contains(&add_operator) {
-            return Err(NeutronError::Std(StdError::generic_err(
-                "operator already exist",
-            )));
-        }
-        stack.operators.push(add_operator);
-    }
-    if let Some(rm_operator) = param.rm_operator {
-        if !stack.operators.contains(&rm_operator) {
-            return Err(NeutronError::Std(StdError::generic_err(
-                "operator not exist",
-            )));
-        }
-        stack.operators.retain(|o| o != rm_operator);
-    }
     if let Some(stack_fee_commission) = param.stack_fee_commission {
         stack.stack_fee_commission = stack_fee_commission;
     }
@@ -47,6 +31,11 @@ pub fn execute_config_stack(
     }
     if let Some(lsd_token_code_id) = param.lsd_token_code_id {
         stack.lsd_token_code_id = lsd_token_code_id;
+    }
+    if let Some(add_entrusted_pool) = param.add_entrusted_pool {
+        if !stack.pools.contains(&add_entrusted_pool) {
+            stack.pools.push(add_entrusted_pool);
+        }
     }
 
     STACK.save(deps.storage, &stack)?;

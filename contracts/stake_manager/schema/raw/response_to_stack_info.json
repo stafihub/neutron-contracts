@@ -5,7 +5,6 @@
   "required": [
     "admin",
     "lsd_token_code_id",
-    "operators",
     "pools",
     "stack_fee_commission",
     "stack_fee_receiver",
@@ -19,12 +18,6 @@
       "type": "integer",
       "format": "uint64",
       "minimum": 0.0
-    },
-    "operators": {
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/Addr"
-      }
     },
     "pools": {
       "type": "array",

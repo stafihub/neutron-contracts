@@ -77,7 +77,6 @@ pub fn instantiate(
             stack_fee_receiver: info.sender.clone(),
             stack_fee_commission: Uint128::new(100_000),
             total_stack_fee: Uint128::zero(),
-            operators: vec![],
             pools: vec![],
             lsd_token_code_id: 0,
         }),

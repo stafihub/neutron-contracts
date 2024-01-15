@@ -9,7 +9,7 @@ use neutron_sdk::{
     NeutronResult,
 };
 
-use crate::state::{EraSnapshot, ValidatorUpdateStatus, STACK};
+use crate::state::{EraSnapshot, ValidatorUpdateStatus};
 use crate::{
     helper::{get_withdraw_ica_id, ICA_WITHDRAW_SUFIX, INTERCHAIN_ACCOUNT_ID_LEN_LIMIT},
     state::{EraProcessStatus, IcaInfo, PoolInfo, INFO_OF_ICA_ID, POOLS},
@@ -37,10 +37,6 @@ pub fn execute_register_pool(
     deps.as_ref()
         .api
         .debug(format!("WASMDEBUG: register_fee {:?}", register_fee).as_str());
-    let state = STACK.load(deps.storage)?;
-    if !state.operators.contains(&info.sender) {
-        return Err(NeutronError::Std(StdError::generic_err("Invalid operator")));
-    }
 
     if interchain_account_id.trim().is_empty()
         || interchain_account_id.contains(".")
@@ -225,10 +221,6 @@ pub fn sudo_open_ack(
             };
 
             POOLS.save(deps.storage, pool_ica_info.ica_addr.clone(), &pool_info)?;
-
-            let mut stack = STACK.load(deps.storage)?;
-            stack.pools.push(pool_ica_info.ica_addr.clone());
-            STACK.save(deps.storage, &stack)?;
         }
 
         INFO_OF_ICA_ID.save(

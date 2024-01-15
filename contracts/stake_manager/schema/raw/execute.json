@@ -579,14 +579,10 @@
     "ConfigStackParams": {
       "type": "object",
       "properties": {
-        "add_operator": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/Addr"
-            },
-            {
-              "type": "null"
-            }
+        "add_entrusted_pool": {
+          "type": [
+            "string",
+            "null"
           ]
         },
         "lsd_token_code_id": {
@@ -598,16 +594,6 @@
           "minimum": 0.0
         },
         "new_admin": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/Addr"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "rm_operator": {
           "anyOf": [
             {
               "$ref": "#/definitions/Addr"

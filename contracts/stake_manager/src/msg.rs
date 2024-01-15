@@ -88,9 +88,8 @@ pub struct ConfigStackParams {
     pub new_admin: Option<Addr>,
     pub stack_fee_commission: Option<Uint128>,
     pub total_stack_fee: Option<Uint128>,
-    pub add_operator: Option<Addr>,
-    pub rm_operator: Option<Addr>,
     pub lsd_token_code_id: Option<u64>,
+    pub add_entrusted_pool: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]

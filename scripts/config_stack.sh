@@ -27,10 +27,9 @@ config_stack() {
 
   msg=$(printf '{
   "config_stack": {
-    "add_operator": "%s",
     "lsd_token_code_id": %d
   }
-}' "$ADDRESS_1" "$lsd_code_id")
+}' "$lsd_code_id")
 
   # echo "the msg is: $msg"
   tx_result="$(neutrond tx wasm execute "$contract_address" "$msg" \
