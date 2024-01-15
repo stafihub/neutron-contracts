@@ -1,12 +1,17 @@
-use std::ops::{Div, Mul};
-use std::vec;
-
+use crate::contract::{DEFAULT_TIMEOUT_SECONDS, DEFAULT_UPDATE_PERIOD};
+use crate::error_conversion::ContractError;
+use crate::helper::{CAL_BASE, DEFAULT_DECIMALS};
+use crate::msg::InitPoolParams;
+use crate::query_callback::register_query_submsg;
+use crate::state::{QueryKind, SudoPayload, TxType, POOLS};
+use crate::state::{INFO_OF_ICA_ID, STACK};
+use crate::tx_callback::msg_with_sudo_callback;
+use crate::{helper::min_ntrn_ibc_fee, state::ValidatorUpdateStatus};
 use cosmos_sdk_proto::cosmos::distribution::v1beta1::MsgSetWithdrawAddress;
 use cosmos_sdk_proto::prost::Message;
 use cosmwasm_std::{instantiate2_address, to_json_binary, Addr, Uint128, WasmMsg};
 use cosmwasm_std::{Binary, DepsMut, Env, MessageInfo, Response, StdError};
-use cw20::MinterResponse;
-
+use lsd_token::msg::InstantiateMinterData;
 use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::interchain_queries::v045::new_register_delegator_delegations_query_msg;
 use neutron_sdk::interchain_queries::v045::{
@@ -17,16 +22,8 @@ use neutron_sdk::{
     query::min_ibc_fee::query_min_ibc_fee,
     NeutronError, NeutronResult,
 };
-
-use crate::contract::{DEFAULT_TIMEOUT_SECONDS, DEFAULT_UPDATE_PERIOD};
-use crate::error_conversion::ContractError;
-use crate::helper::{CAL_BASE, DEFAULT_DECIMALS};
-use crate::msg::InitPoolParams;
-use crate::query_callback::register_query_submsg;
-use crate::state::{QueryKind, SudoPayload, TxType, POOLS};
-use crate::state::{INFO_OF_ICA_ID, STACK};
-use crate::tx_callback::msg_with_sudo_callback;
-use crate::{helper::min_ntrn_ibc_fee, state::ValidatorUpdateStatus};
+use std::ops::{Div, Mul};
+use std::vec;
 
 // add execute to config the validator addrs and withdraw address on reply
 pub fn execute_init_pool(
@@ -95,7 +92,8 @@ pub fn execute_init_pool(
                 symbol: param.lsd_token_symbol,
                 decimals: DEFAULT_DECIMALS,
                 initial_balances: vec![],
-                mint: Option::from(MinterResponse {
+                mint: Option::from(InstantiateMinterData {
+                    admin: pool_info.admin.to_string(),
                     minter: env.contract.address.to_string(),
                     cap: None,
                 }),

@@ -15,7 +15,8 @@ pub struct TokenInfo {
 
 #[cw_serde]
 pub struct MinterData {
-    pub minter: Addr,
+    pub admin: Addr,
+    pub minters: Vec<Addr>,
     /// cap is how many more tokens can be issued by the minter
     pub cap: Option<Uint128>,
 }
