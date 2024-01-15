@@ -1303,7 +1303,7 @@ mod tests {
             amount: transfer,
             msg: send_msg,
         }
-        .into_json_binary()
+        .into_binary()
         .unwrap();
         // and this is how it must be wrapped for the vm to process it
         assert_eq!(

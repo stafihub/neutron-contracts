@@ -49,7 +49,7 @@ pub enum QueryMsg {
         pool_addr: String,
         user_neutron_addr: Addr,
     },
-    #[returns([String])]
+    #[returns(String)]
     UserUnstakeIndex {
         pool_addr: String,
         user_neutron_addr: Addr,

@@ -697,7 +697,7 @@ mod tests {
             amount: transfer,
             msg: send_msg.clone(),
         }
-        .into_json_binary()
+        .into_binary()
         .unwrap();
         assert_eq!(
             res.messages[0],
