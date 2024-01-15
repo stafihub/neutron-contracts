@@ -38,6 +38,6 @@ lsd_token = { path = "../lsd_token", features = ["library"] }
 thiserror = "1.0.50"
 prost = "0.12.2"
 cw-utils = "1.0.3"
+cosmwasm-schema = { workspace = true }
 
 [dev-dependencies]
-cosmwasm-schema = { workspace = true }

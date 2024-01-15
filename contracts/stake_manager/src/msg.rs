@@ -1,52 +1,59 @@
+use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Coin, Uint128};
+use neutron_sdk::{
+    bindings::query::{QueryInterchainAccountAddressResponse, QueryRegisteredQueryResponse},
+    interchain_queries::v045::queries::{BalanceResponse, DelegatorDelegationsResponse},
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use crate::state::{EraSnapshot, IcaInfo, PoolInfo, Stack, UnstakeInfo};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct InstantiateMsg {}
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
+#[derive(QueryResponses)]
 pub enum QueryMsg {
-    GetRegisteredQuery {
-        query_id: u64,
-    },
-    Balance {
-        ica_addr: String,
-    },
-    Delegations {
-        pool_addr: String,
-    },
-    PoolInfo {
-        pool_addr: String,
-    },
+    #[returns(QueryRegisteredQueryResponse)]
+    GetRegisteredQuery { query_id: u64 },
+    #[returns(BalanceResponse)]
+    Balance { ica_addr: String },
+    #[returns(DelegatorDelegationsResponse)]
+    Delegations { pool_addr: String },
+    #[returns(PoolInfo)]
+    PoolInfo { pool_addr: String },
+    #[returns(Stack)]
     StackInfo {},
-    EraSnapshot {
-        pool_addr: String,
-    },
+    #[returns(EraSnapshot)]
+    EraSnapshot { pool_addr: String },
+    #[returns(QueryInterchainAccountAddressResponse)]
     /// this query goes to neutron and get stored ICA with a specific query
     InterchainAccountAddress {
         interchain_account_id: String,
         connection_id: String,
     },
+    #[returns((IcaInfo, IcaInfo, Addr))]
     // this query returns ICA from contract store, which saved from acknowledgement
-    InterchainAccountAddressFromContract {
-        interchain_account_id: String,
-    },
+    InterchainAccountAddressFromContract { interchain_account_id: String },
+    #[returns(u64)]
     // this query returns acknowledgement result after interchain transaction
     AcknowledgementResult {
         interchain_account_id: String,
         sequence_id: u64,
     },
+    #[returns([UnstakeInfo])]
     UserUnstake {
         pool_addr: String,
         user_neutron_addr: Addr,
     },
+    #[returns([String])]
     UserUnstakeIndex {
         pool_addr: String,
         user_neutron_addr: Addr,
     },
     // this query returns non-critical errors list
+    #[returns(Vec < (Vec < u8 >, String) >)]
     ErrorsQueue {},
 }
 

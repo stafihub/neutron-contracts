@@ -1,7 +1,6 @@
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{from_json, to_json_vec, Addr, Binary, Order, StdResult, Storage, Uint128};
 use cw_storage_plus::{Item, Map};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 
 pub const REPLY_ID_RANGE_START: u64 = 1_000_000_000;
 pub const REPLY_ID_RANGE_SIZE: u64 = 1_000_000;
@@ -11,7 +10,7 @@ pub const QUERY_REPLY_ID_RANGE_START: u64 = 2_000_000_000;
 pub const QUERY_REPLY_ID_RANGE_SIZE: u64 = 1_000_000;
 pub const QUERY_REPLY_ID_RANGE_END: u64 = QUERY_REPLY_ID_RANGE_START + QUERY_REPLY_ID_RANGE_SIZE;
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[cw_serde]
 pub struct Stack {
     pub admin: Addr,
     pub stack_fee_receiver: Addr,
@@ -24,7 +23,7 @@ pub struct Stack {
 
 pub const STACK: Item<Stack> = Item::new("stack");
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct EraSnapshot {
     pub era: u64,
     pub bond: Uint128,
@@ -34,7 +33,7 @@ pub struct EraSnapshot {
     pub bond_height: u64,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[cw_serde]
 pub struct PoolInfo {
     pub bond: Uint128,
     pub unbond: Uint128,
@@ -72,7 +71,7 @@ pub struct PoolInfo {
 
 pub const POOLS: Map<String, PoolInfo> = Map::new("pools");
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[cw_serde]
 pub enum EraProcessStatus {
     EraUpdateStarted,
     EraUpdateEnded,
@@ -85,20 +84,20 @@ pub enum EraProcessStatus {
     ActiveEnded,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[cw_serde]
 pub enum ValidatorUpdateStatus {
     Start,
     WaitQueryUpdate,
     End,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub enum WithdrawStatus {
     Default,
     Pending,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct UnstakeInfo {
     pub era: u64,
     pub pool_addr: String,
@@ -110,7 +109,7 @@ pub struct UnstakeInfo {
 // (poolAddress,unstakeIndex)
 pub const UNSTAKES_OF_INDEX: Map<(String, u64), UnstakeInfo> = Map::new("unstakes_of_index");
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct IcaInfo {
     pub ctrl_connection_id: String,
     pub host_connection_id: String,
@@ -134,7 +133,7 @@ pub const UNSTAKES_INDEX_FOR_USER: Map<(Addr, String), Vec<u64>> =
 // pub const STACK_INFO: Item<StackInfo> = Item::new("stack_info");
 
 // contains query kinds that we expect to handle in `sudo_kv_query_result`
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
 pub enum QueryKind {
     // Balance query
     Balances,
@@ -154,8 +153,7 @@ impl QueryKind {
 }
 
 /// Serves for storing acknowledgement calls for interchain transactions
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum AcknowledgementResult {
     /// Success - Got success acknowledgement in sudo with array of message item types in it
     Success(Vec<String>),
@@ -209,8 +207,7 @@ pub fn get_next_query_reply_id(store: &mut dyn Storage) -> StdResult<u64> {
     Ok(id)
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum TxType {
     SetWithdrawAddr,
     UpdateValidator,
@@ -224,8 +221,7 @@ pub enum TxType {
     RedeemTokenForShare,
     StakeLsm,
 }
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub struct SudoPayload {
     pub message: String,
     pub pool_addr: String,

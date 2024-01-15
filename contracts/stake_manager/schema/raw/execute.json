@@ -60,6 +60,18 @@
     {
       "type": "object",
       "required": [
+        "config_stack"
+      ],
+      "properties": {
+        "config_stack": {
+          "$ref": "#/definitions/ConfigStackParams"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
         "open_channel"
       ],
       "properties": {
@@ -199,10 +211,10 @@
     {
       "type": "object",
       "required": [
-        "pool_rm_validators"
+        "pool_rm_validator"
       ],
       "properties": {
-        "pool_rm_validators": {
+        "pool_rm_validator": {
           "type": "object",
           "required": [
             "pool_addr",
@@ -223,24 +235,21 @@
     {
       "type": "object",
       "required": [
-        "pool_add_validators"
+        "pool_add_validator"
       ],
       "properties": {
-        "pool_add_validators": {
+        "pool_add_validator": {
           "type": "object",
           "required": [
             "pool_addr",
-            "validator_addrs"
+            "validator_addr"
           ],
           "properties": {
             "pool_addr": {
               "type": "string"
             },
-            "validator_addrs": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
+            "validator_addr": {
+              "type": "string"
             }
           }
         }
@@ -267,6 +276,26 @@
             "old_validator": {
               "type": "string"
             },
+            "pool_addr": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "pool_update_query"
+      ],
+      "properties": {
+        "pool_update_query": {
+          "type": "object",
+          "required": [
+            "pool_addr"
+          ],
+          "properties": {
             "pool_addr": {
               "type": "string"
             }
@@ -378,28 +407,6 @@
     {
       "type": "object",
       "required": [
-        "update_lsd_token_code_id"
-      ],
-      "properties": {
-        "update_lsd_token_code_id": {
-          "type": "object",
-          "required": [
-            "code_id"
-          ],
-          "properties": {
-            "code_id": {
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0.0
-            }
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
         "stake_lsm"
       ],
       "properties": {
@@ -480,6 +487,16 @@
             }
           ]
         },
+        "new_admin": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Addr"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "next_unstake_index": {
           "type": [
             "integer",
@@ -502,9 +519,6 @@
             "null"
           ]
         },
-        "pool_addr": {
-          "type": "string"
-        },
         "platform_fee_commission": {
           "anyOf": [
             {
@@ -520,6 +534,9 @@
             "string",
             "null"
           ]
+        },
+        "pool_addr": {
+          "type": "string"
         },
         "rate_change_limit": {
           "anyOf": [
@@ -559,6 +576,79 @@
         }
       }
     },
+    "ConfigStackParams": {
+      "type": "object",
+      "properties": {
+        "add_operator": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Addr"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lsd_token_code_id": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "new_admin": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Addr"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rm_operator": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Addr"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stack_fee_commission": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Uint128"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stack_fee_receiver": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Addr"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "total_stack_fee": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Uint128"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
     "InitPoolParams": {
       "type": "object",
       "required": [
@@ -570,10 +660,11 @@
         "interchain_account_id",
         "lsd_token_name",
         "lsd_token_symbol",
-        "share_tokens",
         "platform_fee_receiver",
         "rate",
         "remote_denom",
+        "share_tokens",
+        "total_platform_fee",
         "unbond",
         "validator_addrs"
       ],
@@ -592,11 +683,27 @@
           "format": "uint64",
           "minimum": 0.0
         },
+        "era_seconds": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
         "ibc_denom": {
           "type": "string"
         },
         "interchain_account_id": {
           "type": "string"
+        },
+        "lsd_code_id": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
         },
         "lsd_token_name": {
           "type": "string"
@@ -604,11 +711,13 @@
         "lsd_token_symbol": {
           "type": "string"
         },
-        "share_tokens": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/Coin"
-          }
+        "offset": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
         },
         "platform_fee_receiver": {
           "type": "string"
@@ -618,6 +727,25 @@
         },
         "remote_denom": {
           "type": "string"
+        },
+        "share_tokens": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Coin"
+          }
+        },
+        "total_lsd_token_amount": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Uint128"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "total_platform_fee": {
+          "$ref": "#/definitions/Uint128"
         },
         "unbond": {
           "$ref": "#/definitions/Uint128"
