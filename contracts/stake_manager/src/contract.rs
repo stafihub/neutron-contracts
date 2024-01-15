@@ -66,7 +66,7 @@ pub fn instantiate(
     deps: DepsMut,
     _: Env,
     info: MessageInfo,
-    _: InstantiateMsg,
+    msg: InstantiateMsg,
 ) -> NeutronResult<Response<NeutronMsg>> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
@@ -78,7 +78,7 @@ pub fn instantiate(
             stack_fee_commission: Uint128::new(100_000),
             total_stack_fee: Uint128::zero(),
             pools: vec![],
-            lsd_token_code_id: 0,
+            lsd_token_code_id: msg.lsd_token_code_id,
         }),
     )?;
 

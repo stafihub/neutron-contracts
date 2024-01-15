@@ -10,7 +10,9 @@ use serde::{Deserialize, Serialize};
 use crate::state::{EraSnapshot, IcaInfo, PoolInfo, Stack, UnstakeInfo};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-pub struct InstantiateMsg {}
+pub struct InstantiateMsg {
+    pub lsd_token_code_id: u64,
+}
 
 #[cw_serde]
 #[derive(QueryResponses)]
@@ -27,17 +29,17 @@ pub enum QueryMsg {
     StackInfo {},
     #[returns(EraSnapshot)]
     EraSnapshot { pool_addr: String },
-    #[returns(QueryInterchainAccountAddressResponse)]
     /// this query goes to neutron and get stored ICA with a specific query
+    #[returns(QueryInterchainAccountAddressResponse)]
     InterchainAccountAddress {
         interchain_account_id: String,
         connection_id: String,
     },
-    #[returns((IcaInfo, IcaInfo, Addr))]
     // this query returns ICA from contract store, which saved from acknowledgement
+    #[returns((IcaInfo, IcaInfo, Addr))]
     InterchainAccountAddressFromContract { interchain_account_id: String },
-    #[returns(u64)]
     // this query returns acknowledgement result after interchain transaction
+    #[returns(u64)]
     AcknowledgementResult {
         interchain_account_id: String,
         sequence_id: u64,
