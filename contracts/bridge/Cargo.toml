@@ -1,0 +1,25 @@
+[package]
+name = "bridge"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+backtraces = ["cosmwasm-std/backtraces"]
+# use library feature to disable all instantiate/execute/query exports
+library = []
+
+[dependencies]
+cosmwasm-schema = { version = "1.4.0" }
+cw-utils = "1.0.1"
+cw2 = { workspace = true }
+cw-storage-plus = "1.1.0"
+cosmwasm-std = { version = "1.4.0" }
+schemars = "0.8.15"
+semver = "1"
+serde = { version = "1.0.188", default-features = false, features = ["derive"] }
+thiserror = { version = "1.0.49" }
+lsd_token = { path = "../lsd_token", features = ["library"] }
+sha2 = "0.10.3"
