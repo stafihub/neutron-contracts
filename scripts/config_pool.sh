@@ -98,7 +98,6 @@ config_pool() {
     msg=$(printf '{
   "config_pool": {
     "pool_addr": "%s",
-    "lsd_token": "%s",
     "platform_fee_receiver": "%s",
     "minimal_stake": "1000",
     "unstake_times_limit": 10,
@@ -111,7 +110,7 @@ config_pool() {
     "era_seconds": 60,
     "offset": 26657
   }
-}' "$pool_address" "$lsd_token_contract_address" "$ADDRESS_1")
+}' "$pool_address" "$ADDRESS_1")
     # echo $msg
     # echo "config pool msg is: $msg"
     tx_result="$(neutrond tx wasm execute "$contract_address" "$msg" \

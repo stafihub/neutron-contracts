@@ -272,17 +272,59 @@
       "description": "Only with the \"mintable\" extension. The current minter may set a new minter. Setting the minter to None will remove the token's minter forever.",
       "type": "object",
       "required": [
-        "update_minter"
+        "add_minter"
       ],
       "properties": {
-        "update_minter": {
+        "add_minter": {
           "type": "object",
+          "required": [
+            "new_minter"
+          ],
           "properties": {
             "new_minter": {
-              "type": [
-                "string",
-                "null"
-              ]
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "remove_minter"
+      ],
+      "properties": {
+        "remove_minter": {
+          "type": "object",
+          "required": [
+            "remove_minter"
+          ],
+          "properties": {
+            "remove_minter": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "transfer_admin"
+      ],
+      "properties": {
+        "transfer_admin": {
+          "type": "object",
+          "required": [
+            "new_admin"
+          ],
+          "properties": {
+            "new_admin": {
+              "type": "string"
             }
           },
           "additionalProperties": false

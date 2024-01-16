@@ -4,12 +4,10 @@ use neutron_sdk::{
     bindings::query::{QueryInterchainAccountAddressResponse, QueryRegisteredQueryResponse},
     interchain_queries::v045::queries::{BalanceResponse, DelegatorDelegationsResponse},
 };
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 
 use crate::state::{EraSnapshot, IcaInfo, PoolInfo, Stack, UnstakeInfo};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
 pub struct InstantiateMsg {
     pub lsd_token_code_id: u64,
 }
@@ -59,8 +57,7 @@ pub enum QueryMsg {
     ErrorsQueue {},
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub struct InitPoolParams {
     pub interchain_account_id: String,
     pub unbond: Uint128,
@@ -83,8 +80,7 @@ pub struct InitPoolParams {
     pub offset: Option<u64>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub struct ConfigStackParams {
     pub stack_fee_receiver: Option<Addr>,
     pub new_admin: Option<Addr>,
@@ -94,8 +90,7 @@ pub struct ConfigStackParams {
     pub add_entrusted_pool: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub struct ConfigPoolParams {
     pub pool_addr: String,
     pub platform_fee_receiver: Option<String>,
@@ -114,8 +109,7 @@ pub struct ConfigPoolParams {
     pub new_admin: Option<Addr>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum ExecuteMsg {
     RegisterPool {
         connection_id: String,
@@ -184,5 +178,5 @@ pub enum ExecuteMsg {
     },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[cw_serde]
 pub struct MigrateMsg {}

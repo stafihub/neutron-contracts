@@ -3,8 +3,6 @@ use cosmwasm_std::Binary;
 use cosmwasm_std::{StdError, StdResult, Uint128};
 use cw20::{Cw20Coin, Logo};
 use cw_utils::Expiration;
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 
 #[cw_serde]
 pub struct InstantiateMarketingInfo {
@@ -216,7 +214,7 @@ pub enum QueryMsg {
     DownloadLogo {},
 }
 
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[cw_serde]
 pub struct MigrateMsg {}
 
 #[cfg(test)]

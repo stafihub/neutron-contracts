@@ -1,6 +1,7 @@
 #![warn(clippy::unwrap_used, clippy::expect_used)]
 
 pub mod contract;
+#[allow(unused_imports)]
 pub mod msg;
 pub mod state;
 
