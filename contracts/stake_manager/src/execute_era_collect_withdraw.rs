@@ -1,6 +1,6 @@
 use cosmos_sdk_proto::cosmos::bank::v1beta1::MsgSend;
 use cosmos_sdk_proto::prost::Message;
-use cosmwasm_std::{Binary, DepsMut, Env, Response, StdError, StdResult, Uint128};
+use cosmwasm_std::{Binary, DepsMut, Env, Response, StdResult, Uint128};
 
 use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::{
@@ -9,12 +9,12 @@ use neutron_sdk::{
     NeutronError, NeutronResult,
 };
 
-use crate::contract::DEFAULT_TIMEOUT_SECONDS;
 use crate::helper::{get_withdraw_ica_id, min_ntrn_ibc_fee};
 use crate::query::query_balance_by_addr;
 use crate::state::EraProcessStatus::{BondEnded, WithdrawEnded, WithdrawStarted};
 use crate::state::{SudoPayload, TxType, INFO_OF_ICA_ID, POOLS};
 use crate::tx_callback::msg_with_sudo_callback;
+use crate::{contract::DEFAULT_TIMEOUT_SECONDS, error_conversion::ContractError};
 
 pub fn execute_era_collect_withdraw(
     mut deps: DepsMut<NeutronQuery>,
@@ -32,7 +32,7 @@ pub fn execute_era_collect_withdraw(
             )
             .as_str(),
         );
-        return Err(NeutronError::Std(StdError::generic_err("status not allow")));
+        return Err(ContractError::StatusNotAllow {}.into());
     }
     pool_info.era_process_status = WithdrawStarted;
 
@@ -48,7 +48,7 @@ pub fn execute_era_collect_withdraw(
     match withdraw_balances_result {
         Ok(balance_response) => {
             if balance_response.last_submitted_local_height <= pool_info.era_snapshot.bond_height {
-                return Err(NeutronError::Std(StdError::generic_err("Withdraw Addr submission height is less than or equal to the bond height of the pool era, which is not allowed.")));
+                return Err(ContractError::WithdrawAddrBalanceSubmissionHeight {}.into());
             }
 
             if !balance_response.balances.coins.is_empty() {
@@ -62,9 +62,6 @@ pub fn execute_era_collect_withdraw(
             }
         }
         Err(_) => {
-            // return Err(NeutronError::Std(StdError::generic_err(
-            //     "balance not exist",
-            // )));
             deps.as_ref().api.debug(
                 format!(
                     "WASMDEBUG: execute_era_collect_withdraw withdraw_balances_result: {:?}",
@@ -106,10 +103,7 @@ pub fn execute_era_collect_withdraw(
     buf.reserve(inter_send.encoded_len());
 
     if let Err(e) = inter_send.encode(&mut buf) {
-        return Err(NeutronError::Std(StdError::generic_err(format!(
-            "Encode error: {}",
-            e
-        ))));
+        return Err(ContractError::EncodeError(e.to_string()).into());
     }
     let any_msg = ProtobufAny {
         type_url: "/cosmos.bank.v1beta1.MsgSend".to_string(),

@@ -1,16 +1,11 @@
-use crate::contract::{DEFAULT_TIMEOUT_SECONDS, DEFAULT_UPDATE_PERIOD};
-use crate::error_conversion::ContractError;
-use crate::helper::{CAL_BASE, DEFAULT_DECIMALS};
-use crate::msg::InitPoolParams;
-use crate::query_callback::register_query_submsg;
-use crate::state::{QueryKind, SudoPayload, TxType, POOLS};
-use crate::state::{INFO_OF_ICA_ID, STACK};
-use crate::tx_callback::msg_with_sudo_callback;
-use crate::{helper::min_ntrn_ibc_fee, state::ValidatorUpdateStatus};
+use std::ops::{Div, Mul};
+use std::vec;
+
 use cosmos_sdk_proto::cosmos::distribution::v1beta1::MsgSetWithdrawAddress;
 use cosmos_sdk_proto::prost::Message;
 use cosmwasm_std::{instantiate2_address, to_json_binary, Addr, Uint128, WasmMsg};
-use cosmwasm_std::{Binary, DepsMut, Env, MessageInfo, Response, StdError};
+use cosmwasm_std::{Binary, DepsMut, Env, MessageInfo, Response};
+
 use lsd_token::msg::InstantiateMinterData;
 use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::interchain_queries::v045::new_register_delegator_delegations_query_msg;
@@ -22,8 +17,16 @@ use neutron_sdk::{
     query::min_ibc_fee::query_min_ibc_fee,
     NeutronError, NeutronResult,
 };
-use std::ops::{Div, Mul};
-use std::vec;
+
+use crate::contract::{DEFAULT_TIMEOUT_SECONDS, DEFAULT_UPDATE_PERIOD};
+use crate::error_conversion::ContractError;
+use crate::helper::{CAL_BASE, DEFAULT_DECIMALS};
+use crate::msg::InitPoolParams;
+use crate::query_callback::register_query_submsg;
+use crate::state::{QueryKind, SudoPayload, TxType, POOLS};
+use crate::state::{INFO_OF_ICA_ID, STACK};
+use crate::tx_callback::msg_with_sudo_callback;
+use crate::{helper::min_ntrn_ibc_fee, state::ValidatorUpdateStatus};
 
 // add execute to config the validator addrs and withdraw address on reply
 pub fn execute_init_pool(
@@ -46,9 +49,7 @@ pub fn execute_init_pool(
     );
 
     if param.validator_addrs.is_empty() || param.validator_addrs.len() > 5 {
-        return Err(NeutronError::Std(StdError::generic_err(
-            "Validator addresses list must contain between 1 and 5 addresses.",
-        )));
+        return Err(ContractError::ValidatorAddressesListSize {}.into());
     }
 
     let mut pool_info = POOLS.load(deps.as_ref().storage, pool_ica_info.ica_addr.clone())?;
@@ -56,7 +57,7 @@ pub fn execute_init_pool(
         return Err(ContractError::Unauthorized {}.into());
     }
     if param.rate.is_zero() {
-        return Err(NeutronError::Std(StdError::generic_err("Rate is zero")));
+        return Err(ContractError::RateIsZero {}.into());
     }
 
     let code_id = match param.lsd_code_id {
@@ -69,14 +70,8 @@ pub fn execute_init_pool(
     let creator_cannonical = deps.api.addr_canonicalize(env.contract.address.as_str())?;
 
     let i2_address =
-        instantiate2_address(&code_info.checksum, &creator_cannonical, salt.as_bytes()).map_err(
-            |e| {
-                NeutronError::Std(StdError::generic_err(format!(
-                    "instantiate2_address failed, err: {}",
-                    e
-                )))
-            },
-        )?;
+        instantiate2_address(&code_info.checksum, &creator_cannonical, salt.as_bytes())
+            .map_err(|e| ContractError::Instantiate2AddressFailed(e.to_string()))?;
 
     let contract_addr = deps
         .api
@@ -158,7 +153,7 @@ pub fn execute_init_pool(
             .div(pool_info.total_lsd_token_amount)
     };
     if cal_rate != pool_info.rate {
-        return Err(NeutronError::Std(StdError::generic_err("Rate not match")));
+        return Err(ContractError::RateNotMatch {}.into());
     }
 
     deps.as_ref()
@@ -220,10 +215,7 @@ pub fn execute_init_pool(
     buf.reserve(set_withdraw_msg.encoded_len());
 
     if let Err(e) = set_withdraw_msg.encode(&mut buf) {
-        return Err(NeutronError::Std(StdError::generic_err(format!(
-            "Encode error: {}",
-            e
-        ))));
+        return Err(ContractError::EncodeError(e.to_string()).into());
     }
 
     let cosmos_msg = NeutronMsg::submit_tx(

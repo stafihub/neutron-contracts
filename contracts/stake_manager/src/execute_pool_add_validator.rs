@@ -1,22 +1,18 @@
-use cosmwasm_std::{DepsMut, Env, MessageInfo, Response, StdError};
+use cosmwasm_std::{DepsMut, Env, MessageInfo, Response};
 
+use neutron_sdk::interchain_queries::v045::new_register_delegator_delegations_query_msg;
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     interchain_queries::v045::new_register_staking_validators_query_msg,
     NeutronResult,
 };
-use neutron_sdk::{
-    interchain_queries::v045::new_register_delegator_delegations_query_msg, NeutronError,
-};
 
+use crate::state::{QueryKind, INFO_OF_ICA_ID};
+use crate::{contract::DEFAULT_UPDATE_PERIOD, error_conversion::ContractError};
 use crate::{
     query_callback::register_query_submsg,
     state::{EraProcessStatus, POOLS},
 };
-
-use crate::state::{QueryKind, INFO_OF_ICA_ID};
-
-use crate::{contract::DEFAULT_UPDATE_PERIOD, error_conversion::ContractError};
 
 pub fn execute_add_pool_validators(
     mut deps: DepsMut<NeutronQuery>,
@@ -31,20 +27,14 @@ pub fn execute_add_pool_validators(
         return Err(ContractError::Unauthorized {}.into());
     }
     if pool_info.era_process_status != EraProcessStatus::ActiveEnded {
-        return Err(NeutronError::Std(StdError::generic_err(
-            "Era process not end",
-        )));
+        return Err(ContractError::EraProcessNotEnd {}.into());
     }
 
     if pool_info.validator_addrs.len() >= 5 {
-        return Err(NeutronError::Std(StdError::generic_err(
-            "Validator addresses list must contain between 1 and 5 addresses.",
-        )));
+        return Err(ContractError::ValidatorAddressesListSize {}.into());
     }
     if pool_info.validator_addrs.contains(&validator_addr) {
-        return Err(NeutronError::Std(StdError::generic_err(
-            "validator already exit",
-        )));
+        return Err(ContractError::ValidatorAlreadyExit {}.into());
     }
     pool_info.validator_addrs.push(validator_addr);
 

@@ -32,7 +32,6 @@ NEUTRON_NODE="tcp://127.0.0.1:26657"
 GAIA_NODE="tcp://127.0.0.1:16657"
 ADDRESS_1="neutron1m9l358xunhhwds0568za49mzhvuxx9ux8xafx2"
 ADDRESS_2="cosmos10h9stc5v6ntgeygf5xf945njqq5h32r53uquvw"
-# ADDRESS_2="cosmos1tn7wpug7hq2xxmcr00g4jrewna5rmhtkaeu3k6" # neutron1tn7wpug7hq2xxmcr00g4jrewna5rmhtkex4nva
 ADMIN="neutron1m9l358xunhhwds0568za49mzhvuxx9ux8xafx2"
 VALIDATOR="cosmosvaloper18hl5c9xn5dze2g50uaw0l2mr02ew57zk0auktn"
 

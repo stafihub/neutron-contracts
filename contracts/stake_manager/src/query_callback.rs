@@ -2,7 +2,10 @@ use cosmwasm_std::{CosmosMsg, DepsMut, Reply, Response, StdError, StdResult, Sub
 
 use neutron_sdk::bindings::{msg::MsgRegisterInterchainQueryResponse, query::NeutronQuery};
 
-use crate::state::{get_next_query_reply_id, QueryKind, ADDRESS_TO_REPLY_ID, REPLY_ID_TO_QUERY_ID};
+use crate::{
+    error_conversion::ContractError,
+    state::{get_next_query_reply_id, QueryKind, ADDRESS_TO_REPLY_ID, REPLY_ID_TO_QUERY_ID},
+};
 
 pub fn register_query_submsg<C: Into<CosmosMsg<T>>, T>(
     deps: DepsMut<NeutronQuery>,
@@ -24,10 +27,10 @@ pub fn write_reply_id_to_query_id(deps: DepsMut, msg: Reply) -> StdResult<Respon
             .into_result()
             .map_err(StdError::generic_err)?
             .data
-            .ok_or_else(|| StdError::generic_err("no result"))?
+            .ok_or_else(|| ContractError::ICQErrReplyNoResult {})?
             .as_slice(),
     )
-    .map_err(|e| StdError::generic_err(format!("failed to parse response: {:?}", e)))?;
+    .map_err(|e| ContractError::ICQErrFailedParse(e.to_string()))?;
 
     deps.api.debug(
         format!(

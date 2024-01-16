@@ -1,20 +1,23 @@
 use std::ops::{Div, Mul, Sub};
 
-use cosmwasm_std::{DepsMut, Env, Response, StdError, StdResult, Uint128};
+use cosmwasm_std::{DepsMut, Env, Response, StdResult, Uint128};
 
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     query::min_ibc_fee::query_min_ibc_fee,
-    NeutronError, NeutronResult,
+    NeutronResult,
 };
 
-use crate::helper::{gen_delegation_txs, min_ntrn_ibc_fee};
 use crate::state::EraProcessStatus::{RestakeEnded, RestakeStarted, WithdrawEnded};
 use crate::state::{INFO_OF_ICA_ID, POOLS};
 use crate::{
     contract::DEFAULT_TIMEOUT_SECONDS,
     state::{SudoPayload, TxType},
     tx_callback::msg_with_sudo_callback,
+};
+use crate::{
+    error_conversion::ContractError,
+    helper::{gen_delegation_txs, min_ntrn_ibc_fee},
 };
 
 pub fn execute_era_restake(
@@ -29,17 +32,14 @@ pub fn execute_era_restake(
         deps.as_ref()
             .api
             .debug(format!("WASMDEBUG: execute_era_restake skip pool: {:?}", pool_addr).as_str());
-        return Err(NeutronError::Std(StdError::generic_err("status not allow")));
+        return Err(ContractError::StatusNotAllow {}.into());
     }
     pool_info.era_process_status = RestakeStarted;
 
     let (pool_ica_info, _, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
 
     if env.block.height <= pool_info.era_snapshot.bond_height {
-        return Err(NeutronError::Std(StdError::generic_err(
-            "Pool Addr submission height is less than or
-         equal to the bond height of the pool era, which is not allowed.",
-        )));
+        return Err(ContractError::RestakeHeight {}.into());
     }
 
     let restake_amount = pool_info.era_snapshot.restake_amount;
@@ -71,9 +71,7 @@ pub fn execute_era_restake(
     );
 
     if validator_count == 0 {
-        return Err(NeutronError::Std(StdError::generic_err(
-            "validator_count is zero",
-        )));
+        return Err(ContractError::ValidatorCountIsZero {}.into());
     }
 
     let amount_per_validator = restake_amount.div(Uint128::from(validator_count));

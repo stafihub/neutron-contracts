@@ -1,16 +1,14 @@
 use std::ops::{Add, Div, Mul};
 use std::vec;
 
-use cosmwasm_std::{
-    to_json_binary, CosmosMsg, DepsMut, Env, MessageInfo, Response, StdError, WasmMsg,
-};
+use cosmwasm_std::{to_json_binary, CosmosMsg, DepsMut, Env, MessageInfo, Response, WasmMsg};
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
-    NeutronError, NeutronResult,
+    NeutronResult,
 };
 
-use crate::helper::CAL_BASE;
 use crate::state::POOLS;
+use crate::{error_conversion::ContractError, helper::CAL_BASE};
 
 pub fn execute_stake(
     deps: DepsMut<NeutronQuery>,
@@ -21,22 +19,16 @@ pub fn execute_stake(
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
     if pool_info.paused {
-        return Err(NeutronError::Std(StdError::generic_err("Pool is paused")));
+        return Err(ContractError::PoolIsPaused {}.into());
     }
 
     if info.funds.len() != 1 || info.funds[0].denom != pool_info.ibc_denom.clone() {
-        return Err(NeutronError::Std(StdError::generic_err(format!(
-            "Params error: {}",
-            "funds not match"
-        ))));
+        return Err(ContractError::ParamsErrorFundsNotMatch {}.into());
     }
 
     let token_amount = info.funds[0].amount;
     if token_amount < pool_info.minimal_stake {
-        return Err(NeutronError::Std(StdError::generic_err(format!(
-            "Params error: {}",
-            "less than minimal stake"
-        ))));
+        return Err(ContractError::LessThanMinimalStake {}.into());
     }
 
     pool_info.active = pool_info.active.add(token_amount);

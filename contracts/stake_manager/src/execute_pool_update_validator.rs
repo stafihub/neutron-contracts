@@ -8,11 +8,11 @@ use crate::{
     state::{SudoPayload, TxType},
     tx_callback::msg_with_sudo_callback,
 };
-use cosmwasm_std::{DepsMut, Env, MessageInfo, Response, StdError, StdResult};
+use cosmwasm_std::{DepsMut, Env, MessageInfo, Response, StdResult};
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     query::min_ibc_fee::query_min_ibc_fee,
-    NeutronError, NeutronResult,
+    NeutronResult,
 };
 use std::vec;
 
@@ -31,9 +31,7 @@ pub fn execute_pool_update_validator(
         return Err(ContractError::Unauthorized {}.into());
     }
     if pool_info.era_process_status != EraProcessStatus::ActiveEnded {
-        return Err(NeutronError::Std(StdError::generic_err(
-            "Era process not end",
-        )));
+        return Err(ContractError::EraProcessNotEnd {}.into());
     }
 
     deps.as_ref().api.debug(
@@ -45,17 +43,13 @@ pub fn execute_pool_update_validator(
     );
 
     if pool_info.validator_update_status != ValidatorUpdateStatus::End {
-        return Err(NeutronError::Std(StdError::generic_err("status not allow")));
+        return Err(ContractError::StatusNotAllow {}.into());
     }
     if !pool_info.validator_addrs.contains(&old_validator) {
-        return Err(NeutronError::Std(StdError::generic_err(
-            "old valdiator not exist",
-        )));
+        return Err(ContractError::OldValidatorNotExist {}.into());
     }
     if pool_info.validator_addrs.contains(&new_validator) {
-        return Err(NeutronError::Std(StdError::generic_err(
-            "new valdiator already exist",
-        )));
+        return Err(ContractError::NewValidatorAlreadyExist {}.into());
     }
 
     let delegations = query_delegation_by_addr(deps.as_ref(), pool_addr.clone())?;

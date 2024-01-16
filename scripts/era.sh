@@ -18,7 +18,6 @@ redeem_token_for_share() {
 
   echo "redeem mag: $redeem_msg"
   tx_result="$(neutrond tx wasm execute "$contract_address" "$redeem_msg" \
-    --amount 2000000untrn \
     --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
     --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \
     --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"
@@ -53,7 +52,6 @@ process_era() {
 }' "$pool_address")
 
   tx_result="$(neutrond tx wasm execute "$contract_address" "$era_update_msg" \
-    --amount 2000000untrn \
     --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
     --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \
     --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"
@@ -88,7 +86,6 @@ process_era() {
 }' "$pool_address")
 
   tx_result="$(neutrond tx wasm execute "$contract_address" "$bond_msg" \
-    --amount 2000000untrn \
     --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
     --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \
     --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"
@@ -124,7 +121,6 @@ process_era() {
 }' "$pool_address")
 
   tx_result="$(neutrond tx wasm execute "$contract_address" "$era_collect_withdraw_msg" \
-    --amount 2000000untrn \
     --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
     --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \
     --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"
@@ -156,7 +152,6 @@ process_era() {
 }' "$pool_address")
 
   tx_result="$(neutrond tx wasm execute "$contract_address" "$era_restake_msg" \
-    --amount 2000000untrn \
     --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
     --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \
     --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"
@@ -190,7 +185,6 @@ process_era() {
 }' "$pool_address")
 
   tx_result="$(neutrond tx wasm execute "$contract_address" "$era_active_msg" \
-    --amount 2000000untrn \
     --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
     --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \
     --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"

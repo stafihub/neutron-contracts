@@ -7,7 +7,6 @@
 # }' "$pool_address")
 
 # tx_result="$(neutrond tx wasm execute "$contract_address" "$pool_add_validator_msg" \
-#     --amount 2000000untrn \
 #     --from "demowallet1" -y --chain-id "$CHAIN_ID_1" --output json \
 #     --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \
 #     --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"
@@ -40,7 +39,6 @@
 # }' "$pool_address")
 
 # tx_result="$(neutrond tx wasm execute "$contract_address" "$pool_rm_validator_msg" \
-#     --amount 2000000untrn \
 #     --from "demowallet1" -y --chain-id "$CHAIN_ID_1" --output json \
 #     --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \
 #     --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"
@@ -73,7 +71,6 @@
 # }' "$pool_address")
 
 # tx_result="$(neutrond tx wasm execute "$contract_address" "$pool_add_validator_msg" \
-#     --amount 2000000untrn \
 #     --from "demowallet2" -y --chain-id "$CHAIN_ID_1" --output json \
 #     --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \
 #     --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"

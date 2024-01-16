@@ -3,23 +3,22 @@ use std::vec;
 use cosmos_sdk_proto::cosmos::bank::v1beta1::MsgSend;
 use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
 use cosmos_sdk_proto::prost::Message;
-use cosmwasm_std::{
-    Addr, Binary, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128,
-};
+use cosmwasm_std::{Addr, Binary, DepsMut, Env, MessageInfo, Response, StdResult, Uint128};
+
 use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     query::min_ibc_fee::query_min_ibc_fee,
-    NeutronError, NeutronResult,
+    NeutronResult,
 };
 
-use crate::contract::DEFAULT_TIMEOUT_SECONDS;
 use crate::helper::min_ntrn_ibc_fee;
 use crate::state::{
     SudoPayload, TxType, WithdrawStatus, INFO_OF_ICA_ID, POOLS, UNSTAKES_INDEX_FOR_USER,
     UNSTAKES_OF_INDEX,
 };
 use crate::tx_callback::msg_with_sudo_callback;
+use crate::{contract::DEFAULT_TIMEOUT_SECONDS, error_conversion::ContractError};
 
 pub fn execute_withdraw(
     mut deps: DepsMut<NeutronQuery>,
@@ -30,9 +29,7 @@ pub fn execute_withdraw(
     unstake_index_list: Vec<u64>,
 ) -> NeutronResult<Response<NeutronMsg>> {
     if unstake_index_list.is_empty() {
-        return Err(NeutronError::Std(StdError::generic_err(
-            "Empty unstake list",
-        )));
+        return Err(ContractError::EmptyUnstakeList {}.into());
     }
 
     let pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
@@ -43,30 +40,18 @@ pub fn execute_withdraw(
             UNSTAKES_OF_INDEX.load(deps.storage, (pool_addr.clone(), unstake_index))?;
 
         if unstake_info.pool_addr != pool_addr {
-            return Err(NeutronError::Std(StdError::generic_err(format!(
-                "Unstake index: {} pool not match",
-                unstake_index
-            ))));
+            return Err(ContractError::UnstakeIndexPoolNotMatch(unstake_index).into());
         }
 
         if unstake_info.unstaker != info.sender {
-            return Err(NeutronError::Std(StdError::generic_err(format!(
-                "Unstake index: {} unstaker not match",
-                unstake_index
-            ))));
+            return Err(ContractError::UnstakeIndexUnstakerNotMatch(unstake_index).into());
         }
 
         if unstake_info.status == WithdrawStatus::Pending {
-            return Err(NeutronError::Std(StdError::generic_err(format!(
-                "Unstake index: {} status not match",
-                unstake_index
-            ))));
+            return Err(ContractError::UnstakeIndexStatusNotMatch(unstake_index).into());
         }
         if unstake_info.era + pool_info.unbonding_period > pool_info.era {
-            return Err(NeutronError::Std(StdError::generic_err(format!(
-                "Unstake index: {} not withdrawable",
-                unstake_index
-            ))));
+            return Err(ContractError::UnstakeIndexNotWithdrawable(unstake_index).into());
         }
 
         // Remove the unstake index element of info.sender from UNSTAKES_INDEX_FOR_USER
@@ -81,10 +66,7 @@ pub fn execute_withdraw(
     }
 
     if total_withdraw_amount.is_zero() {
-        return Err(NeutronError::Std(StdError::generic_err(format!(
-            "Encode error: {}",
-            "Zero withdraw amount"
-        ))));
+        return Err(ContractError::EncodeErrZeroWithdrawAmount {}.into());
     }
 
     let unstake_index_list_str = unstake_index_list
@@ -107,10 +89,7 @@ pub fn execute_withdraw(
     buf.reserve(ica_send.encoded_len());
 
     if let Err(e) = ica_send.encode(&mut buf) {
-        return Err(NeutronError::Std(StdError::generic_err(format!(
-            "Encode error: {}",
-            e
-        ))));
+        return Err(ContractError::EncodeError(e.to_string()).into());
     }
 
     let send_msg = ProtobufAny {
@@ -153,10 +132,7 @@ pub fn execute_withdraw(
 pub fn sudo_withdraw_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
     let parts: Vec<String> = payload.message.split('_').map(String::from).collect();
     if parts.len() <= 1 {
-        return Err(StdError::generic_err(format!(
-            "unsupported  message {}",
-            payload.message
-        )));
+        return Err(ContractError::UnsupportedMessage(payload.message).into());
     }
     let user_addr = Addr::unchecked(parts.get(0).unwrap());
 

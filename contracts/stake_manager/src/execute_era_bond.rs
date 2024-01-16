@@ -9,20 +9,23 @@ use cosmos_sdk_proto::cosmos::{
     base::v1beta1::Coin, distribution::v1beta1::MsgWithdrawDelegatorReward,
 };
 use cosmos_sdk_proto::prost::Message;
-use cosmwasm_std::{Binary, Delegation, DepsMut, Env, Response, StdError, StdResult, Uint128};
+use cosmwasm_std::{Binary, Delegation, DepsMut, Env, Response, StdResult, Uint128};
 
 use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     query::min_ibc_fee::query_min_ibc_fee,
-    NeutronError, NeutronResult,
+    NeutronResult,
 };
 
-use crate::helper::{gen_delegation_txs, min_ntrn_ibc_fee};
 use crate::state::EraProcessStatus::{BondEnded, BondStarted, EraUpdateEnded};
 use crate::state::{SudoPayload, TxType, INFO_OF_ICA_ID, POOLS};
 use crate::tx_callback::msg_with_sudo_callback;
 use crate::{contract::DEFAULT_TIMEOUT_SECONDS, query::query_delegation_by_addr};
+use crate::{
+    error_conversion::ContractError,
+    helper::{gen_delegation_txs, min_ntrn_ibc_fee},
+};
 
 #[derive(Clone, Debug)]
 struct ValidatorUnbondInfo {
@@ -43,7 +46,7 @@ pub fn execute_era_bond(
         deps.as_ref()
             .api
             .debug(format!("WASMDEBUG: execute_era_bond skip pool: {:?}", pool_addr).as_str());
-        return Err(NeutronError::Std(StdError::generic_err("status not allow")));
+        return Err(ContractError::StatusNotAllow {}.into());
     }
 
     pool_info.era_process_status = BondStarted;
@@ -100,10 +103,7 @@ pub fn execute_era_bond(
                 buf.reserve(delegate_msg.encoded_len());
 
                 if let Err(e) = delegate_msg.encode(&mut buf) {
-                    return Err(NeutronError::Std(StdError::generic_err(format!(
-                        "Encode error: {}",
-                        e
-                    ))));
+                    return Err(ContractError::EncodeError(e.to_string()).into());
                 }
 
                 let any_msg = ProtobufAny {
@@ -143,10 +143,7 @@ pub fn execute_era_bond(
                 buf.reserve(withdraw_msg.encoded_len());
 
                 if let Err(e) = withdraw_msg.encode(&mut buf) {
-                    return Err(NeutronError::Std(StdError::generic_err(format!(
-                        "Encode error: {}",
-                        e
-                    ))));
+                    return Err(ContractError::EncodeError(e.to_string()).into());
                 }
 
                 // Put the serialized MsgWithdrawDelegatorReward message to a types.Any protobuf message
@@ -172,9 +169,7 @@ pub fn execute_era_bond(
         );
 
         if validator_count == 0 {
-            return Err(NeutronError::Std(StdError::generic_err(
-                "validator_count is zero",
-            )));
+            return Err(ContractError::ValidatorCountIsZero {}.into());
         }
 
         let amount_per_validator = stake_amount.div(Uint128::from(validator_count));

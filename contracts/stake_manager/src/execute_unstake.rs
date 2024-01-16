@@ -1,18 +1,16 @@
 use std::ops::{Add, Div, Mul, Sub};
 use std::vec;
 
-use cosmwasm_std::{
-    to_json_binary, CosmosMsg, DepsMut, MessageInfo, Response, StdError, Uint128, WasmMsg,
-};
+use cosmwasm_std::{to_json_binary, CosmosMsg, DepsMut, MessageInfo, Response, Uint128, WasmMsg};
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
-    NeutronError, NeutronResult,
+    NeutronResult,
 };
 
-use crate::helper::CAL_BASE;
 use crate::state::{
     UnstakeInfo, WithdrawStatus, POOLS, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX,
 };
+use crate::{error_conversion::ContractError, helper::CAL_BASE};
 
 // Before this step, need the user to authorize burn from
 pub fn execute_unstake(
@@ -22,10 +20,7 @@ pub fn execute_unstake(
     pool_addr: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
     if lsd_token_amount == Uint128::zero() {
-        return Err(NeutronError::Std(StdError::generic_err(format!(
-            "Encode error: {}",
-            "lsd_token amount is zero"
-        ))));
+        return Err(ContractError::EncodeErrLsdTokenAmountZero {}.into());
     }
 
     let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
@@ -50,10 +45,7 @@ pub fn execute_unstake(
 
     let unstake_limit = pool_info.unstake_times_limit;
     if unstake_count >= unstake_limit {
-        return Err(NeutronError::Std(StdError::generic_err(format!(
-            "Encode error: {}",
-            "Unstake times limit reached"
-        ))));
+        return Err(ContractError::EncodeErrUnstakeTimesLimitReached {}.into());
     }
 
     let mut rsp = Response::new();
@@ -90,9 +82,7 @@ pub fn execute_unstake(
         );
     }
     if will_burn_lsd_token_amount.is_zero() {
-        return Err(NeutronError::Std(StdError::generic_err(
-            "Burn lsd_token amount is zero",
-        )));
+        return Err(ContractError::BurnLsdTokenAmountIsZero {}.into());
     }
 
     // Calculate the number of tokens(atom)
