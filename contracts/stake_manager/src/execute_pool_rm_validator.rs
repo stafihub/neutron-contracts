@@ -1,3 +1,14 @@
+use std::vec;
+
+use cosmwasm_std::StdResult;
+use cosmwasm_std::{DepsMut, Env, MessageInfo, Response};
+
+use neutron_sdk::{
+    bindings::{msg::NeutronMsg, query::NeutronQuery},
+    query::min_ibc_fee::query_min_ibc_fee,
+    NeutronResult,
+};
+
 use crate::contract::DEFAULT_TIMEOUT_SECONDS;
 use crate::error_conversion::ContractError;
 use crate::helper::gen_redelegate_txs;
@@ -7,14 +18,6 @@ use crate::state::{
     EraProcessStatus, SudoPayload, TxType, ValidatorUpdateStatus, INFO_OF_ICA_ID, POOLS,
 };
 use crate::tx_callback::msg_with_sudo_callback;
-use cosmwasm_std::StdResult;
-use cosmwasm_std::{DepsMut, Env, MessageInfo, Response, StdError};
-use neutron_sdk::{
-    bindings::{msg::NeutronMsg, query::NeutronQuery},
-    query::min_ibc_fee::query_min_ibc_fee,
-    NeutronError, NeutronResult,
-};
-use std::vec;
 
 pub fn execute_rm_pool_validator(
     mut deps: DepsMut<NeutronQuery>,
@@ -29,17 +32,13 @@ pub fn execute_rm_pool_validator(
         return Err(ContractError::Unauthorized {}.into());
     }
     if pool_info.era_process_status != EraProcessStatus::ActiveEnded {
-        return Err(NeutronError::Std(StdError::generic_err(
-            "Era process not end",
-        )));
+        return Err(ContractError::EraProcessNotEnd {}.into());
     }
     if !pool_info.validator_addrs.contains(&validator_addr) {
-        return Err(NeutronError::Std(StdError::generic_err(
-            "Validator not exist",
-        )));
+        return Err(ContractError::OldValidatorNotExist {}.into());
     }
     if pool_info.validator_update_status != ValidatorUpdateStatus::End {
-        return Err(NeutronError::Std(StdError::generic_err("status not allow")));
+        return Err(ContractError::StatusNotAllow {}.into());
     }
 
     deps.as_ref().api.debug(
@@ -60,9 +59,7 @@ pub fn execute_rm_pool_validator(
         .as_str(),
     );
     if pool_info.validator_addrs.len() <= 1 {
-        return Err(NeutronError::Std(StdError::generic_err(
-            "validator_count not enough",
-        )));
+        return Err(ContractError::ValidatorAddressesListSize {}.into());
     }
 
     let left_validators: Vec<String> = pool_info

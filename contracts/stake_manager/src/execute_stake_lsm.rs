@@ -4,18 +4,19 @@ use std::{
 };
 
 use cosmwasm_std::{
-    coins, to_json_binary, BankMsg, Coin, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
-    Uint128, WasmMsg,
+    coins, to_json_binary, BankMsg, Coin, DepsMut, Env, MessageInfo, Response, StdResult, Uint128,
+    WasmMsg,
 };
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     query::min_ibc_fee::query_min_ibc_fee,
     sudo::msg::RequestPacketTimeoutHeight,
-    NeutronError, NeutronResult,
+    NeutronResult,
 };
 
 use crate::{
     contract::DEFAULT_TIMEOUT_SECONDS,
+    error_conversion::ContractError,
     helper::{min_ntrn_ibc_fee, query_denom_trace, CAL_BASE},
     query::query_validator_by_addr,
     state::{EraProcessStatus, SudoPayload, TxType, ValidatorUpdateStatus, INFO_OF_ICA_ID, POOLS},
@@ -31,38 +32,28 @@ pub fn execute_stake_lsm(
 ) -> NeutronResult<Response<NeutronMsg>> {
     let pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
     if !pool_info.lsm_support {
-        return Err(NeutronError::Std(StdError::generic_err(
-            "Lsm stake not support",
-        )));
+        return Err(ContractError::LsmStakeNotSupport {}.into());
     }
     if pool_info.share_tokens.len() >= pool_info.lsm_pending_limit as usize {
-        return Err(NeutronError::Std(StdError::generic_err(
-            "Lsm pending stake over limit",
-        )));
+        return Err(ContractError::LsmPendingStakeOverLimit {}.into());
     }
     if pool_info.era_process_status != EraProcessStatus::ActiveEnded {
-        return Err(NeutronError::Std(StdError::generic_err(
-            "Era process not end",
-        )));
+        return Err(ContractError::EraProcessNotEnd {}.into());
     }
     if pool_info.validator_update_status != ValidatorUpdateStatus::End {
-        return Err(NeutronError::Std(StdError::generic_err(
-            "Pool icq not updated",
-        )));
+        return Err(ContractError::PoolIcqNotUpdated {}.into());
     }
+
     deps.as_ref()
         .api
         .debug(format!("WASMDEBUG: pool_info {:?}", pool_info).as_str());
 
     let (pool_ica_info, _, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
     if pool_info.paused {
-        return Err(NeutronError::Std(StdError::generic_err("Pool is paused")));
+        return Err(ContractError::PoolIsPaused {}.into());
     }
     if info.funds.len() != 1 || !info.funds[0].denom.contains("/") {
-        return Err(NeutronError::Std(StdError::generic_err(format!(
-            "Params error: {}",
-            "funds not match"
-        ))));
+        return Err(ContractError::ParamsErrorFundsNotMatch {}.into());
     }
 
     deps.as_ref()
@@ -70,14 +61,12 @@ pub fn execute_stake_lsm(
         .debug(format!("WASMDEBUG: funds {:?}", info.funds[0]).as_str());
     let share_token_amount = info.funds[0].amount;
     if share_token_amount < pool_info.minimal_stake {
-        return Err(NeutronError::Std(StdError::generic_err(
-            "less than minimal stake",
-        )));
+        return Err(ContractError::LessThanMinimalStake {}.into());
     }
 
     let denom_parts: Vec<String> = info.funds[0].denom.split("/").map(String::from).collect();
     if denom_parts.len() != 2 {
-        return Err(NeutronError::Std(StdError::generic_err("denom not match")));
+        return Err(ContractError::DenomNotMatch {}.into());
     }
     deps.as_ref()
         .api
@@ -98,23 +87,17 @@ pub fn execute_stake_lsm(
         .map(String::from)
         .collect();
     if path_parts.len() != 2 {
-        return Err(NeutronError::Std(StdError::generic_err(
-            "denom path not match",
-        )));
+        return Err(ContractError::DenomPathNotMatch {}.into());
     }
 
     let denom_trace_parts: Vec<String> = share_token_denom.split("/").map(String::from).collect();
     if denom_trace_parts.len() != 2 {
-        return Err(NeutronError::Std(StdError::generic_err(
-            "denom trace not match",
-        )));
+        return Err(ContractError::DenomTraceNotMatch {}.into());
     }
     let channel_id_of_share_token = path_parts.get(1).unwrap();
     let validator_addr = denom_trace_parts.get(0).unwrap();
     if !pool_info.validator_addrs.contains(validator_addr) {
-        return Err(NeutronError::Std(StdError::generic_err(
-            "validator not support",
-        )));
+        return Err(ContractError::ValidatorNotSupport {}.into());
     }
     let validators = query_validator_by_addr(deps.as_ref(), pool_addr.clone())?;
     deps.as_ref()
@@ -136,9 +119,7 @@ pub fn execute_stake_lsm(
             .mul(val_token_amount)
             .div(val_share_amount);
         if token_amount.is_zero() {
-            return Err(NeutronError::Std(StdError::generic_err(
-                "token amount zero",
-            )));
+            return Err(ContractError::TokenAmountZero {}.into());
         }
 
         let fee: neutron_sdk::bindings::msg::IbcFee =
@@ -181,9 +162,8 @@ pub fn execute_stake_lsm(
         deps.as_ref()
             .api
             .debug(format!("WASMDEBUG: no validator info").as_str());
-        return Err(NeutronError::Std(StdError::generic_err(
-            "no validator info",
-        )));
+
+        return Err(ContractError::NoValidatorInfo {}.into());
     }
 
     Ok(Response::new().add_submessage(sub_msg))
@@ -195,10 +175,7 @@ pub fn sudo_stake_lsm_callback(deps: DepsMut, payload: SudoPayload) -> StdResult
         .debug(format!("WASMDEBUG: sudo_stake_lsm_callback payload {:?}", payload).as_str());
     let parts: Vec<String> = payload.message.split('_').map(String::from).collect();
     if parts.len() != 5 {
-        return Err(StdError::generic_err(format!(
-            "unsupported  message {}",
-            payload.message
-        )));
+        return Err(ContractError::UnsupportedMessage(payload.message).into());
     }
 
     let staker_neutron_addr = parts.get(0).unwrap();
@@ -209,19 +186,13 @@ pub fn sudo_stake_lsm_callback(deps: DepsMut, payload: SudoPayload) -> StdResult
     let token_amount = match token_amount_str.parse::<u128>() {
         Ok(amount) => amount,
         Err(_) => {
-            return Err(StdError::generic_err(format!(
-                "unsupported  message {}",
-                payload.message
-            )));
+            return Err(ContractError::UnsupportedMessage(payload.message).into());
         }
     };
     let share_token_amount = match share_token_amount_str.parse::<u128>() {
         Ok(amount) => amount,
         Err(_) => {
-            return Err(StdError::generic_err(format!(
-                "unsupported  message {}",
-                payload.message
-            )));
+            return Err(ContractError::UnsupportedMessage(payload.message).into());
         }
     };
 
@@ -267,10 +238,7 @@ pub fn sudo_stake_lsm_failed_callback(deps: DepsMut, payload: SudoPayload) -> St
 
     let parts: Vec<String> = payload.message.split('_').map(String::from).collect();
     if parts.len() != 5 {
-        return Err(StdError::generic_err(format!(
-            "unsupported  message {}",
-            payload.message
-        )));
+        return Err(ContractError::UnsupportedMessage(payload.message).into());
     }
 
     let staker_neutron_addr = parts.get(0).unwrap();
@@ -280,10 +248,7 @@ pub fn sudo_stake_lsm_failed_callback(deps: DepsMut, payload: SudoPayload) -> St
     let share_token_amount = match share_token_amount_str.parse::<u128>() {
         Ok(amount) => amount,
         Err(_) => {
-            return Err(StdError::generic_err(format!(
-                "unsupported  message {}",
-                payload.message
-            )));
+            return Err(ContractError::UnsupportedMessage(payload.message).into());
         }
     };
 

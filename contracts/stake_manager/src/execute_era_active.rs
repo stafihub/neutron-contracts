@@ -1,17 +1,18 @@
 use core::ops::{Mul, Sub};
 use std::ops::{Add, Div};
 
-use cosmwasm_std::{to_json_binary, DepsMut, Response, StdError, Uint128, WasmMsg};
+use cosmwasm_std::{to_json_binary, DepsMut, Response, Uint128, WasmMsg};
+
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
-    NeutronError, NeutronResult,
+    NeutronResult,
 };
 
-use crate::state::POOLS;
 use crate::state::{
     EraProcessStatus::{ActiveEnded, RestakeEnded},
     STACK,
 };
+use crate::{error_conversion::ContractError, state::POOLS};
 use crate::{helper::CAL_BASE, query::query_delegation_by_addr};
 
 pub fn execute_era_active(
@@ -24,13 +25,11 @@ pub fn execute_era_active(
         deps.as_ref()
             .api
             .debug(format!("WASMDEBUG: execute_era_active skip pool: {:?}", pool_addr).as_str());
-        return Err(NeutronError::Std(StdError::generic_err("status not allow")));
+        return Err(ContractError::StatusNotAllow {}.into());
     }
 
     if pool_info.share_tokens.len() > 0 {
-        return Err(NeutronError::Std(StdError::generic_err(
-            "Pending share token not empty",
-        )));
+        return Err(ContractError::PendingShareNotEmpty {}.into());
     }
 
     deps.as_ref().api.debug(
@@ -51,8 +50,7 @@ pub fn execute_era_active(
     match delegations_result {
         Ok(delegations_resp) => {
             if delegations_resp.last_submitted_local_height <= pool_info.era_snapshot.bond_height {
-                return Err(NeutronError::Std(StdError::generic_err("Delegation submission height is less than 
-                or equal to the bond/withdraw collect height of the pool era, which is not allowed.")));
+                return Err(ContractError::DelegationSubmissionHeight {}.into());
             }
             for delegation in delegations_resp.delegations {
                 total_amount.amount = total_amount.amount.add(delegation.amount.amount);
@@ -66,10 +64,7 @@ pub fn execute_era_active(
                 )
                 .as_str(),
             );
-
-            return Err(NeutronError::Std(StdError::generic_err(
-                "delegations not exist",
-            )));
+            return Err(ContractError::DelegationsNotExist {}.into());
         }
     }
 
@@ -130,9 +125,7 @@ pub fn execute_era_active(
     };
 
     if rate_change > pool_info.rate_change_limit {
-        return Err(NeutronError::Std(StdError::generic_err(
-            "rate change over limit",
-        )));
+        return Err(ContractError::RateChangeOverLimit {}.into());
     }
 
     pool_info.rate = new_rate;

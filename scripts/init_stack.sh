@@ -38,7 +38,6 @@ init_stack() {
 
 #   # echo "the msg is: $msg"
 #   tx_result="$(neutrond tx wasm execute "$contract_address" "$msg" \
-#     --amount 2000000untrn \
 #     --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
 #     --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \
 #     --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"

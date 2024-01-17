@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 user_stake() {
     echo "--------------------------user stake-------------------------------------"
+
     msg=$(
         cat <<EOF
 {
@@ -16,6 +17,7 @@ user_stake() {
 }
 EOF
     )
+
     tx_result=$(gaiad tx ibc-transfer transfer transfer channel-0 \
         "$contract_address" 405550000uatom \
         --memo "$msg" \
@@ -56,7 +58,6 @@ user_allowance() {
 }' "$contract_address")
 
     tx_result="$(neutrond tx wasm execute "$lsd_token_contract_address" "$allow_msg" \
-        --amount 2000000untrn \
         --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
         --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \
         --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"
@@ -177,8 +178,8 @@ user_stake_lsm() {
     done
     echo " done"
 
-    share_token_denom=$(gaiad q bank balances $ADDRESS_2 --output json | jq ".balances[0].denom" | sed 's/\"//g')
-    share_token_amount=$(gaiad q bank balances $ADDRESS_2 --output json | jq ".balances[0].amount" | sed 's/\"//g')
+    share_token_denom=$(gaiad q bank balances $ADDRESS_2 --node "$GAIA_NODE" --output json | jq ".balances[0].denom" | sed 's/\"//g')
+    share_token_amount=$(gaiad q bank balances $ADDRESS_2 --node "$GAIA_NODE" --output json | jq ".balances[0].amount" | sed 's/\"//g')
 
     msg=$(
         cat <<EOF
@@ -195,6 +196,7 @@ user_stake_lsm() {
 }
 EOF
     )
+
     tx_result=$(gaiad tx ibc-transfer transfer transfer channel-0 \
         "$contract_address" $share_token_amount$share_token_denom \
         --memo "$msg" \

@@ -1,7 +1,6 @@
 use std::vec;
 
-use cosmwasm_std::{DepsMut, Env, MessageInfo, Response, StdError};
-use neutron_sdk::NeutronError;
+use cosmwasm_std::{DepsMut, Env, MessageInfo, Response};
 
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
@@ -50,9 +49,7 @@ pub fn execute_open_channel(
         );
         msgs.push(register_withdraw_msg);
     } else {
-        return Err(NeutronError::Std(StdError::generic_err(
-            "closed_channel_id unmatch",
-        )));
+        return Err(ContractError::ClosedChannelIdUnmatch {}.into());
     }
 
     Ok(Response::default().add_messages(msgs))

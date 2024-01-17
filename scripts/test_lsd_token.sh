@@ -72,7 +72,6 @@ mint_msg=$(printf '{
 }' "$ADDRESS_1")
 
 tx_result="$(neutrond tx wasm execute "$contract_address" "$mint_msg" \
-    --amount 300000000untrn \
     --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
     --broadcast-mode=sync --gas-prices 0.0055untrn --gas 2000000 \
     --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"
@@ -148,7 +147,6 @@ lsd_token_send_msg=$(printf '{
 }' "$ics20_contract_address" "$channel_msg_base64")
 
 tx_result="$(neutrond tx wasm execute "$contract_address" "$lsd_token_send_msg" \
-    --amount 300000000untrn \
     --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
     --broadcast-mode=sync --gas-prices 0.0055untrn --gas 2000000 \
     --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"

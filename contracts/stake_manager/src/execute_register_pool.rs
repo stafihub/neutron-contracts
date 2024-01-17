@@ -1,5 +1,4 @@
-use cosmwasm_std::{Addr, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128};
-use neutron_sdk::NeutronError;
+use cosmwasm_std::{Addr, DepsMut, Env, MessageInfo, Response, StdResult, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -9,7 +8,10 @@ use neutron_sdk::{
     NeutronResult,
 };
 
-use crate::state::{EraSnapshot, ValidatorUpdateStatus};
+use crate::{
+    error_conversion::ContractError,
+    state::{EraSnapshot, ValidatorUpdateStatus},
+};
 use crate::{
     helper::{get_withdraw_ica_id, ICA_WITHDRAW_SUFIX, INTERCHAIN_ACCOUNT_ID_LEN_LIMIT},
     state::{EraProcessStatus, IcaInfo, PoolInfo, INFO_OF_ICA_ID, POOLS},
@@ -44,18 +46,14 @@ pub fn execute_register_pool(
         || interchain_account_id.contains(ICA_WITHDRAW_SUFIX)
         || interchain_account_id.len() > INTERCHAIN_ACCOUNT_ID_LEN_LIMIT
     {
-        return Err(NeutronError::Std(StdError::generic_err(
-            "Invalid interchain_account_id",
-        )));
+        return Err(ContractError::InvalidInterchainAccountId {}.into());
     }
 
     if INFO_OF_ICA_ID
         .load(deps.storage, interchain_account_id.clone())
         .is_ok()
     {
-        return Err(NeutronError::Std(StdError::generic_err(
-            "nterchain_account_id already exist",
-        )));
+        return Err(ContractError::InterchainAccountIdAlreadyExist {}.into());
     }
 
     let register_pool_msg = NeutronMsg::register_interchain_account(
@@ -140,7 +138,7 @@ pub fn sudo_open_ack(
     if let Ok(parsed_version) = parsed_version {
         let port_id_parts: Vec<String> = port_id.split('.').map(String::from).collect();
         if port_id_parts.len() != 2 {
-            return Err(StdError::generic_err("counterparty_version not match"));
+            return Err(ContractError::CounterpartyVersionNotMatch {}.into());
         }
 
         let ica_id_raw = port_id_parts.get(1).unwrap();
@@ -231,6 +229,6 @@ pub fn sudo_open_ack(
 
         return Ok(Response::default());
     } else {
-        Err(StdError::generic_err("Can't parse counterparty_version"))
+        Err(ContractError::CantParseCounterpartyVersion {}.into())
     }
 }

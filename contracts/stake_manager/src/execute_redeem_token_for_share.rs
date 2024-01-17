@@ -1,15 +1,16 @@
 use std::collections::HashSet;
 
-use cosmwasm_std::{DepsMut, MessageInfo, Response, StdError, StdResult};
+use cosmwasm_std::{DepsMut, MessageInfo, Response, StdResult};
 
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     query::min_ibc_fee::query_min_ibc_fee,
-    NeutronError, NeutronResult,
+    NeutronResult,
 };
 
 use crate::{
     contract::DEFAULT_TIMEOUT_SECONDS,
+    error_conversion::ContractError,
     helper::{min_ntrn_ibc_fee, redeem_token_for_share_msg},
     state::POOLS,
 };
@@ -25,9 +26,7 @@ pub fn execute_redeem_token_for_share(
     tokens: Vec<cosmwasm_std::Coin>,
 ) -> NeutronResult<Response<NeutronMsg>> {
     if tokens.len() == 0 || tokens.len() > 10 {
-        return Err(NeutronError::Std(StdError::generic_err(
-            "Tokens len not match",
-        )));
+        return Err(ContractError::TokensLenNotMatch {}.into());
     }
     let mut pool_info = POOLS.load(deps.as_ref().storage, pool_addr.clone())?;
     let (pool_ica_info, _, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
@@ -38,9 +37,7 @@ pub fn execute_redeem_token_for_share(
 
     for token in &tokens {
         if !pool_info.share_tokens.contains(token) {
-            return Err(NeutronError::Std(StdError::generic_err(
-                "Share token not exist",
-            )));
+            return Err(ContractError::ShareTokenNotExist {}.into());
         }
         denom_set.insert(token.denom.clone());
         denoms.push(token.denom.clone());
@@ -54,7 +51,7 @@ pub fn execute_redeem_token_for_share(
         ));
     }
     if denoms.len() != denom_set.len() {
-        return Err(NeutronError::Std(StdError::generic_err("Duplicate token")));
+        return Err(ContractError::DuplicateToken {}.into());
     }
 
     let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);

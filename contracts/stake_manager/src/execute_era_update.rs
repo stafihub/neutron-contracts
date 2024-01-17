@@ -1,19 +1,22 @@
 use std::ops::{Add, Div, Sub};
 
-use cosmwasm_std::{coin, DepsMut, Env, Response, StdError, StdResult, Uint128};
+use cosmwasm_std::{coin, DepsMut, Env, Response, StdResult, Uint128};
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     query::min_ibc_fee::query_min_ibc_fee,
     sudo::msg::RequestPacketTimeoutHeight,
-    NeutronError, NeutronResult,
+    NeutronResult,
 };
 
-use crate::state::{
-    EraProcessStatus::{ActiveEnded, EraUpdateEnded, EraUpdateStarted},
-    ValidatorUpdateStatus,
-};
 use crate::state::{INFO_OF_ICA_ID, POOLS};
 use crate::{contract::DEFAULT_TIMEOUT_SECONDS, state::EraSnapshot};
+use crate::{
+    error_conversion::ContractError,
+    state::{
+        EraProcessStatus::{ActiveEnded, EraUpdateEnded, EraUpdateStarted},
+        ValidatorUpdateStatus,
+    },
+};
 use crate::{
     helper::min_ntrn_ibc_fee,
     state::{SudoPayload, TxType},
@@ -27,7 +30,7 @@ pub fn execute_era_update(
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
     if pool_info.paused {
-        return Err(NeutronError::Std(StdError::generic_err("Pool is paused")));
+        return Err(ContractError::PoolIsPaused {}.into());
     }
     // check era state
     if pool_info.era_process_status != ActiveEnded
@@ -36,7 +39,7 @@ pub fn execute_era_update(
         deps.as_ref()
             .api
             .debug(format!("WASMDEBUG: execute_era_update skip pool: {:?}", pool_addr).as_str());
-        return Err(NeutronError::Std(StdError::generic_err("status not allow")));
+        return Err(ContractError::StatusNotAllow {}.into());
     }
     let current_era = env
         .block
@@ -46,9 +49,7 @@ pub fn execute_era_update(
         .add(pool_info.offset);
 
     if current_era <= pool_info.era {
-        return Err(NeutronError::Std(StdError::generic_err(
-            "already latest era",
-        )));
+        return Err(ContractError::AlreadyLatestEra {}.into());
     }
 
     pool_info.era_process_status = EraUpdateStarted;

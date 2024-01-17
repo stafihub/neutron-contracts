@@ -3,13 +3,13 @@ use crate::query_callback::register_query_submsg;
 use crate::state::QueryKind;
 use crate::state::{ValidatorUpdateStatus, POOLS};
 use crate::{contract::DEFAULT_UPDATE_PERIOD, state::INFO_OF_ICA_ID};
-use cosmwasm_std::{DepsMut, Env, MessageInfo, Response, StdError};
+use cosmwasm_std::{DepsMut, Env, MessageInfo, Response};
 use neutron_sdk::interchain_queries::v045::{
     new_register_delegator_delegations_query_msg, new_register_staking_validators_query_msg,
 };
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
-    NeutronError, NeutronResult,
+    NeutronResult,
 };
 
 pub fn execute_update_query(
@@ -26,7 +26,7 @@ pub fn execute_update_query(
     }
 
     if pool_info.validator_update_status != ValidatorUpdateStatus::WaitQueryUpdate {
-        return Err(NeutronError::Std(StdError::generic_err("status not allow")));
+        return Err(ContractError::StatusNotAllow {}.into());
     }
 
     let (pool_ica_info, _, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;

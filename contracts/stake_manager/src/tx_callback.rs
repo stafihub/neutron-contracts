@@ -1,4 +1,3 @@
-use crate::execute_era_restake::sudo_era_restake_callback;
 use crate::execute_era_restake::sudo_era_restake_failed_callback;
 use crate::execute_pool_rm_validator::{
     sudo_rm_validator_callback, sudo_rm_validator_failed_callback,
@@ -15,6 +14,7 @@ use crate::state::{
     read_reply_payload, read_sudo_payload, save_reply_payload, save_sudo_payload, SudoPayload,
     TxType,
 };
+use crate::{error_conversion::ContractError, execute_era_restake::sudo_era_restake_callback};
 use crate::{
     execute_era_bond::sudo_era_bond_callback,
     execute_era_bond::sudo_era_bond_failed_callback,
@@ -52,9 +52,9 @@ pub fn prepare_sudo_payload(mut deps: DepsMut, _env: Env, msg: Reply) -> StdResu
             .into_result()
             .map_err(StdError::generic_err)?
             .data
-            .ok_or_else(|| StdError::generic_err("no result"))?,
+            .ok_or_else(|| ContractError::ICQErrReplyNoResult {})?,
     )
-    .map_err(|e| StdError::generic_err(format!("failed to parse response: {:?}", e)))?;
+    .map_err(|e| ContractError::ICQErrFailedParse(e.to_string()))?;
 
     let seq_id = resp.sequence_id;
     let channel_id = resp.channel;
@@ -78,16 +78,16 @@ pub fn sudo_response(
 
     let seq_id = req
         .sequence
-        .ok_or_else(|| StdError::generic_err("sequence not found"))?;
+        .ok_or_else(|| ContractError::CallBackErrSequenceNotFound {})?;
     let channel_id = req
         .source_channel
-        .ok_or_else(|| StdError::generic_err("channel_id not found"))?;
+        .ok_or_else(|| ContractError::CallBackErrChannelIDNotFound {})?;
 
     if let Ok(payload) = read_sudo_payload(deps.storage, channel_id, seq_id) {
         return sudo_callback(deps, env, payload);
     }
 
-    Err(StdError::generic_err("Error message"))
+    Err(ContractError::CallBackErrErrorMsg {}.into())
     // at this place we can safely remove the data under (channel_id, seq_id) key
     // but it costs an extra gas, so its on you how to use the storage
 }
@@ -103,10 +103,10 @@ pub fn sudo_error(deps: DepsMut, req: RequestPacket, data: String) -> StdResult<
 
     let seq_id = req
         .sequence
-        .ok_or_else(|| StdError::generic_err("sequence not found"))?;
+        .ok_or_else(|| ContractError::CallBackErrSequenceNotFound {})?;
     let channel_id = req
         .source_channel
-        .ok_or_else(|| StdError::generic_err("channel_id not found"))?;
+        .ok_or_else(|| ContractError::CallBackErrChannelIDNotFound {})?;
 
     if let Ok(payload) = read_sudo_payload(deps.storage, channel_id, seq_id) {
         return sudo_failed_callback(deps, payload);
@@ -126,10 +126,10 @@ pub fn sudo_timeout(deps: DepsMut, req: RequestPacket) -> StdResult<Response> {
 
     let seq_id = req
         .sequence
-        .ok_or_else(|| StdError::generic_err("sequence not found"))?;
+        .ok_or_else(|| ContractError::CallBackErrSequenceNotFound {})?;
     let channel_id = req
         .source_channel
-        .ok_or_else(|| StdError::generic_err("channel_id not found"))?;
+        .ok_or_else(|| ContractError::CallBackErrChannelIDNotFound {})?;
 
     if let Ok(payload) = read_sudo_payload(deps.storage, channel_id, seq_id) {
         return sudo_failed_callback(deps, payload);

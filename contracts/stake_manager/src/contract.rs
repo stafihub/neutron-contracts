@@ -2,10 +2,23 @@ use std::env;
 
 use cosmwasm_std::{
     entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response,
-    StdError, StdResult, Uint128,
+    StdResult, Uint128,
 };
 use cw2::set_contract_version;
 
+use crate::execute_era_active::execute_era_active;
+use crate::execute_era_bond::execute_era_bond;
+use crate::execute_era_collect_withdraw::execute_era_collect_withdraw;
+use crate::execute_era_restake::execute_era_restake;
+use crate::execute_era_update::execute_era_update;
+use crate::execute_init_pool::execute_init_pool;
+use crate::execute_open_channel::execute_open_channel;
+use crate::execute_pool_add_validator::execute_add_pool_validators;
+use crate::execute_pool_rm_validator::execute_rm_pool_validator;
+use crate::execute_pool_update_validator::execute_pool_update_validator;
+use crate::execute_redeem_token_for_share::execute_redeem_token_for_share;
+use crate::{error_conversion::ContractError, execute_config_stack::execute_config_stack};
+use crate::{execute_config_pool::execute_config_pool, msg::ExecuteMsg};
 use neutron_sdk::sudo::msg::SudoMsg;
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
@@ -13,16 +26,17 @@ use neutron_sdk::{
     NeutronResult,
 };
 
-use crate::execute_era_update::execute_era_update;
-use crate::execute_open_channel::execute_open_channel;
-use crate::execute_pool_rm_validator::execute_rm_pool_validator;
-use crate::execute_pool_update_validator::execute_pool_update_validator;
 use crate::execute_register_pool::{execute_register_pool, sudo_open_ack};
 use crate::execute_stake::execute_stake;
 use crate::execute_stake_lsm::execute_stake_lsm;
 use crate::execute_unstake::execute_unstake;
+use crate::execute_update_query::execute_update_query;
 use crate::execute_withdraw::execute_withdraw;
-use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
+use crate::msg::{InstantiateMsg, MigrateMsg, QueryMsg};
+use crate::query::query_balance_by_addr;
+use crate::query::query_delegation_by_addr;
+use crate::query::query_era_snapshot;
+use crate::query::query_stack_info;
 use crate::query::query_user_unstake_index;
 use crate::query::{
     query_acknowledgement_result, query_errors_queue, query_interchain_address,
@@ -34,21 +48,6 @@ use crate::state::{
     REPLY_ID_RANGE_START, STACK,
 };
 use crate::tx_callback::{prepare_sudo_payload, sudo_error, sudo_response, sudo_timeout};
-use crate::{execute_config_pool::execute_config_pool, query::query_balance_by_addr};
-use crate::{
-    execute_config_stack::execute_config_stack, execute_update_query::execute_update_query,
-};
-use crate::{execute_era_active::execute_era_active, query::query_delegation_by_addr};
-use crate::{execute_era_bond::execute_era_bond, query::query_stack_info};
-use crate::{
-    execute_era_collect_withdraw::execute_era_collect_withdraw,
-    execute_init_pool::execute_init_pool,
-};
-use crate::{
-    execute_era_restake::execute_era_restake,
-    execute_pool_add_validator::execute_add_pool_validators,
-    execute_redeem_token_for_share::execute_redeem_token_for_share, query::query_era_snapshot,
-};
 
 // Default timeout for SubmitTX is 600s
 pub const DEFAULT_TIMEOUT_SECONDS: u64 = 60 * 10;
@@ -129,8 +128,6 @@ pub fn query(deps: Deps<NeutronQuery>, env: Env, msg: QueryMsg) -> NeutronResult
     }
 }
 
-// todo: add response event
-// todo: uniform definition error
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut<NeutronQuery>,
@@ -218,10 +215,7 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> StdResult<Response> {
             write_reply_id_to_query_id(deps, msg)
         }
 
-        _ => Err(StdError::generic_err(format!(
-            "unsupported reply message id {}",
-            msg.id
-        ))),
+        _ => Err(ContractError::UnsupportedReplyId(msg.id).into()),
     }
 }
 
