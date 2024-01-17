@@ -26,7 +26,7 @@ pub fn update_icq_update_period(
 
     // check era state
     if pool_info.era_process_status != ActiveEnded
-        && pool_info.validator_update_status != ValidatorUpdateStatus::End
+        || pool_info.validator_update_status != ValidatorUpdateStatus::End
     {
         return Err(ContractError::StatusNotAllow {}.into());
     }
