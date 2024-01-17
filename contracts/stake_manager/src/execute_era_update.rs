@@ -1,6 +1,6 @@
 use std::ops::{Add, Div, Sub};
 
-use cosmwasm_std::{coin, DepsMut, Env, Response, StdResult, Uint128};
+use cosmwasm_std::{coin, DepsMut, Env, Response, Uint128};
 
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
@@ -136,7 +136,10 @@ pub fn execute_era_update(
     Ok(Response::default().add_submessage(submsg_pool_ibc_send))
 }
 
-pub fn sudo_era_update_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
+pub fn sudo_era_update_callback(
+    deps: DepsMut,
+    payload: SudoPayload,
+) -> NeutronResult<Response<NeutronMsg>> {
     deps.as_ref()
         .api
         .debug("WASMDEBUG: sudo_era_update_callback");
@@ -148,7 +151,10 @@ pub fn sudo_era_update_callback(deps: DepsMut, payload: SudoPayload) -> StdResul
     Ok(Response::new())
 }
 
-pub fn sudo_era_update_failed_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
+pub fn sudo_era_update_failed_callback(
+    deps: DepsMut,
+    payload: SudoPayload,
+) -> NeutronResult<Response<NeutronMsg>> {
     deps.as_ref()
         .api
         .debug("WASMDEBUG: sudo_era_update_failed_callback");

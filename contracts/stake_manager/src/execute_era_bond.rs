@@ -9,7 +9,7 @@ use cosmos_sdk_proto::cosmos::{
     base::v1beta1::Coin, distribution::v1beta1::MsgWithdrawDelegatorReward,
 };
 use cosmos_sdk_proto::prost::Message;
-use cosmwasm_std::{Binary, Delegation, DepsMut, Env, Response, StdResult, Uint128};
+use cosmwasm_std::{Binary, Delegation, DepsMut, Env, Response, Uint128};
 
 use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::{
@@ -284,7 +284,7 @@ pub fn sudo_era_bond_callback(
     deps: DepsMut,
     env: Env,
     payload: SudoPayload,
-) -> StdResult<Response> {
+) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
     pool_info.era_process_status = BondEnded;
     pool_info.era_snapshot.bond_height = env.block.height;
@@ -293,7 +293,10 @@ pub fn sudo_era_bond_callback(
     Ok(Response::new())
 }
 
-pub fn sudo_era_bond_failed_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
+pub fn sudo_era_bond_failed_callback(
+    deps: DepsMut,
+    payload: SudoPayload,
+) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
     pool_info.era_process_status = EraUpdateEnded;
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;

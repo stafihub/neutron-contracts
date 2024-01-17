@@ -8,7 +8,7 @@ use crate::{
     state::{SudoPayload, TxType},
     tx_callback::msg_with_sudo_callback,
 };
-use cosmwasm_std::{DepsMut, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{DepsMut, Env, MessageInfo, Response};
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     query::min_ibc_fee::query_min_ibc_fee,
@@ -129,7 +129,10 @@ pub fn execute_pool_update_validator(
     Ok(resp)
 }
 
-pub fn sudo_update_validator_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
+pub fn sudo_update_validator_callback(
+    deps: DepsMut,
+    payload: SudoPayload,
+) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
 
     let new_validators: Vec<String> = payload.message.split('_').map(String::from).collect();
@@ -145,7 +148,7 @@ pub fn sudo_update_validator_callback(deps: DepsMut, payload: SudoPayload) -> St
 pub fn sudo_update_validator_failed_callback(
     deps: DepsMut,
     payload: SudoPayload,
-) -> StdResult<Response> {
+) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
 
     pool_info.validator_update_status = ValidatorUpdateStatus::End;

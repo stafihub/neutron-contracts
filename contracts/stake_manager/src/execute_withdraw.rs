@@ -3,7 +3,7 @@ use std::vec;
 use cosmos_sdk_proto::cosmos::bank::v1beta1::MsgSend;
 use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
 use cosmos_sdk_proto::prost::Message;
-use cosmwasm_std::{Addr, Binary, DepsMut, Env, MessageInfo, Response, StdResult, Uint128};
+use cosmwasm_std::{Addr, Binary, DepsMut, Env, MessageInfo, Response, Uint128};
 
 use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::{
@@ -129,7 +129,10 @@ pub fn execute_withdraw(
         .add_submessage(submsg))
 }
 
-pub fn sudo_withdraw_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
+pub fn sudo_withdraw_callback(
+    deps: DepsMut,
+    payload: SudoPayload,
+) -> NeutronResult<Response<NeutronMsg>> {
     let parts: Vec<String> = payload.message.split('_').map(String::from).collect();
     if parts.len() <= 1 {
         return Err(ContractError::UnsupportedMessage(payload.message).into());
@@ -169,7 +172,10 @@ pub fn sudo_withdraw_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<
     Ok(Response::new())
 }
 
-pub fn sudo_withdraw_failed_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
+pub fn sudo_withdraw_failed_callback(
+    deps: DepsMut,
+    payload: SudoPayload,
+) -> NeutronResult<Response<NeutronMsg>> {
     let parts: Vec<String> = payload.message.split('_').map(String::from).collect();
 
     if let Some((_, index_list)) = parts.split_first() {

@@ -1,6 +1,5 @@
 use std::vec;
 
-use cosmwasm_std::StdResult;
 use cosmwasm_std::{DepsMut, Env, MessageInfo, Response};
 
 use neutron_sdk::{
@@ -119,7 +118,10 @@ pub fn execute_rm_pool_validator(
     Ok(rsp)
 }
 
-pub fn sudo_rm_validator_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
+pub fn sudo_rm_validator_callback(
+    deps: DepsMut,
+    payload: SudoPayload,
+) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
 
     pool_info
@@ -135,7 +137,7 @@ pub fn sudo_rm_validator_callback(deps: DepsMut, payload: SudoPayload) -> StdRes
 pub fn sudo_rm_validator_failed_callback(
     deps: DepsMut,
     payload: SudoPayload,
-) -> StdResult<Response> {
+) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
 
     pool_info.validator_update_status = ValidatorUpdateStatus::End;

@@ -1,5 +1,5 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{from_json, to_json_vec, Addr, Binary, StdResult, Storage, Uint128};
+use cosmwasm_std::{Addr, Binary, from_json, StdResult, Storage, to_json_vec, Uint128};
 use cw_storage_plus::{Item, Map};
 
 pub const REPLY_ID_RANGE_START: u64 = 1_000_000_000;
@@ -245,3 +245,8 @@ pub const ADDRESS_TO_REPLY_ID: Map<(String, String), u64> =
     Map::new("address_querykind_to_reply_id");
 
 pub const REPLY_ID_TO_QUERY_ID: Map<u64, u64> = Map::new("reply_id_to_query_id");
+
+// reply id -> (true)
+// just save in validators query init
+pub const REPLY_ID_TO_NEED_UPDATE: Map<u64, bool> = Map::new("reply_id_to_need_update");
+pub const QUERY_ID_TO_REPLY_ID: Map<u64, u64> = Map::new("query_id_to_reply_id");

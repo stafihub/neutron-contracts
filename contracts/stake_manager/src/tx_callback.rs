@@ -27,7 +27,7 @@ use crate::{
 use cosmwasm_std::{
     from_json, Binary, CosmosMsg, DepsMut, Env, Reply, Response, StdError, StdResult, SubMsg,
 };
-use neutron_sdk::bindings::{msg::MsgIbcTransferResponse, query::NeutronQuery};
+use neutron_sdk::{bindings::{msg::{MsgIbcTransferResponse, NeutronMsg}, query::NeutronQuery}, NeutronResult};
 use neutron_sdk::sudo::msg::RequestPacket;
 
 // saves payload to process later to the storage and returns a SubmitTX Cosmos SubMsg with necessary reply id
@@ -67,7 +67,7 @@ pub fn sudo_response(
     env: Env,
     req: RequestPacket,
     data: Binary,
-) -> StdResult<Response> {
+) -> NeutronResult<Response<NeutronMsg>> {
     deps.api.debug(
         format!(
             "WASMDEBUG: sudo_response: sudo received: {:?} {}",
@@ -92,7 +92,7 @@ pub fn sudo_response(
     // but it costs an extra gas, so its on you how to use the storage
 }
 
-pub fn sudo_error(deps: DepsMut, req: RequestPacket, data: String) -> StdResult<Response> {
+pub fn sudo_error(deps: DepsMut, req: RequestPacket, data: String) -> NeutronResult<Response<NeutronMsg>> {
     deps.api.debug(
         format!(
             "WASMDEBUG: sudo_error: sudo error received: {:?} {}",
@@ -115,7 +115,7 @@ pub fn sudo_error(deps: DepsMut, req: RequestPacket, data: String) -> StdResult<
     Ok(Response::new())
 }
 
-pub fn sudo_timeout(deps: DepsMut, req: RequestPacket) -> StdResult<Response> {
+pub fn sudo_timeout(deps: DepsMut, req: RequestPacket) -> NeutronResult<Response<NeutronMsg>> {
     deps.api.debug(
         format!(
             "WASMDEBUG: sudo_timeout: sudo timeout ack received: {:?}",
@@ -138,7 +138,7 @@ pub fn sudo_timeout(deps: DepsMut, req: RequestPacket) -> StdResult<Response> {
     Ok(Response::new())
 }
 
-fn sudo_callback(deps: DepsMut, env: Env, payload: SudoPayload) -> StdResult<Response> {
+fn sudo_callback(deps: DepsMut, env: Env, payload: SudoPayload) -> NeutronResult<Response<NeutronMsg>> {
     match payload.tx_type {
         TxType::EraUpdate => sudo_era_update_callback(deps, payload),
         TxType::EraBond => sudo_era_bond_callback(deps, env, payload),
@@ -154,7 +154,7 @@ fn sudo_callback(deps: DepsMut, env: Env, payload: SudoPayload) -> StdResult<Res
     }
 }
 
-fn sudo_failed_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
+fn sudo_failed_callback(deps: DepsMut, payload: SudoPayload) -> NeutronResult<Response<NeutronMsg>> {
     match payload.tx_type {
         TxType::EraUpdate => sudo_era_update_failed_callback(deps, payload),
         TxType::EraBond => sudo_era_bond_failed_callback(deps, payload),

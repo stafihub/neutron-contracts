@@ -1,6 +1,6 @@
 use cosmos_sdk_proto::cosmos::bank::v1beta1::MsgSend;
 use cosmos_sdk_proto::prost::Message;
-use cosmwasm_std::{Binary, DepsMut, Env, Response, StdResult, Uint128};
+use cosmwasm_std::{Binary, DepsMut, Env, Response, Uint128};
 
 use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::{
@@ -149,7 +149,7 @@ pub fn sudo_era_collect_withdraw_callback(
     deps: DepsMut,
     env: Env,
     payload: SudoPayload,
-) -> StdResult<Response> {
+) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
     pool_info.era_process_status = WithdrawEnded;
     pool_info.era_snapshot.bond_height = env.block.height;
@@ -161,7 +161,7 @@ pub fn sudo_era_collect_withdraw_callback(
 pub fn sudo_era_collect_withdraw_failed_callback(
     deps: DepsMut,
     payload: SudoPayload,
-) -> StdResult<Response> {
+) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
     pool_info.era_process_status = BondEnded;
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;

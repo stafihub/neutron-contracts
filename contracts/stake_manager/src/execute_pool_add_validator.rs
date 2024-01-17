@@ -1,21 +1,17 @@
 use cosmwasm_std::{DepsMut, Env, MessageInfo, Response};
 
-use neutron_sdk::interchain_queries::v045::new_register_delegator_delegations_query_msg;
+use neutron_sdk::interchain_queries::get_registered_query;
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
-    interchain_queries::v045::new_register_staking_validators_query_msg,
     NeutronResult,
 };
 
-use crate::state::{QueryKind, INFO_OF_ICA_ID};
-use crate::{contract::DEFAULT_UPDATE_PERIOD, error_conversion::ContractError};
-use crate::{
-    query_callback::register_query_submsg,
-    state::{EraProcessStatus, POOLS},
-};
+use crate::error_conversion::ContractError;
+use crate::state::{EraProcessStatus, POOLS};
+use crate::{helper::get_query_id, state::QueryKind};
 
 pub fn execute_add_pool_validators(
-    mut deps: DepsMut<NeutronQuery>,
+    deps: DepsMut<NeutronQuery>,
     _: Env,
     info: MessageInfo,
     pool_addr: String,
@@ -38,55 +34,36 @@ pub fn execute_add_pool_validators(
     }
     pool_info.validator_addrs.push(validator_addr);
 
-    // todo: remove old query wait for test in testnet Testing the network locally would cause ICQ to be completely unavailable
-    // let old_reply_id_delegations = ADDRESS_TO_REPLY_ID.load(
-    //     deps.storage,
-    //     (pool_addr.clone(), QueryKind::Delegations.to_string()),
-    // )?;
-    // let need_rm_query_id_delegations =
-    //     REPLY_ID_TO_QUERY_ID.load(deps.storage, old_reply_id_delegations)?;
-    // let remove_icq_msg_delegations =
-    //     NeutronMsg::remove_interchain_query(need_rm_query_id_delegations);
+    POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
 
-    // let old_reply_id_validators = ADDRESS_TO_REPLY_ID.load(
-    //     deps.storage,
-    //     (pool_addr.clone(), QueryKind::Validators.to_string()),
-    // )?;
-    // let need_rm_query_id_validators =
-    //     REPLY_ID_TO_QUERY_ID.load(deps.storage, old_reply_id_validators)?;
-    // let remove_icq_msg_validators =
-    //     NeutronMsg::remove_interchain_query(need_rm_query_id_validators);
+    let pool_delegations_query_id =
+        get_query_id(deps.as_ref(), pool_addr.clone(), QueryKind::Delegations)?;
 
-    let (pool_ica_info, _, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
+    let pool_delegations_registered_query: neutron_sdk::bindings::query::QueryRegisteredQueryResponse =
+        get_registered_query(deps.as_ref(), pool_delegations_query_id)?;
 
-    let register_delegation_submsg = register_query_submsg(
-        deps.branch(),
-        new_register_delegator_delegations_query_msg(
-            pool_ica_info.ctrl_connection_id.clone(),
-            pool_ica_info.ica_addr.clone(),
-            pool_info.validator_addrs.clone(),
-            DEFAULT_UPDATE_PERIOD,
-        )?,
-        pool_ica_info.ica_addr.clone(),
-        QueryKind::Delegations,
+    let update_pool_delegations_msg = NeutronMsg::update_interchain_query(
+        pool_delegations_query_id,
+        Some(pool_delegations_registered_query.registered_query.keys),
+        None,
+        None,
     )?;
 
-    let register_validator_submsg = register_query_submsg(
-        deps.branch(),
-        new_register_staking_validators_query_msg(
-            pool_ica_info.ctrl_connection_id.clone(),
-            pool_info.validator_addrs.clone(),
-            DEFAULT_UPDATE_PERIOD,
-        )?,
-        pool_ica_info.ica_addr.clone(),
-        QueryKind::Validators,
+    let pool_validators_query_id =
+        get_query_id(deps.as_ref(), pool_addr.clone(), QueryKind::Validators)?;
+
+    let pool_validators_registered_query: neutron_sdk::bindings::query::QueryRegisteredQueryResponse =
+        get_registered_query(deps.as_ref(), pool_validators_query_id)?;
+
+    let update_pool_validators_msg = NeutronMsg::update_interchain_query(
+        pool_validators_query_id,
+        Some(pool_validators_registered_query.registered_query.keys),
+        None,
+        None,
     )?;
 
-    POOLS.save(deps.storage, pool_addr, &pool_info)?;
-
-    Ok(Response::new()
-        // .add_message(remove_icq_msg_delegations)
-        // .add_message(remove_icq_msg_validators)
-        .add_submessage(register_delegation_submsg)
-        .add_submessage(register_validator_submsg))
+    Ok(Response::default().add_messages(vec![
+        update_pool_delegations_msg,
+        update_pool_validators_msg,
+    ]))
 }

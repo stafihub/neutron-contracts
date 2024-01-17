@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use cosmwasm_std::{DepsMut, MessageInfo, Response, StdResult};
+use cosmwasm_std::{DepsMut, MessageInfo, Response};
 
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
@@ -80,7 +80,7 @@ pub fn execute_redeem_token_for_share(
 pub fn sudo_redeem_token_for_share_callback(
     deps: DepsMut,
     payload: SudoPayload,
-) -> StdResult<Response> {
+) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.as_ref().storage, payload.pool_addr.clone())?;
 
     let will_removed_denoms: Vec<String> = payload.message.split(",").map(String::from).collect();
@@ -101,7 +101,7 @@ pub fn sudo_redeem_token_for_share_callback(
 pub fn sudo_redeem_token_for_share_failed_callback(
     deps: DepsMut,
     payload: SudoPayload,
-) -> StdResult<Response> {
+) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.as_ref().storage, payload.pool_addr.clone())?;
 
     let will_removed_denoms: Vec<String> = payload.message.split(",").map(String::from).collect();

@@ -1,4 +1,19 @@
-use crate::error_conversion::ContractError;
+use std::env;
+
+use cosmwasm_std::{
+    Binary, Deps, DepsMut, entry_point, Env, MessageInfo, Reply, Response, to_json_binary
+    , Uint128, StdResult,
+};
+use cw2::set_contract_version;
+
+use neutron_sdk::{
+    bindings::{msg::NeutronMsg, query::NeutronQuery},
+    interchain_queries::get_registered_query,
+    NeutronResult,
+};
+use neutron_sdk::sudo::msg::SudoMsg;
+
+use crate::{error_conversion::ContractError, query_callback::sudo_kv_query_result};
 use crate::execute_config_pool::execute_config_pool;
 use crate::execute_config_stack::execute_config_stack;
 use crate::execute_era_active::execute_era_active;
@@ -22,33 +37,21 @@ use crate::execute_unstake::execute_unstake;
 use crate::execute_update_query::execute_update_query;
 use crate::execute_withdraw::execute_withdraw;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
-use crate::query::query_delegation_by_addr;
-use crate::query::query_era_snapshot;
-use crate::query::query_stack_info;
-use crate::query::query_user_unstake_index;
 use crate::query::{query_balance_by_addr, query_validator_by_addr};
 use crate::query::{
     query_interchain_address, query_interchain_address_contract, query_pool_info,
     query_user_unstake,
 };
+use crate::query::query_delegation_by_addr;
+use crate::query::query_era_snapshot;
+use crate::query::query_stack_info;
+use crate::query::query_user_unstake_index;
 use crate::query_callback::write_reply_id_to_query_id;
 use crate::state::{
-    Stack, QUERY_REPLY_ID_RANGE_END, QUERY_REPLY_ID_RANGE_START, REPLY_ID_RANGE_END,
-    REPLY_ID_RANGE_START, STACK,
+    QUERY_REPLY_ID_RANGE_END, QUERY_REPLY_ID_RANGE_START, REPLY_ID_RANGE_END, REPLY_ID_RANGE_START,
+    Stack, STACK,
 };
 use crate::tx_callback::{prepare_sudo_payload, sudo_error, sudo_response, sudo_timeout};
-use cosmwasm_std::{
-    entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response,
-    StdResult, Uint128,
-};
-use cw2::set_contract_version;
-use neutron_sdk::sudo::msg::SudoMsg;
-use neutron_sdk::{
-    bindings::{msg::NeutronMsg, query::NeutronQuery},
-    interchain_queries::get_registered_query,
-    NeutronResult,
-};
-use std::env;
 
 // Default timeout for SubmitTX is 30h
 pub const DEFAULT_TIMEOUT_SECONDS: u64 = 30 * 60 * 60;
@@ -226,7 +229,7 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> StdResult<Response> {
 }
 
 #[entry_point]
-pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> StdResult<Response> {
+pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> NeutronResult<Response<NeutronMsg>> {
     match msg {
         // For handling kv query result
         // For handling successful (non-error) acknowledgements
@@ -237,6 +240,8 @@ pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> StdResult<Response> {
 
         // For handling error timeouts
         SudoMsg::Timeout { request } => sudo_timeout(deps, request),
+
+        SudoMsg::KVQueryResult { query_id } => sudo_kv_query_result(deps, query_id),
 
         // For handling successful registering of ICA
         SudoMsg::OpenAck {

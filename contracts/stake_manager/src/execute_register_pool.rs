@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr, DepsMut, Env, MessageInfo, Response, StdResult, Uint128};
+use cosmwasm_std::{Addr, DepsMut, Env, MessageInfo, Response, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -122,7 +122,7 @@ pub fn sudo_open_ack(
     _channel_id: String,
     _counterparty_channel_id: String,
     counterparty_version: String,
-) -> StdResult<Response> {
+) -> NeutronResult<Response<NeutronMsg>> {
     deps.api.debug(
         format!(
             "WASMDEBUG: sudo_open_ack: sudo received: {:?} {}",

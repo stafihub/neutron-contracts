@@ -4,8 +4,7 @@ use std::{
 };
 
 use cosmwasm_std::{
-    coins, to_json_binary, BankMsg, Coin, DepsMut, Env, MessageInfo, Response, StdResult, Uint128,
-    WasmMsg,
+    coins, to_json_binary, BankMsg, Coin, DepsMut, Env, MessageInfo, Response, Uint128, WasmMsg,
 };
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
@@ -169,7 +168,10 @@ pub fn execute_stake_lsm(
     Ok(Response::new().add_submessage(sub_msg))
 }
 
-pub fn sudo_stake_lsm_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
+pub fn sudo_stake_lsm_callback(
+    deps: DepsMut,
+    payload: SudoPayload,
+) -> NeutronResult<Response<NeutronMsg>> {
     deps.as_ref()
         .api
         .debug(format!("WASMDEBUG: sudo_stake_lsm_callback payload {:?}", payload).as_str());
@@ -227,7 +229,10 @@ pub fn sudo_stake_lsm_callback(deps: DepsMut, payload: SudoPayload) -> StdResult
     Ok(Response::new().add_message(msg))
 }
 
-pub fn sudo_stake_lsm_failed_callback(deps: DepsMut, payload: SudoPayload) -> StdResult<Response> {
+pub fn sudo_stake_lsm_failed_callback(
+    deps: DepsMut,
+    payload: SudoPayload,
+) -> NeutronResult<Response<NeutronMsg>> {
     deps.as_ref().api.debug(
         format!(
             "WASMDEBUG: sudo_stake_lsm_failed_callback payload {:?}",

@@ -1,6 +1,6 @@
 use std::ops::{Div, Mul, Sub};
 
-use cosmwasm_std::{DepsMut, Env, Response, StdResult, Uint128};
+use cosmwasm_std::{DepsMut, Env, Response, Uint128};
 
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
@@ -147,7 +147,7 @@ pub fn sudo_era_restake_callback(
     deps: DepsMut,
     env: Env,
     payload: SudoPayload,
-) -> StdResult<Response> {
+) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
     pool_info.era_process_status = RestakeEnded;
     pool_info.era_snapshot.bond_height = env.block.height;
@@ -159,7 +159,7 @@ pub fn sudo_era_restake_callback(
 pub fn sudo_era_restake_failed_callback(
     deps: DepsMut,
     payload: SudoPayload,
-) -> StdResult<Response> {
+) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
     pool_info.era_process_status = WithdrawEnded;
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
