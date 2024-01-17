@@ -58,7 +58,7 @@ pub enum QueryMsg {
 }
 
 #[cw_serde]
-pub struct InitPoolParams {
+pub struct MigratePoolParams {
     pub interchain_account_id: String,
     pub unbond: Uint128,
     pub bond: Uint128,
@@ -70,14 +70,34 @@ pub struct InitPoolParams {
     pub era: u64,
     pub rate: Uint128,
     pub total_platform_fee: Uint128,
-    pub total_lsd_token_amount: Option<Uint128>,
+    pub total_lsd_token_amount: Uint128,
     pub platform_fee_receiver: String,
     pub share_tokens: Vec<Coin>,
     pub lsd_code_id: Option<u64>,
     pub lsd_token_name: String,
     pub lsd_token_symbol: String,
+    pub minimal_stake: Uint128,
+    pub unbonding_period: u64,
+    pub platform_fee_commission: Option<Uint128>,
+    pub era_seconds: u64,
+    pub offset: u64,
+}
+
+#[cw_serde]
+pub struct InitPoolParams {
+    pub interchain_account_id: String,
+    pub ibc_denom: String,
+    pub channel_id_of_ibc_denom: String,
+    pub remote_denom: String,
+    pub validator_addrs: Vec<String>,
+    pub platform_fee_receiver: String,
+    pub lsd_code_id: Option<u64>,
+    pub lsd_token_name: String,
+    pub lsd_token_symbol: String,
+    pub minimal_stake: Uint128,
+    pub unbonding_period: u64,
+    pub platform_fee_commission: Option<Uint128>,
     pub era_seconds: Option<u64>,
-    pub offset: Option<u64>,
 }
 
 #[cw_serde]
@@ -96,7 +116,6 @@ pub struct ConfigPoolParams {
     pub platform_fee_receiver: Option<String>,
     pub minimal_stake: Option<Uint128>,
     pub unstake_times_limit: Option<u64>,
-    pub next_unstake_index: Option<u64>,
     pub unbonding_period: Option<u64>,
     pub unbond_commission: Option<Uint128>,
     pub platform_fee_commission: Option<Uint128>,
@@ -117,6 +136,7 @@ pub enum ExecuteMsg {
         register_fee: Vec<Coin>,
     },
     InitPool(Box<InitPoolParams>),
+    MigratePool(Box<MigratePoolParams>),
     ConfigPool(Box<ConfigPoolParams>),
     ConfigStack(Box<ConfigStackParams>),
     OpenChannel {

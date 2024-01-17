@@ -12,6 +12,7 @@ use crate::execute_era_collect_withdraw::execute_era_collect_withdraw;
 use crate::execute_era_restake::execute_era_restake;
 use crate::execute_era_update::execute_era_update;
 use crate::execute_init_pool::execute_init_pool;
+use crate::execute_migrate_pool::execute_migrate_pool;
 use crate::execute_open_channel::execute_open_channel;
 use crate::execute_pool_add_validator::execute_add_pool_validators;
 use crate::execute_pool_rm_validator::execute_rm_pool_validator;
@@ -152,6 +153,7 @@ pub fn execute(
             register_fee,
         ),
         ExecuteMsg::InitPool(params) => execute_init_pool(deps, env, info, *params),
+        ExecuteMsg::MigratePool(params) => execute_migrate_pool(deps, env, info, *params),
         ExecuteMsg::ConfigPool(params) => execute_config_pool(deps, info, *params),
         ExecuteMsg::ConfigStack(params) => execute_config_stack(deps, info, *params),
         ExecuteMsg::OpenChannel {

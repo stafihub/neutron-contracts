@@ -5,8 +5,8 @@ use neutron_sdk::{
     NeutronResult,
 };
 
-use crate::state::POOLS;
 use crate::{error_conversion::ContractError, msg::ConfigPoolParams};
+use crate::{helper::MIN_ERA_SECONDS, state::POOLS};
 
 pub fn execute_config_pool(
     deps: DepsMut<NeutronQuery>,
@@ -26,9 +26,6 @@ pub fn execute_config_pool(
     if let Some(minimal_stake) = param.minimal_stake {
         pool_info.minimal_stake = minimal_stake;
     }
-    if let Some(next_unstake_index) = param.next_unstake_index {
-        pool_info.next_unstake_index = next_unstake_index;
-    }
     if let Some(unbonding_period) = param.unbonding_period {
         pool_info.unbonding_period = unbonding_period;
     }
@@ -42,6 +39,9 @@ pub fn execute_config_pool(
         pool_info.platform_fee_commission = platform_fee_commission;
     }
     if let Some(era_seconds) = param.era_seconds {
+        if era_seconds < MIN_ERA_SECONDS {
+            return Err(ContractError::LessThanMinimalEraSeconds {}.into());
+        }
         pool_info.era_seconds = era_seconds;
     }
     if let Some(offset) = param.offset {

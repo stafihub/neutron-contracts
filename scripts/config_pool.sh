@@ -48,20 +48,15 @@ config_pool() {
   msg=$(printf '{
     "init_pool": {
       "interchain_account_id": "test1",
-      "unbond": "0",
-      "active": "0",
-      "bond": "0",
       "ibc_denom": "ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2",
       "channel_id_of_ibc_denom": "channel-0",
       "remote_denom": "uatom",
       "validator_addrs": ["cosmosvaloper18hl5c9xn5dze2g50uaw0l2mr02ew57zk0auktn"],
-      "era": 1,
       "platform_fee_receiver": "%s",
-      "total_platform_fee": "0",
-      "rate": "1000000",
       "lsd_token_name": "lsdTokenNameX",
       "lsd_token_symbol": "symbolX",
-      "share_tokens": []
+      "minimal_stake": "100",
+      "unbonding_period": 1
     }
   }' "$ADDRESS_1")
 
@@ -106,9 +101,7 @@ config_pool() {
     "lsm_support": true,
     "paused": false,
     "rate_change_limit": "500000",
-    "lsm_pending_limit": 60,
-    "era_seconds": 60,
-    "offset": 26657
+    "lsm_pending_limit": 60
   }
 }' "$pool_address" "$ADDRESS_1")
   # echo "config pool msg is: $msg"

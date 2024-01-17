@@ -12,6 +12,7 @@ pub mod execute_era_collect_withdraw;
 pub mod execute_era_restake;
 pub mod execute_era_update;
 pub mod execute_init_pool;
+pub mod execute_migrate_pool;
 pub mod execute_pool_add_validator;
 pub mod execute_pool_rm_validator;
 pub mod execute_pool_update_validator;

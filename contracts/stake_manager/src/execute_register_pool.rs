@@ -172,9 +172,7 @@ pub fn sudo_open_ack(
 
         if !pool_ica_info.ica_addr.is_empty()
             && !withdraw_ica_info.ica_addr.is_empty()
-            && POOLS
-                .load(deps.storage, pool_ica_info.ica_addr.clone())
-                .is_err()
+            && !POOLS.has(deps.storage, pool_ica_info.ica_addr.clone())
         {
             let pool_info = PoolInfo {
                 bond: Uint128::zero(),

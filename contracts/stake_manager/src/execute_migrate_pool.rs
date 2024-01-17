@@ -1,7 +1,11 @@
+use std::ops::{Div, Mul};
+use std::vec;
+
 use cosmos_sdk_proto::cosmos::distribution::v1beta1::MsgSetWithdrawAddress;
 use cosmos_sdk_proto::prost::Message;
 use cosmwasm_std::{instantiate2_address, to_json_binary, Addr, Uint128, WasmMsg};
 use cosmwasm_std::{Binary, DepsMut, Env, MessageInfo, Response};
+
 use lsd_token::msg::InstantiateMinterData;
 use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::interchain_queries::v045::new_register_delegator_delegations_query_msg;
@@ -13,13 +17,11 @@ use neutron_sdk::{
     query::min_ibc_fee::query_min_ibc_fee,
     NeutronError, NeutronResult,
 };
-use std::ops::Div;
-use std::vec;
 
 use crate::contract::{DEFAULT_TIMEOUT_SECONDS, DEFAULT_UPDATE_PERIOD};
 use crate::error_conversion::ContractError;
-use crate::helper::{CAL_BASE, DEFAULT_DECIMALS, DEFAULT_ERA_SECONDS, MIN_ERA_SECONDS};
-use crate::msg::InitPoolParams;
+use crate::helper::{CAL_BASE, DEFAULT_DECIMALS};
+use crate::msg::MigratePoolParams;
 use crate::query_callback::register_query_submsg;
 use crate::state::{QueryKind, SudoPayload, TxType, POOLS};
 use crate::state::{INFO_OF_ICA_ID, STACK};
@@ -27,11 +29,11 @@ use crate::tx_callback::msg_with_sudo_callback;
 use crate::{helper::min_ntrn_ibc_fee, state::ValidatorUpdateStatus};
 
 // add execute to config the validator addrs and withdraw address on reply
-pub fn execute_init_pool(
+pub fn execute_migrate_pool(
     mut deps: DepsMut<NeutronQuery>,
     env: Env,
     info: MessageInfo,
-    param: InitPoolParams,
+    param: MigratePoolParams,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
 
@@ -56,6 +58,9 @@ pub fn execute_init_pool(
     }
     if !pool_info.rate.is_zero() {
         return Err(ContractError::PoolInited {}.into());
+    }
+    if param.rate.is_zero() {
+        return Err(ContractError::RateIsZero {}.into());
     }
 
     let code_id = match param.lsd_code_id {
@@ -98,12 +103,22 @@ pub fn execute_init_pool(
         salt: salt.as_bytes().into(),
     };
 
+    pool_info.bond = param.bond;
+    pool_info.unbond = param.unbond;
+    pool_info.active = param.active;
+    pool_info.era = param.era;
+    pool_info.rate = param.rate;
     pool_info.ibc_denom = param.ibc_denom;
     pool_info.channel_id_of_ibc_denom = param.channel_id_of_ibc_denom;
     pool_info.remote_denom = param.remote_denom;
     pool_info.validator_addrs = param.validator_addrs.clone();
     pool_info.platform_fee_receiver = Addr::unchecked(param.platform_fee_receiver);
     pool_info.lsd_token = contract_addr;
+    pool_info.share_tokens = param.share_tokens;
+    pool_info.total_platform_fee = param.total_platform_fee;
+    pool_info.total_lsd_token_amount = param.total_lsd_token_amount;
+    pool_info.era_seconds = param.era_seconds;
+    pool_info.offset = param.offset;
     pool_info.unbonding_period = param.unbonding_period;
     pool_info.minimal_stake = param.minimal_stake;
 
@@ -114,36 +129,28 @@ pub fn execute_init_pool(
         pool_info.platform_fee_commission = Uint128::new(100_000);
     }
 
-    if let Some(era_seconds) = param.era_seconds {
-        if era_seconds < MIN_ERA_SECONDS {
-            return Err(ContractError::LessThanMinimalEraSeconds {}.into());
-        }
-        pool_info.era_seconds = era_seconds;
-    } else {
-        pool_info.era_seconds = DEFAULT_ERA_SECONDS;
-    }
-
-    // cal
-    let offset = env.block.time.seconds().div(pool_info.era_seconds);
-    pool_info.offset = offset;
-
     // default
-    pool_info.era = 0;
-    pool_info.bond = Uint128::zero();
-    pool_info.unbond = Uint128::zero();
-    pool_info.active = Uint128::zero();
-    pool_info.rate = CAL_BASE;
-    pool_info.share_tokens = vec![];
-    pool_info.total_platform_fee = Uint128::zero();
-    pool_info.total_lsd_token_amount = Uint128::zero();
     pool_info.next_unstake_index = 0;
     pool_info.unstake_times_limit = 20;
     pool_info.unbond_commission = Uint128::zero();
     pool_info.paused = false;
-    pool_info.lsm_support = false;
-    pool_info.lsm_pending_limit = 100;
+    pool_info.lsm_support = true;
+    pool_info.lsm_pending_limit = 50;
     pool_info.rate_change_limit = Uint128::new(5000);
     pool_info.validator_update_status = ValidatorUpdateStatus::End;
+
+    // check rate
+    let cal_rate = if pool_info.total_lsd_token_amount.is_zero() {
+        CAL_BASE
+    } else {
+        pool_info
+            .active
+            .mul(CAL_BASE)
+            .div(pool_info.total_lsd_token_amount)
+    };
+    if cal_rate != pool_info.rate {
+        return Err(ContractError::RateNotMatch {}.into());
+    }
 
     deps.as_ref()
         .api

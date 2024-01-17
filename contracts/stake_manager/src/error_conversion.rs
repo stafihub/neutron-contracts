@@ -47,6 +47,9 @@ pub enum ContractError {
     #[error("Rate is zero")]
     RateIsZero {},
 
+    #[error("Pool inited")]
+    PoolInited {},
+
     #[error("Instantiate2 address failed, err: {0}")]
     Instantiate2AddressFailed(String),
 
@@ -103,6 +106,9 @@ pub enum ContractError {
 
     #[error("Less than minimal stake")]
     LessThanMinimalStake {},
+    
+    #[error("Less than minimal era seconds")]
+    LessThanMinimalEraSeconds {},
 
     #[error("Denom not match")]
     DenomNotMatch {},
