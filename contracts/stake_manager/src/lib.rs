@@ -20,6 +20,7 @@ pub mod execute_stake;
 pub mod execute_stake_lsm;
 pub mod execute_unstake;
 pub mod execute_update_query;
+pub mod execute_icq_update_period;
 pub mod execute_withdraw;
 
 pub mod error_conversion;

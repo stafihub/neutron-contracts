@@ -6,7 +6,7 @@ use cosmwasm_std::{
 };
 use cw2::set_contract_version;
 
-use crate::execute_era_active::execute_era_active;
+use crate::{execute_era_active::execute_era_active, execute_icq_update_period::update_icq_update_period};
 use crate::execute_era_bond::execute_era_bond;
 use crate::execute_era_collect_withdraw::execute_era_collect_withdraw;
 use crate::execute_era_restake::execute_era_restake;
@@ -201,6 +201,10 @@ pub fn execute(
             neutron_address,
             pool_addr,
         } => execute_stake_lsm(deps, env, info, neutron_address, pool_addr),
+        ExecuteMsg::UpdateIcqUpdatePeriod {
+            query_id,
+            new_update_period,
+        } => update_icq_update_period(query_id, new_update_period),
     }
 }
 

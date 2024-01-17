@@ -176,6 +176,10 @@ pub enum ExecuteMsg {
         neutron_address: String,
         pool_addr: String,
     },
+    UpdateIcqUpdatePeriod {
+        query_id: u64,
+        new_update_period: u64,
+    },
 }
 
 #[cw_serde]
