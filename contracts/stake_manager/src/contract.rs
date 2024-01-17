@@ -22,14 +22,14 @@ use crate::execute_unstake::execute_unstake;
 use crate::execute_update_query::execute_update_query;
 use crate::execute_withdraw::execute_withdraw;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
-use crate::query::query_balance_by_addr;
 use crate::query::query_delegation_by_addr;
 use crate::query::query_era_snapshot;
 use crate::query::query_stack_info;
 use crate::query::query_user_unstake_index;
+use crate::query::{query_balance_by_addr, query_validator_by_addr};
 use crate::query::{
-    query_acknowledgement_result, query_errors_queue, query_interchain_address,
-    query_interchain_address_contract, query_pool_info, query_user_unstake,
+    query_interchain_address, query_interchain_address_contract, query_pool_info,
+    query_user_unstake,
 };
 use crate::query_callback::write_reply_id_to_query_id;
 use crate::state::{
@@ -104,6 +104,9 @@ pub fn query(deps: Deps<NeutronQuery>, env: Env, msg: QueryMsg) -> NeutronResult
         QueryMsg::Delegations { pool_addr } => {
             Ok(to_json_binary(&query_delegation_by_addr(deps, pool_addr)?)?)
         }
+        QueryMsg::Validators { pool_addr } => {
+            Ok(to_json_binary(&query_validator_by_addr(deps, pool_addr)?)?)
+        }
         QueryMsg::PoolInfo { pool_addr } => query_pool_info(deps, env, pool_addr),
         QueryMsg::StackInfo {} => query_stack_info(deps),
         QueryMsg::EraSnapshot { pool_addr } => query_era_snapshot(deps, env, pool_addr),
@@ -114,10 +117,6 @@ pub fn query(deps: Deps<NeutronQuery>, env: Env, msg: QueryMsg) -> NeutronResult
         QueryMsg::InterchainAccountAddressFromContract {
             interchain_account_id,
         } => query_interchain_address_contract(deps, env, interchain_account_id),
-        QueryMsg::AcknowledgementResult {
-            interchain_account_id,
-            sequence_id,
-        } => query_acknowledgement_result(deps, env, interchain_account_id, sequence_id),
         QueryMsg::UserUnstake {
             pool_addr,
             user_neutron_addr,
@@ -126,7 +125,6 @@ pub fn query(deps: Deps<NeutronQuery>, env: Env, msg: QueryMsg) -> NeutronResult
             pool_addr,
             user_neutron_addr,
         } => query_user_unstake_index(deps, pool_addr, user_neutron_addr),
-        QueryMsg::ErrorsQueue {} => query_errors_queue(deps),
     }
 }
 

@@ -178,7 +178,7 @@ pub fn execute_init_pool(
         new_register_delegator_delegations_query_msg(
             pool_ica_info.ctrl_connection_id.clone(),
             pool_ica_info.ica_addr.clone(),
-            param.validator_addrs,
+            pool_info.validator_addrs.clone(),
             DEFAULT_UPDATE_PERIOD,
         )?,
         pool_ica_info.ica_addr.clone(),
@@ -190,7 +190,7 @@ pub fn execute_init_pool(
         new_register_staking_validators_query_msg(
             pool_ica_info.ctrl_connection_id.clone(),
             pool_info.validator_addrs.clone(),
-            DEFAULT_UPDATE_PERIOD,
+            6,
         )?,
         pool_ica_info.ica_addr.clone(),
         QueryKind::Validators,

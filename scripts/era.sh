@@ -45,8 +45,8 @@ redeem_token_for_share() {
 process_era() {
   echo "-------------------------- era pre process -------------------------------------"
   era_pre_process_msg=$(printf '{
-  "era_update": {
-    "era_pre_process": "%s"
+  "era_pre_process": {
+    "pool_addr": "%s"
   }
 }' "$pool_address")
 

@@ -69,6 +69,18 @@
       {
         "type": "object",
         "required": [
+          "migrate_pool"
+        ],
+        "properties": {
+          "migrate_pool": {
+            "$ref": "#/definitions/MigratePoolParams"
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
           "config_pool"
         ],
         "properties": {
@@ -581,14 +593,6 @@
               }
             ]
           },
-          "next_unstake_index": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "format": "uint64",
-            "minimum": 0.0
-          },
           "offset": {
             "type": [
               "integer",
@@ -724,36 +728,20 @@
       "InitPoolParams": {
         "type": "object",
         "required": [
-          "active",
-          "bond",
           "channel_id_of_ibc_denom",
-          "era",
           "ibc_denom",
           "interchain_account_id",
           "lsd_token_name",
           "lsd_token_symbol",
+          "minimal_stake",
           "platform_fee_receiver",
-          "rate",
           "remote_denom",
-          "share_tokens",
-          "total_platform_fee",
-          "unbond",
+          "unbonding_period",
           "validator_addrs"
         ],
         "properties": {
-          "active": {
-            "$ref": "#/definitions/Uint128"
-          },
-          "bond": {
-            "$ref": "#/definitions/Uint128"
-          },
           "channel_id_of_ibc_denom": {
             "type": "string"
-          },
-          "era": {
-            "type": "integer",
-            "format": "uint64",
-            "minimum": 0.0
           },
           "era_seconds": {
             "type": [
@@ -783,13 +771,120 @@
           "lsd_token_symbol": {
             "type": "string"
           },
-          "offset": {
+          "minimal_stake": {
+            "$ref": "#/definitions/Uint128"
+          },
+          "platform_fee_commission": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/Uint128"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "platform_fee_receiver": {
+            "type": "string"
+          },
+          "remote_denom": {
+            "type": "string"
+          },
+          "unbonding_period": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0
+          },
+          "validator_addrs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "MigratePoolParams": {
+        "type": "object",
+        "required": [
+          "active",
+          "bond",
+          "channel_id_of_ibc_denom",
+          "era",
+          "era_seconds",
+          "ibc_denom",
+          "interchain_account_id",
+          "lsd_token_name",
+          "lsd_token_symbol",
+          "minimal_stake",
+          "offset",
+          "platform_fee_receiver",
+          "rate",
+          "remote_denom",
+          "share_tokens",
+          "total_lsd_token_amount",
+          "total_platform_fee",
+          "unbond",
+          "unbonding_period",
+          "validator_addrs"
+        ],
+        "properties": {
+          "active": {
+            "$ref": "#/definitions/Uint128"
+          },
+          "bond": {
+            "$ref": "#/definitions/Uint128"
+          },
+          "channel_id_of_ibc_denom": {
+            "type": "string"
+          },
+          "era": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0
+          },
+          "era_seconds": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0
+          },
+          "ibc_denom": {
+            "type": "string"
+          },
+          "interchain_account_id": {
+            "type": "string"
+          },
+          "lsd_code_id": {
             "type": [
               "integer",
               "null"
             ],
             "format": "uint64",
             "minimum": 0.0
+          },
+          "lsd_token_name": {
+            "type": "string"
+          },
+          "lsd_token_symbol": {
+            "type": "string"
+          },
+          "minimal_stake": {
+            "$ref": "#/definitions/Uint128"
+          },
+          "offset": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0
+          },
+          "platform_fee_commission": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/Uint128"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "platform_fee_receiver": {
             "type": "string"
@@ -807,20 +902,18 @@
             }
           },
           "total_lsd_token_amount": {
-            "anyOf": [
-              {
-                "$ref": "#/definitions/Uint128"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/definitions/Uint128"
           },
           "total_platform_fee": {
             "$ref": "#/definitions/Uint128"
           },
           "unbond": {
             "$ref": "#/definitions/Uint128"
+          },
+          "unbonding_period": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0
           },
           "validator_addrs": {
             "type": "array",

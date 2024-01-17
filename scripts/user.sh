@@ -34,9 +34,9 @@ EOF
         echo "Failed to send ibc hook to contract: $(echo "$tx_result" | jq '.raw_log')" && exit 1
     fi
     echo "$tx_hash"
-    echo "Waiting 10 seconds for stake (sometimes it takes a lot of time)…"
+    echo "Waiting 15 seconds for stake (sometimes it takes a lot of time)…"
     # shellcheck disable=SC2034
-    for i in $(seq 10); do
+    for i in $(seq 15); do
         sleep 1
         echo -n .
     done
@@ -135,6 +135,9 @@ user_withdraw() {
 
 user_stake_lsm() {
     echo "--------------------------user stake lsm-------------------------------------"
+    query="$(printf '{"balance": {"address": "%s"}}' "$ADDRESS_1")"
+    neutrond query wasm contract-state smart "$lsd_token_contract_address" "$query" --output json | jq
+
     tx_result=$(gaiad tx staking delegate "$VALIDATOR" 10000uatom \
         --gas auto --gas-adjustment 1.4 \
         --fees 10000uatom --from $ADDRESS_2 \
@@ -224,4 +227,8 @@ EOF
 
     query="$(printf '{"balance": {"address": "%s"}}' "$ADDRESS_1")"
     neutrond query wasm contract-state smart "$lsd_token_contract_address" "$query" --output json | jq
+
+    query="$(printf '{"pool_info": {"pool_addr": "%s"}}' "$pool_address")"
+    echo "------------------------ pool_info after stake lsm ------------------------"
+    neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq
 }

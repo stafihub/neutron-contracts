@@ -2,6 +2,9 @@ use std::vec;
 
 use cosmwasm_std::{to_json_binary, Addr, Binary, Deps, Env};
 
+use neutron_sdk::interchain_queries::v045::queries::{
+    DelegatorDelegationsResponse, ValidatorResponse,
+};
 use neutron_sdk::{
     bindings::query::{NeutronQuery, QueryInterchainAccountAddressResponse},
     interchain_queries::{
@@ -13,13 +16,9 @@ use neutron_sdk::{
     },
     NeutronResult,
 };
-use neutron_sdk::{
-    interchain_queries::v045::queries::{DelegatorDelegationsResponse, ValidatorResponse},
-    interchain_txs::helpers::get_port_id,
-};
 
-use crate::state::{read_errors_from_queue, ACKNOWLEDGEMENT_RESULTS, ADDRESS_TO_REPLY_ID, STACK};
 use crate::state::{QueryKind, INFO_OF_ICA_ID};
+use crate::state::{ADDRESS_TO_REPLY_ID, STACK};
 use crate::state::{POOLS, REPLY_ID_TO_QUERY_ID, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX};
 
 pub fn query_user_unstake(
@@ -184,9 +183,7 @@ pub fn query_pool_info(
     Ok(to_json_binary(&pool_info)?)
 }
 
-pub fn query_stack_info(
-    deps: Deps<NeutronQuery>,
-) -> NeutronResult<Binary> {
+pub fn query_stack_info(deps: Deps<NeutronQuery>) -> NeutronResult<Binary> {
     let stack_info = STACK.load(deps.storage)?;
 
     Ok(to_json_binary(&stack_info)?)
@@ -227,22 +224,5 @@ pub fn query_interchain_address_contract(
     interchain_account_id: String,
 ) -> NeutronResult<Binary> {
     let res = INFO_OF_ICA_ID.may_load(deps.storage, interchain_account_id)?;
-    Ok(to_json_binary(&res)?)
-}
-
-// returns the result
-pub fn query_acknowledgement_result(
-    deps: Deps<NeutronQuery>,
-    env: Env,
-    interchain_account_id: String,
-    sequence_id: u64,
-) -> NeutronResult<Binary> {
-    let port_id = get_port_id(env.contract.address.as_str(), &interchain_account_id);
-    let res = ACKNOWLEDGEMENT_RESULTS.may_load(deps.storage, (port_id, sequence_id))?;
-    Ok(to_json_binary(&res)?)
-}
-
-pub fn query_errors_queue(deps: Deps<NeutronQuery>) -> NeutronResult<Binary> {
-    let res = read_errors_from_queue(deps.storage)?;
     Ok(to_json_binary(&res)?)
 }

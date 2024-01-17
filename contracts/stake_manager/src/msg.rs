@@ -3,7 +3,9 @@ use cosmwasm_std::{Addr, Coin, Uint128};
 
 use neutron_sdk::{
     bindings::query::{QueryInterchainAccountAddressResponse, QueryRegisteredQueryResponse},
-    interchain_queries::v045::queries::{BalanceResponse, DelegatorDelegationsResponse},
+    interchain_queries::v045::queries::{
+        BalanceResponse, DelegatorDelegationsResponse, ValidatorResponse,
+    },
 };
 
 use crate::state::{EraSnapshot, IcaInfo, PoolInfo, Stack, UnstakeInfo};
@@ -22,6 +24,8 @@ pub enum QueryMsg {
     Balance { ica_addr: String },
     #[returns(DelegatorDelegationsResponse)]
     Delegations { pool_addr: String },
+    #[returns(ValidatorResponse)]
+    Validators { pool_addr: String },
     #[returns(PoolInfo)]
     PoolInfo { pool_addr: String },
     #[returns(Stack)]
@@ -37,12 +41,6 @@ pub enum QueryMsg {
     // this query returns ICA from contract store, which saved from acknowledgement
     #[returns((IcaInfo, IcaInfo, Addr))]
     InterchainAccountAddressFromContract { interchain_account_id: String },
-    // this query returns acknowledgement result after interchain transaction
-    #[returns(u64)]
-    AcknowledgementResult {
-        interchain_account_id: String,
-        sequence_id: u64,
-    },
     #[returns([UnstakeInfo])]
     UserUnstake {
         pool_addr: String,
@@ -53,9 +51,6 @@ pub enum QueryMsg {
         pool_addr: String,
         user_neutron_addr: Addr,
     },
-    // this query returns non-critical errors list
-    #[returns(Vec < (Vec < u8 >, String) >)]
-    ErrorsQueue {},
 }
 
 #[cw_serde]

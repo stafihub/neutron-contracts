@@ -15,9 +15,9 @@ config_pool() {
   }}'
 
   tx_result="$(neutrond tx wasm execute "$contract_address" "$msg" \
-      --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
-      --broadcast-mode=sync --gas-prices 0.0055untrn --gas 2000000 \
-      --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"
+    --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
+    --broadcast-mode=sync --gas-prices 0.0055untrn --gas 2000000 \
+    --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"
   # --amount 2000000untrn \
 
   code="$(echo "$tx_result" | jq '.code')"
@@ -61,7 +61,8 @@ config_pool() {
   }' "$ADDRESS_1")
 
   # echo "the msg is: $msg"
-  tx_result="$(neutrond tx wasm execute "$contract_address" "$msg" \
+  tx_result="$(
+    neutrond tx wasm execute "$contract_address" "$msg" \
       --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
       --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \
       --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx
@@ -101,7 +102,8 @@ config_pool() {
     "lsm_support": true,
     "paused": false,
     "rate_change_limit": "500000",
-    "lsm_pending_limit": 60
+    "lsm_pending_limit": 60,
+    "offset": 26
   }
 }' "$pool_address" "$ADDRESS_1")
   # echo "config pool msg is: $msg"
