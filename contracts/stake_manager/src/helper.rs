@@ -1,9 +1,11 @@
 use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
 use cosmos_sdk_proto::cosmos::staking::v1beta1::{MsgBeginRedelegate, MsgDelegate};
 use cosmos_sdk_proto::prost::Message;
-use cosmwasm_std::{Binary, Deps, QueryRequest, StdResult, Uint128};
+use cosmwasm_std::{Binary, Deps, DepsMut, QueryRequest, StdResult, Uint128};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
-use neutron_sdk::bindings::msg::IbcFee;
+use neutron_sdk::bindings::msg::{IbcFee, NeutronMsg};
 use neutron_sdk::bindings::query::NeutronQuery;
 use neutron_sdk::bindings::types::{KVKey, ProtobufAny};
 use neutron_sdk::interchain_queries::helpers::decode_and_convert;
@@ -13,8 +15,9 @@ use neutron_sdk::interchain_queries::v045::helpers::{
 use neutron_sdk::interchain_queries::v045::types::{
     KEY_BOND_DENOM, PARAMS_STORE_KEY, STAKING_STORE_KEY,
 };
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use neutron_sdk::NeutronError;
+
+use crate::state::{QueryKind, ADDRESS_TO_REPLY_ID, INFO_OF_ICA_ID, REPLY_ID_TO_QUERY_ID};
 
 const FEE_DENOM: &str = "untrn";
 pub const ICA_WITHDRAW_SUFIX: &str = "-withdraw_addr";
@@ -218,4 +221,56 @@ pub fn query_denom_trace(
     };
     let denom_trace: QueryDenomTraceResponse = deps.querier.query(&req.into())?;
     return Ok(denom_trace);
+}
+
+pub fn get_query_id(
+    deps: Deps<NeutronQuery>,
+    addr: String,
+    query_kind: QueryKind,
+) -> StdResult<u64> {
+    let reply_id = ADDRESS_TO_REPLY_ID.load(deps.storage, (addr, query_kind.to_string()))?;
+    let query_id = REPLY_ID_TO_QUERY_ID.load(deps.storage, reply_id)?;
+    return Ok(query_id);
+}
+
+pub fn get_update_pool_icq_msgs(
+    deps: DepsMut<NeutronQuery>,
+    pool_addr: String,
+    pool_ica_id: String,
+    period: u64,
+) -> Result<Vec<NeutronMsg>, NeutronError> {
+    let mut msgs = vec![];
+    let pool_balances_query_id =
+        get_query_id(deps.as_ref(), pool_addr.clone(), QueryKind::Balances)?;
+
+    let (_, withdraw_ica_info, _) = INFO_OF_ICA_ID.load(deps.storage, pool_ica_id)?;
+    let withdraw_addr_balances_query_id = get_query_id(
+        deps.as_ref(),
+        withdraw_ica_info.ica_addr,
+        QueryKind::Balances,
+    )?;
+
+    let pool_delegations_query_id =
+        get_query_id(deps.as_ref(), pool_addr.clone(), QueryKind::Delegations)?;
+    let pool_validators_query_id =
+        get_query_id(deps.as_ref(), pool_addr.clone(), QueryKind::Validators)?;
+
+    let update_pool_balances_msg =
+        NeutronMsg::update_interchain_query(pool_balances_query_id, None, Some(period), None)?;
+    let update_withdraw_addr_balances_msg = NeutronMsg::update_interchain_query(
+        withdraw_addr_balances_query_id,
+        None,
+        Some(period),
+        None,
+    )?;
+    let update_pool_delegations_msg =
+        NeutronMsg::update_interchain_query(pool_delegations_query_id, None, Some(period), None)?;
+    let update_pool_validators_msg =
+        NeutronMsg::update_interchain_query(pool_validators_query_id, None, Some(period), None)?;
+
+    msgs.push(update_pool_balances_msg);
+    msgs.push(update_withdraw_addr_balances_msg);
+    msgs.push(update_pool_delegations_msg);
+    msgs.push(update_pool_validators_msg);
+    Ok(msgs)
 }

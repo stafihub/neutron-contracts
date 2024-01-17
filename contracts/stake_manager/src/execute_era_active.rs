@@ -8,6 +8,8 @@ use neutron_sdk::{
     NeutronResult,
 };
 
+use crate::contract::DEFAULT_UPDATE_PERIOD;
+use crate::helper::get_update_pool_icq_msgs;
 use crate::state::{
     EraProcessStatus::{ActiveEnded, RestakeEnded},
     STACK,
@@ -169,5 +171,12 @@ pub fn execute_era_active(
     POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
     STACK.save(deps.storage, &stack_info)?;
 
-    Ok(resp)
+    let update_pool_icq_msgs = get_update_pool_icq_msgs(
+        deps,
+        pool_addr,
+        pool_info.ica_id.clone(),
+        DEFAULT_UPDATE_PERIOD,
+    )?;
+
+    Ok(resp.add_messages(update_pool_icq_msgs))
 }

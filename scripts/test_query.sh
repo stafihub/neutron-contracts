@@ -38,20 +38,15 @@ echo "---------------------------------------------------------------"
 query_id=2
 query="$(printf '{"balance": {"query_id": %s}}' "$query_id")"
 neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq
-# withdraw_addr="cosmos10h9stc5v6ntgeygf5xf945njqq5h32r53uquvw"query_id=3
 echo "---------------------------------------------------------------"
 
 
-lsd_token_contract_address="neutron1v6a0pv0pd3etcd7atyr06efg4q56p4czu30lfycff7sf0n55ed8qhvfcl2"
-ADDRESS_1="neutron1m9l358xunhhwds0568za49mzhvuxx9ux8xafx2"
-query="$(printf '{"balance": {"address": "%s"}}' "$ADDRESS_1")"
-neutrond query wasm contract-state smart "$lsd_token_contract_address" "$query" --output json | jq
-# withdraw_addr="cosmos10h9stc5v6ntgeygf5xf945njqq5h32r53uquvw"query_id=3
+contract_address="neutron1vlqvaptpe7hztjj52whxk5mm6k2ey9hu4rv5ueu89shagk72mewq6jnxez"
+query='{"stack_info":{}}'
+neutrond query wasm contract-state smart "$contract_address" "$query" --output json | jq
 echo "---------------------------------------------------------------"
 
-# query_id=4
-# contract_address="neutron153vp64h0jlenzwspje0qza5lz8px9sdf63hcdaljtqcghewgl32sh9pe2f"
-# query="$(printf '{"bank_total_supply": {"query_id": %s}}' "$query_id")"
-# # query="$(printf '{"balance": {"query_id": %s}}' "$query_id")"
-# neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq
-# withdraw_addr="cosmos10h9stc5v6ntgeygf5xf945njqq5h32r53uquvw"
+ica_addr="cosmos1rdjunm3uslylh7z5kegy4zjc6cjcpn952ah6pnwd0mrd5u6r5x4scdyman"
+query="$(printf '{"balance": {"ica_addr": "%s"}}' "$ica_addr")"
+neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq
+echo "---------------------------------------------------------------"

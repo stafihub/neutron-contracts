@@ -1,5 +1,6 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Coin, Uint128};
+
 use neutron_sdk::{
     bindings::query::{QueryInterchainAccountAddressResponse, QueryRegisteredQueryResponse},
     interchain_queries::v045::queries::{BalanceResponse, DelegatorDelegationsResponse},
@@ -177,6 +178,9 @@ pub enum ExecuteMsg {
     PoolUpdateQuery {
         pool_addr: String,
     },
+    EraPreProcess {
+        pool_addr: String,
+    },
     EraUpdate {
         pool_addr: String,
     },
@@ -195,6 +199,10 @@ pub enum ExecuteMsg {
     StakeLsm {
         neutron_address: String,
         pool_addr: String,
+    },
+    UpdateIcqUpdatePeriod {
+        pool_addr: String,
+        new_update_period: u64,
     },
 }
 

@@ -181,7 +181,6 @@
     "EraProcessStatus": {
       "type": "string",
       "enum": [
-        "era_preprocess_ended",
         "era_update_started",
         "era_update_ended",
         "bond_started",
