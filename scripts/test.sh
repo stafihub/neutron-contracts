@@ -2,9 +2,10 @@
 
 # http://redsymbol.net/articles/unofficial-bash-strict-mode/
 . ./scripts/common.sh
-. ./scripts/config_pool.sh
-. ./scripts/config_stack.sh
 . ./scripts/deploy.sh
+. ./scripts/init_stack.sh
+. ./scripts/config_pool.sh
+. ./scripts/init_bridge.sh
 . ./scripts/era.sh
 . ./scripts/user.sh
 
@@ -15,9 +16,11 @@ IFS=$'\n\t'
 ARCH=$(uname -m)
 CONTRACT_PATH="artifacts/stake_manager.wasm"
 RTOKEN_CONTRACT_PATH="artifacts/lsd_token.wasm"
+BRIDGE_CONTRACT_PATH="artifacts/bridge.wasm"
 if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
     CONTRACT_PATH="artifacts/stake_manager-aarch64.wasm"
     RTOKEN_CONTRACT_PATH="artifacts/lsd_token-aarch64.wasm"
+    BRIDGE_CONTRACT_PATH="artifacts/bridge-aarch64.wasm"
 fi
 
 CHAIN_ID_1="test-1"
@@ -37,8 +40,9 @@ ADMIN="neutron1m9l358xunhhwds0568za49mzhvuxx9ux8xafx2"
 VALIDATOR="cosmosvaloper18hl5c9xn5dze2g50uaw0l2mr02ew57zk0auktn"
 
 deploy
-config_stack
+init_stack
 config_pool
+init_bridge
 
 user_stake_lsm
 user_stake

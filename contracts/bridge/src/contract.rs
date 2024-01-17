@@ -22,6 +22,10 @@ pub fn instantiate(
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
+    if (msg.relayers.len() as u64) < msg.threshold {
+        return Err(ContractError::RelayersLenNotMatch {});
+    }
+
     BRIDGE_INFO.save(
         deps.storage,
         &BridgeInfo {
@@ -63,7 +67,7 @@ pub fn execute(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     deps.api
-        .debug(format!("WASMDEBUG: lsd_token query msg is {:?}", msg).as_str());
+        .debug(format!("WASMDEBUG: bridge query msg is {:?}", msg).as_str());
 
     match msg {
         QueryMsg::BridgeInfo {} => to_json_binary(&query_bridge_info(deps)?),
@@ -113,6 +117,14 @@ pub fn execute_vote_proposal(
     amount: Uint128,
 ) -> Result<Response, ContractError> {
     let bridge_info = BRIDGE_INFO.load(deps.storage)?;
+    deps.api.debug(
+        format!(
+            "WASMDEBUG: execute_vote_proposal info is {:?}, bridge: {:?}",
+            info, bridge_info
+        )
+        .as_str(),
+    );
+
     if !bridge_info.relayers.contains(&info.sender) {
         return Err(ContractError::Unauthorized {});
     }

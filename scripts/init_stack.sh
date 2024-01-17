@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-config_stack() {
+init_stack() {
   echo "--------------------------instantiate stake manager-------------------------------------"
 
   msg=$(printf '{
@@ -27,6 +27,7 @@ config_stack() {
     echo "Failed to send money to contract: $(echo "$tx_result" | jq '.raw_log')" && exit 1
   fi
 }
+
 #   echo "--------------------------config stack-------------------------------------"
 
 #   msg=$(printf '{
@@ -47,3 +48,16 @@ config_stack() {
 #     echo "Failed to config stack: $(echo "$tx_result" | jq '.raw_log')" && exit 1
 #   fi
 # }
+
+
+# neutrond tx wasm instantiate "27" '{ \
+#     "admin": "neutron1m9l358xunhhwds0568za49mzhvuxx9ux8xafx2",
+#     "lsd_token": "neutron1cuf32kmmxrpxygz5tcqrk6p854jwt6n7q2grzx6n3jjzuhm06nhspffz7d",
+#     "threshold": 1,
+#     "relayers": ["neutron1m9l358xunhhwds0568za49mzhvuxx9ux8xafx2"]
+# }' \
+#     --from "neutron1m9l358xunhhwds0568za49mzhvuxx9ux8xafx2" --admin "neutron1m9l358xunhhwds0568za49mzhvuxx9ux8xafx2" -y --chain-id "test-1" \
+#     --output json --broadcast-mode=sync --label "init" \
+#     --keyring-backend=test --gas-prices 0.0025untrn --gas auto \
+#     --gas-adjustment 1.4 --home "/Users/tpkeeper/OrbStack/docker/volumes/neutron-testing-data/test-1/" \
+#     --node "tcp://127.0.0.1:26657"

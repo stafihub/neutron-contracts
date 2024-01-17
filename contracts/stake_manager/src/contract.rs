@@ -50,12 +50,8 @@ use crate::{
     execute_redeem_token_for_share::execute_redeem_token_for_share, query::query_era_snapshot,
 };
 
-// Default timeout for IbcTransfer is 10000000 blocks
-pub const DEFAULT_TIMEOUT_HEIGHT: u64 = 10000000;
-
 // Default timeout for SubmitTX is 600s
 pub const DEFAULT_TIMEOUT_SECONDS: u64 = 60 * 10;
-
 pub const DEFAULT_UPDATE_PERIOD: u64 = 6;
 
 const CONTRACT_NAME: &str = env!("CARGO_PKG_NAME");

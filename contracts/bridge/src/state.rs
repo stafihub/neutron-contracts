@@ -41,7 +41,7 @@ pub fn get_proposal_id(
     return hash("proposalId", &key);
 }
 
-// (chain_id, deposit_nonce, recipient, amount)
+// hash(chain_id, deposit_nonce, recipient, amount) => proposal
 pub const PROPOSALS: Map<Vec<u8>, Proposal> = Map::new("proposals");
 
 fn hash(ty: &str, key: &[u8]) -> Vec<u8> {
