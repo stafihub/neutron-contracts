@@ -6,19 +6,6 @@ use cosmwasm_std::{
 };
 use cw2::set_contract_version;
 
-use crate::{execute_era_active::execute_era_active, execute_icq_update_period::update_icq_update_period};
-use crate::execute_era_bond::execute_era_bond;
-use crate::execute_era_collect_withdraw::execute_era_collect_withdraw;
-use crate::execute_era_restake::execute_era_restake;
-use crate::execute_era_update::execute_era_update;
-use crate::execute_init_pool::execute_init_pool;
-use crate::execute_open_channel::execute_open_channel;
-use crate::execute_pool_add_validator::execute_add_pool_validators;
-use crate::execute_pool_rm_validator::execute_rm_pool_validator;
-use crate::execute_pool_update_validator::execute_pool_update_validator;
-use crate::execute_redeem_token_for_share::execute_redeem_token_for_share;
-use crate::{error_conversion::ContractError, execute_config_stack::execute_config_stack};
-use crate::{execute_config_pool::execute_config_pool, msg::ExecuteMsg};
 use neutron_sdk::sudo::msg::SudoMsg;
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
@@ -26,13 +13,29 @@ use neutron_sdk::{
     NeutronResult,
 };
 
+use crate::error_conversion::ContractError;
+use crate::execute_config_pool::execute_config_pool;
+use crate::execute_config_stack::execute_config_stack;
+use crate::execute_era_active::execute_era_active;
+use crate::execute_era_bond::execute_era_bond;
+use crate::execute_era_collect_withdraw::execute_era_collect_withdraw;
+use crate::execute_era_preprocess::execute_era_preprocess;
+use crate::execute_era_restake::execute_era_restake;
+use crate::execute_era_update::execute_era_update;
+use crate::execute_icq_update_period::update_icq_update_period;
+use crate::execute_init_pool::execute_init_pool;
+use crate::execute_open_channel::execute_open_channel;
+use crate::execute_pool_add_validator::execute_add_pool_validators;
+use crate::execute_pool_rm_validator::execute_rm_pool_validator;
+use crate::execute_pool_update_validator::execute_pool_update_validator;
+use crate::execute_redeem_token_for_share::execute_redeem_token_for_share;
 use crate::execute_register_pool::{execute_register_pool, sudo_open_ack};
 use crate::execute_stake::execute_stake;
 use crate::execute_stake_lsm::execute_stake_lsm;
 use crate::execute_unstake::execute_unstake;
 use crate::execute_update_query::execute_update_query;
 use crate::execute_withdraw::execute_withdraw;
-use crate::msg::{InstantiateMsg, MigrateMsg, QueryMsg};
+use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
 use crate::query::query_balance_by_addr;
 use crate::query::query_delegation_by_addr;
 use crate::query::query_era_snapshot;
@@ -51,7 +54,8 @@ use crate::tx_callback::{prepare_sudo_payload, sudo_error, sudo_response, sudo_t
 
 // Default timeout for SubmitTX is 30h
 pub const DEFAULT_TIMEOUT_SECONDS: u64 = 30 * 60 * 60;
-pub const DEFAULT_UPDATE_PERIOD: u64 = 10;
+pub const DEFAULT_UPDATE_PERIOD: u64 = 12000;
+pub const DEFAULT_FAST_PERIOD: u64 = 21;
 
 const CONTRACT_NAME: &str = env!("CARGO_PKG_NAME");
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -190,6 +194,7 @@ pub fn execute(
         ExecuteMsg::PoolUpdateQuery { pool_addr } => {
             execute_update_query(deps, env, info, pool_addr)
         }
+        ExecuteMsg::EraPreProcess { pool_addr } => execute_era_preprocess(deps, env, pool_addr),
         ExecuteMsg::EraUpdate { pool_addr } => execute_era_update(deps, env, pool_addr),
         ExecuteMsg::EraBond { pool_addr } => execute_era_bond(deps, env, pool_addr),
         ExecuteMsg::EraCollectWithdraw { pool_addr } => {
@@ -202,9 +207,9 @@ pub fn execute(
             pool_addr,
         } => execute_stake_lsm(deps, env, info, neutron_address, pool_addr),
         ExecuteMsg::UpdateIcqUpdatePeriod {
-            query_id,
+            pool_addr,
             new_update_period,
-        } => update_icq_update_period(query_id, new_update_period),
+        } => update_icq_update_period(deps, info, pool_addr, new_update_period),
     }
 }
 

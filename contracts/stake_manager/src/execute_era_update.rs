@@ -1,6 +1,7 @@
 use std::ops::{Add, Div, Sub};
 
 use cosmwasm_std::{coin, DepsMut, Env, Response, StdResult, Uint128};
+
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     query::min_ibc_fee::query_min_ibc_fee,
@@ -8,6 +9,7 @@ use neutron_sdk::{
     NeutronResult,
 };
 
+use crate::state::EraProcessStatus::EraPreprocessEnded;
 use crate::state::{INFO_OF_ICA_ID, POOLS};
 use crate::{contract::DEFAULT_TIMEOUT_SECONDS, state::EraSnapshot};
 use crate::{
@@ -33,7 +35,7 @@ pub fn execute_era_update(
         return Err(ContractError::PoolIsPaused {}.into());
     }
     // check era state
-    if pool_info.era_process_status != ActiveEnded
+    if pool_info.era_process_status != EraPreprocessEnded
         && pool_info.validator_update_status != ValidatorUpdateStatus::End
     {
         deps.as_ref()

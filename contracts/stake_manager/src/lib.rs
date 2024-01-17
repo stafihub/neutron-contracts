@@ -9,8 +9,10 @@ pub mod execute_config_pool;
 pub mod execute_era_active;
 pub mod execute_era_bond;
 pub mod execute_era_collect_withdraw;
+pub mod execute_era_preprocess;
 pub mod execute_era_restake;
 pub mod execute_era_update;
+pub mod execute_icq_update_period;
 pub mod execute_init_pool;
 pub mod execute_pool_add_validator;
 pub mod execute_pool_rm_validator;
@@ -20,7 +22,6 @@ pub mod execute_stake;
 pub mod execute_stake_lsm;
 pub mod execute_unstake;
 pub mod execute_update_query;
-pub mod execute_icq_update_period;
 pub mod execute_withdraw;
 
 pub mod error_conversion;

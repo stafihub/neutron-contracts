@@ -169,6 +169,9 @@ pub enum ContractError {
 
     #[error("Callback error: Error message")]
     CallBackErrErrorMsg {},
+
+    #[error("Period too small")]
+    PeriodTooSmall {},
 }
 
 impl From<ContractError> for NeutronError {
