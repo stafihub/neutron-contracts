@@ -30,6 +30,9 @@ pub enum ExecuteMsg {
     ChangeThreshold {
         threshold: u64,
     },
+    TransferAdmin {
+        new_admin: String,
+    },
 }
 
 #[cw_serde]

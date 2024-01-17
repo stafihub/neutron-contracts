@@ -61,6 +61,9 @@ pub fn execute(
         ExecuteMsg::ChangeThreshold { threshold } => {
             execute_change_threshold(deps, env, info, threshold)
         }
+        ExecuteMsg::TransferAdmin { new_admin } => {
+            execute_transfer_admin(deps, env, info, new_admin)
+        }
     }
 }
 
@@ -172,7 +175,7 @@ pub fn execute_vote_proposal(
 
     PROPOSALS.save(deps.storage, proposal_id, &proposal)?;
 
-    Ok(res)
+    Ok(res.add_attribute("action", "vote_proposal"))
 }
 
 pub fn execute_add_relayer(
@@ -192,7 +195,7 @@ pub fn execute_add_relayer(
 
     BRIDGE_INFO.save(deps.storage, &bridge_info)?;
 
-    Ok(Response::default())
+    Ok(Response::default().add_attribute("action", "add_relayer"))
 }
 pub fn execute_remove_relayer(
     deps: DepsMut,
@@ -215,7 +218,7 @@ pub fn execute_remove_relayer(
 
     BRIDGE_INFO.save(deps.storage, &bridge_info)?;
 
-    Ok(Response::default())
+    Ok(Response::default().add_attribute("action", "remove_relayer"))
 }
 
 pub fn execute_change_threshold(
@@ -236,7 +239,33 @@ pub fn execute_change_threshold(
 
     BRIDGE_INFO.save(deps.storage, &bridge_info)?;
 
-    Ok(Response::default())
+    Ok(Response::default().add_attribute("action", "change_threshold"))
+}
+
+pub fn execute_transfer_admin(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    new_admin: String,
+) -> Result<Response, ContractError> {
+    let mut bridge_info = BRIDGE_INFO.load(deps.storage)?;
+    if bridge_info.admin != info.sender {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    if bridge_info.admin != info.sender {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    if let Ok(admin) = deps.api.addr_validate(&new_admin) {
+        bridge_info.admin = admin;
+    } else {
+        return Err(ContractError::InvalidAddress {});
+    }
+
+    BRIDGE_INFO.save(deps.storage, &bridge_info)?;
+
+    Ok(Response::default().add_attribute("action", "transfer_admin"))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]

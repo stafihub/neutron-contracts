@@ -410,7 +410,7 @@ pub fn execute_add_minter(
 
     TOKEN_INFO.save(deps.storage, &config)?;
 
-    Ok(Response::default().add_attribute("action", "update_minter"))
+    Ok(Response::default().add_attribute("action", "add_minter"))
 }
 
 pub fn execute_remove_minter(
@@ -433,7 +433,7 @@ pub fn execute_remove_minter(
 
     TOKEN_INFO.save(deps.storage, &config)?;
 
-    Ok(Response::default().add_attribute("action", "update_minter"))
+    Ok(Response::default().add_attribute("action", "remove_minter"))
 }
 
 pub fn execute_transfer_admin(
@@ -459,7 +459,7 @@ pub fn execute_transfer_admin(
 
     TOKEN_INFO.save(deps.storage, &config)?;
 
-    Ok(Response::default().add_attribute("action", "update_minter"))
+    Ok(Response::default().add_attribute("action", "transfer_admin"))
 }
 
 pub fn execute_update_marketing(
