@@ -1933,6 +1933,7 @@
           "required": [
             "amount",
             "era",
+            "index",
             "pool_addr",
             "status",
             "unstaker"
@@ -1942,6 +1943,11 @@
               "$ref": "#/definitions/Uint128"
             },
             "era": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "index": {
               "type": "integer",
               "format": "uint64",
               "minimum": 0.0
