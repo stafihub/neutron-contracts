@@ -74,6 +74,8 @@ pub fn execute_redeem_token_for_share(
         },
     )?;
 
+    POOLS.save(deps.storage, pool_addr, &pool_info)?;
+
     Ok(Response::default().add_submessage(submsg))
 }
 
