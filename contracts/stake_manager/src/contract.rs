@@ -56,7 +56,7 @@ use crate::tx_callback::{prepare_sudo_payload, sudo_error, sudo_response, sudo_t
 // Default timeout for SubmitTX is 30h
 pub const DEFAULT_TIMEOUT_SECONDS: u64 = 30 * 60 * 60;
 pub const DEFAULT_UPDATE_PERIOD: u64 = 12000;
-pub const DEFAULT_FAST_PERIOD: u64 = 21;
+pub const DEFAULT_FAST_PERIOD: u64 = 12;
 
 const CONTRACT_NAME: &str = env!("CARGO_PKG_NAME");
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");

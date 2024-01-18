@@ -60,9 +60,9 @@ process_era() {
     echo "Failed to era_update msg: $(echo "$tx_result" | jq '.raw_log')" && exit 1
   fi
 
-  echo "Waiting 10 seconds for era_pre_process (sometimes it takes a lot of time)…"
+  echo "Waiting 15 seconds for era_pre_process (sometimes it takes a lot of time)…"
   # shellcheck disable=SC2034
-  for i in $(seq 10); do
+  for i in $(seq 15); do
     sleep 1
     echo -n .
   done
