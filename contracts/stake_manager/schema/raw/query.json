@@ -70,6 +70,27 @@
     {
       "type": "object",
       "required": [
+        "validators"
+      ],
+      "properties": {
+        "validators": {
+          "type": "object",
+          "required": [
+            "pool_addr"
+          ],
+          "properties": {
+            "pool_addr": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
         "pool_info"
       ],
       "properties": {
@@ -172,33 +193,6 @@
     {
       "type": "object",
       "required": [
-        "acknowledgement_result"
-      ],
-      "properties": {
-        "acknowledgement_result": {
-          "type": "object",
-          "required": [
-            "interchain_account_id",
-            "sequence_id"
-          ],
-          "properties": {
-            "interchain_account_id": {
-              "type": "string"
-            },
-            "sequence_id": {
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0.0
-            }
-          },
-          "additionalProperties": false
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
         "user_unstake"
       ],
       "properties": {
@@ -241,19 +235,6 @@
               "$ref": "#/definitions/Addr"
             }
           },
-          "additionalProperties": false
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "errors_queue"
-      ],
-      "properties": {
-        "errors_queue": {
-          "type": "object",
           "additionalProperties": false
         }
       },
