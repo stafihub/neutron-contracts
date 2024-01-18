@@ -36,10 +36,6 @@ pub fn execute_register_pool(
     interchain_account_id: String,
     register_fee: Vec<cosmwasm_std::Coin>,
 ) -> NeutronResult<Response<NeutronMsg>> {
-    deps.as_ref()
-        .api
-        .debug(format!("WASMDEBUG: register_fee {:?}", register_fee).as_str());
-
     if interchain_account_id.trim().is_empty()
         || interchain_account_id.contains(".")
         || interchain_account_id.contains("-")
@@ -111,14 +107,6 @@ pub fn sudo_open_ack(
     _counterparty_channel_id: String,
     counterparty_version: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
-    deps.api.debug(
-        format!(
-            "WASMDEBUG: sudo_open_ack: sudo received: {:?} {}",
-            port_id, counterparty_version
-        )
-        .as_str(),
-    );
-
     // The version variable contains a JSON value with multiple fields,
     // including the generated account address.
     let parsed_version: Result<OpenAckVersion, _> =

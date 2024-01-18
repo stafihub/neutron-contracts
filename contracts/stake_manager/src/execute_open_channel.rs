@@ -21,10 +21,6 @@ pub fn execute_open_channel(
     closed_channel_id: String,
     register_fee: Vec<cosmwasm_std::Coin>,
 ) -> NeutronResult<Response<NeutronMsg>> {
-    deps.as_ref()
-        .api
-        .debug(format!("WASMDEBUG: register_fee {:?}", register_fee).as_str());
-
     let pool_info = POOLS.load(deps.as_ref().storage, pool_addr)?;
     if info.sender != pool_info.admin {
         return Err(ContractError::Unauthorized {}.into());

@@ -126,10 +126,6 @@ pub fn sudo_era_update_callback(
     deps: DepsMut,
     payload: SudoPayload,
 ) -> NeutronResult<Response<NeutronMsg>> {
-    deps.as_ref()
-        .api
-        .debug("WASMDEBUG: sudo_era_update_callback");
-
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
     pool_info.era_process_status = EraUpdateEnded;
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
@@ -141,10 +137,6 @@ pub fn sudo_era_update_failed_callback(
     deps: DepsMut,
     payload: SudoPayload,
 ) -> NeutronResult<Response<NeutronMsg>> {
-    deps.as_ref()
-        .api
-        .debug("WASMDEBUG: sudo_era_update_failed_callback");
-
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
     pool_info.era = pool_info.era.sub(1);
     pool_info.era_process_status = ActiveEnded;

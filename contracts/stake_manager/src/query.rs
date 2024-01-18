@@ -61,26 +61,10 @@ pub fn query_balance_by_addr(
     // get info about the query
     let registered_query = get_registered_query(deps, registered_query_id)?;
 
-    deps.api.debug(
-        format!(
-            "WASMDEBUG: query_balance_by_addr contract_query_id is {:?} registered_query_id is: {:?} registered_query is:{:?}",
-            contract_query_id, registered_query_id, registered_query
-        )
-            .as_str(),
-    );
-
     // check that query type is KV
     check_query_type(registered_query.registered_query.query_type, QueryType::KV)?;
     // reconstruct a nice Balances structure from raw KV-storage values
     let balances: Balances = query_kv_result(deps, registered_query_id)?;
-
-    deps.api.debug(
-        format!(
-            "WASMDEBUG: query_balance_by_addr Balances is {:?}",
-            balances
-        )
-        .as_str(),
-    );
 
     Ok(BalanceResponse {
         // last_submitted_height tells us when the query result was updated last time (block height)
@@ -102,26 +86,10 @@ pub fn query_delegation_by_addr(
     let registered_query: neutron_sdk::bindings::query::QueryRegisteredQueryResponse =
         get_registered_query(deps, registered_query_id)?;
 
-    deps.api.debug(
-        format!(
-            "WASMDEBUG: query_delegation_by_addr contract_query_id is {:?} registered_query_id is: {:?} registered_query is:{:?}",
-            contract_query_id, registered_query_id, registered_query
-        )
-            .as_str(),
-    );
-
     // check that query type is KV
     check_query_type(registered_query.registered_query.query_type, QueryType::KV)?;
     // reconstruct a nice Balances structure from raw KV-storage values
     let delegations: Delegations = query_kv_result(deps, registered_query_id)?;
-
-    deps.api.debug(
-        format!(
-            "WASMDEBUG: query_delegation_by_addr Delegations is {:?}",
-            delegations
-        )
-        .as_str(),
-    );
 
     Ok(DelegatorDelegationsResponse {
         // last_submitted_height tells us when the query result was updated last time (block height)
@@ -143,26 +111,10 @@ pub fn query_validator_by_addr(
     let registered_query: neutron_sdk::bindings::query::QueryRegisteredQueryResponse =
         get_registered_query(deps, registered_query_id)?;
 
-    deps.api.debug(
-        format!(
-            "WASMDEBUG: query_validator_by_addr contract_query_id is {:?} registered_query_id is: {:?} registered_query is:{:?}",
-            contract_query_id, registered_query_id, registered_query
-        )
-            .as_str(),
-    );
-
     // check that query type is KV
     check_query_type(registered_query.registered_query.query_type, QueryType::KV)?;
     // reconstruct a nice Balances structure from raw KV-storage values
     let staking_validator: StakingValidator = query_kv_result(deps, registered_query_id)?;
-
-    deps.api.debug(
-        format!(
-            "WASMDEBUG: query_validator_by_addr validator is {:?}",
-            staking_validator
-        )
-        .as_str(),
-    );
 
     Ok(ValidatorResponse {
         // last_submitted_height tells us when the query result was updated last time (block height)

@@ -1,3 +1,12 @@
+use crate::contract::{DEFAULT_TIMEOUT_SECONDS, DEFAULT_UPDATE_PERIOD};
+use crate::error_conversion::ContractError;
+use crate::helper::{CAL_BASE, DEFAULT_DECIMALS, DEFAULT_ERA_SECONDS, MIN_ERA_SECONDS};
+use crate::msg::InitPoolParams;
+use crate::query_callback::register_query_submsg;
+use crate::state::{IcaInfo, PoolInfo, QueryKind, SudoPayload, TxType, POOLS};
+use crate::state::{INFO_OF_ICA_ID, STACK};
+use crate::tx_callback::msg_with_sudo_callback;
+use crate::{helper::min_ntrn_ibc_fee, state::ValidatorUpdateStatus};
 use cosmos_sdk_proto::cosmos::distribution::v1beta1::MsgSetWithdrawAddress;
 use cosmos_sdk_proto::prost::Message;
 use cosmwasm_std::{instantiate2_address, to_json_binary, Addr, Uint128, WasmMsg};
@@ -16,25 +25,13 @@ use neutron_sdk::{
 use std::ops::Div;
 use std::vec;
 
-use crate::contract::{DEFAULT_TIMEOUT_SECONDS, DEFAULT_UPDATE_PERIOD};
-use crate::error_conversion::ContractError;
-use crate::helper::{CAL_BASE, DEFAULT_DECIMALS, DEFAULT_ERA_SECONDS, MIN_ERA_SECONDS};
-use crate::msg::InitPoolParams;
-use crate::query_callback::register_query_submsg;
-use crate::state::{QueryKind, SudoPayload, TxType, POOLS};
-use crate::state::{INFO_OF_ICA_ID, STACK};
-use crate::tx_callback::msg_with_sudo_callback;
-use crate::{helper::min_ntrn_ibc_fee, state::ValidatorUpdateStatus};
-
 // add execute to config the validator addrs and withdraw address on reply
 pub fn execute_init_pool(
-    mut deps: DepsMut<NeutronQuery>,
+    deps: DepsMut<NeutronQuery>,
     env: Env,
     info: MessageInfo,
     param: InitPoolParams,
 ) -> NeutronResult<Response<NeutronMsg>> {
-    let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
-
     let (pool_ica_info, withdraw_ica_info, _) =
         INFO_OF_ICA_ID.load(deps.storage, param.interchain_account_id.clone())?;
 
@@ -67,28 +64,6 @@ pub fn execute_init_pool(
         .api
         .addr_humanize(&i2_address)
         .map_err(NeutronError::Std)?;
-
-    let instantiate_lsd_msg = WasmMsg::Instantiate2 {
-        admin: Option::from(info.sender.to_string()),
-        code_id,
-        msg: to_json_binary(
-            &(lsd_token::msg::InstantiateMsg {
-                name: param.lsd_token_name.clone(),
-                symbol: param.lsd_token_symbol,
-                decimals: DEFAULT_DECIMALS,
-                initial_balances: vec![],
-                mint: Option::from(InstantiateMinterData {
-                    admin: pool_info.admin.to_string(),
-                    minter: env.contract.address.to_string(),
-                    cap: None,
-                }),
-                marketing: None,
-            }),
-        )?,
-        funds: vec![],
-        label: param.lsd_token_name.clone(),
-        salt: salt.as_bytes().into(),
-    };
 
     pool_info.ibc_denom = param.ibc_denom;
     pool_info.channel_id_of_ibc_denom = param.channel_id_of_ibc_denom;
@@ -136,6 +111,53 @@ pub fn execute_init_pool(
     pool_info.lsm_pending_limit = 100;
     pool_info.rate_change_limit = Uint128::new(5000);
     pool_info.validator_update_status = ValidatorUpdateStatus::End;
+
+    return deal_pool(
+        deps,
+        env,
+        info,
+        pool_info,
+        pool_ica_info,
+        withdraw_ica_info,
+        code_id,
+        param.lsd_token_name,
+        param.lsd_token_symbol,
+    );
+}
+
+pub fn deal_pool(
+    mut deps: DepsMut<NeutronQuery>,
+    env: Env,
+    info: MessageInfo,
+    pool_info: PoolInfo,
+    pool_ica_info: IcaInfo,
+    withdraw_ica_info: IcaInfo,
+    lsd_code_id: u64,
+    lsd_token_name: String,
+    lsd_token_symbol: String,
+) -> NeutronResult<Response<NeutronMsg>> {
+    let salt = &pool_ica_info.ica_addr.clone()[..40];
+    let instantiate_lsd_msg = WasmMsg::Instantiate2 {
+        admin: Option::from(info.sender.to_string()),
+        code_id: lsd_code_id,
+        msg: to_json_binary(
+            &(lsd_token::msg::InstantiateMsg {
+                name: lsd_token_name.clone(),
+                symbol: lsd_token_symbol,
+                decimals: DEFAULT_DECIMALS,
+                initial_balances: vec![],
+                mint: Option::from(InstantiateMinterData {
+                    admin: pool_info.admin.to_string(),
+                    minter: env.contract.address.to_string(),
+                    cap: None,
+                }),
+                marketing: None,
+            }),
+        )?,
+        funds: vec![],
+        label: lsd_token_name.clone(),
+        salt: salt.as_bytes().into(),
+    };
 
     POOLS.save(deps.storage, pool_ica_info.ica_addr.clone(), &pool_info)?;
 
@@ -195,9 +217,10 @@ pub fn execute_init_pool(
         return Err(ContractError::EncodeError(e.to_string()).into());
     }
 
+    let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
     let cosmos_msg = NeutronMsg::submit_tx(
         pool_ica_info.ctrl_connection_id.clone(),
-        param.interchain_account_id.clone(),
+        pool_info.ica_id.clone(),
         vec![ProtobufAny {
             type_url: "/cosmos.distribution.v1beta1.MsgSetWithdrawAddress".to_string(),
             value: Binary::from(buf),

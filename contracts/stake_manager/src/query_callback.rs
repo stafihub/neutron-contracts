@@ -43,14 +43,6 @@ pub fn write_reply_id_to_query_id(deps: DepsMut, msg: Reply) -> StdResult<Respon
     )
     .map_err(|e| ContractError::ICQErrFailedParse(e.to_string()))?;
 
-    deps.api.debug(
-        format!(
-            "WASMDEBUG: write_query_id_to_reply_id query_id: {:?} msg.id(Reply id): {:?}",
-            resp.id, msg.id
-        )
-        .as_str(),
-    );
-
     REPLY_ID_TO_QUERY_ID.save(deps.storage, msg.id, &resp.id)?;
     QUERY_ID_TO_REPLY_ID.save(deps.storage, resp.id, &msg.id)?;
 
@@ -67,9 +59,6 @@ pub fn sudo_kv_query_result(deps: DepsMut, query_id: u64) -> NeutronResult<Respo
             .unwrap_or(Some(false));
 
         if need_update_status.unwrap_or(false) {
-            deps.api.debug(
-                format!("WASMDEBUG: sudo_kv_query_result query_id: {:?} ", query_id).as_str(),
-            );
             REPLY_ID_TO_NEED_UPDATE.remove(deps.storage, reply_id);
 
             let update_msg = NeutronMsg::update_interchain_query(
