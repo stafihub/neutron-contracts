@@ -40,14 +40,6 @@ pub fn execute_migrate_pool(
     let (pool_ica_info, withdraw_ica_info, _) =
         INFO_OF_ICA_ID.load(deps.storage, param.interchain_account_id.clone())?;
 
-    deps.as_ref().api.debug(
-        format!(
-            "WASMDEBUG: execute_init_pool pool_ica_info: {:?}",
-            pool_ica_info
-        )
-        .as_str(),
-    );
-
     if param.validator_addrs.is_empty() || param.validator_addrs.len() > 5 {
         return Err(ContractError::ValidatorAddressesListSize {}.into());
     }
@@ -152,10 +144,6 @@ pub fn execute_migrate_pool(
         return Err(ContractError::RateNotMatch {}.into());
     }
 
-    deps.as_ref()
-        .api
-        .debug(format!("WASMDEBUG: execute_init_pool POOLS.load: {:?}", pool_info).as_str());
-
     POOLS.save(deps.storage, pool_ica_info.ica_addr.clone(), &pool_info)?;
 
     let register_balance_pool_submsg = register_query_submsg(
@@ -226,14 +214,6 @@ pub fn execute_migrate_pool(
         fee.clone(),
     );
 
-    deps.as_ref().api.debug(
-        format!(
-            "WASMDEBUG: execute_init_pool cosmos_msg is {:?}",
-            cosmos_msg
-        )
-        .as_str(),
-    );
-
     // We use a submessage here because we need the process message reply to save
     // the outgoing IBC packet identifier for later.
     let submsg_set_withdraw = msg_with_sudo_callback(
@@ -246,14 +226,6 @@ pub fn execute_migrate_pool(
             tx_type: TxType::SetWithdrawAddr,
         },
     )?;
-
-    deps.as_ref().api.debug(
-        format!(
-            "WASMDEBUG: execute_init_pool submsg_set_withdraw: {:?}",
-            submsg_set_withdraw
-        )
-        .as_str(),
-    );
 
     Ok(Response::default()
         .add_message(instantiate_lsd_msg)

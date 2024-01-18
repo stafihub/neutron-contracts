@@ -30,7 +30,6 @@ use crate::{
 #[derive(Clone, Debug)]
 struct ValidatorUnbondInfo {
     pub validator: String,
-    pub delegation_amount: Uint128,
     pub unbond_amount: Uint128,
 }
 
@@ -43,9 +42,6 @@ pub fn execute_era_bond(
 
     // check era state
     if pool_info.era_process_status != EraUpdateEnded {
-        deps.as_ref()
-            .api
-            .debug(format!("WASMDEBUG: execute_era_bond skip pool: {:?}", pool_addr).as_str());
         return Err(ContractError::StatusNotAllow {}.into());
     }
 
@@ -61,14 +57,6 @@ pub fn execute_era_bond(
             .unbond
             .sub(pool_info.era_snapshot.bond);
 
-        deps.as_ref().api.debug(
-            format!(
-                "WASMDEBUG: execute_era_bond unbond_amount: {:?}",
-                unbond_amount
-            )
-            .as_str(),
-        );
-
         let delegations = query_delegation_by_addr(deps.as_ref(), pool_addr.clone())?;
         let delegating_vals: Vec<String> = delegations
             .delegations
@@ -80,14 +68,6 @@ pub fn execute_era_bond(
         if unbond_amount.u128() > 0 {
             let unbond_infos = allocate_unbond_amount(&delegations.delegations, unbond_amount);
             for info in unbond_infos {
-                deps.as_ref().api.debug(
-                    format!(
-                        "Validator: {}, Delegation: {}, Unbond: {}",
-                        info.validator, info.delegation_amount, info.unbond_amount
-                    )
-                    .as_str(),
-                );
-
                 op_validators.push(info.validator.clone());
 
                 // add submessage to unstake
@@ -114,13 +94,6 @@ pub fn execute_era_bond(
                 msgs.push(any_msg);
             }
         }
-        deps.as_ref().api.debug(
-            format!(
-                "WASMDEBUG: execute_era_bond op_validators: {:?}",
-                op_validators
-            )
-            .as_str(),
-        );
         if op_validators.len() != delegating_vals.len() {
             // Find the difference between delegation validator_addrs and op_validators
             let pool_validators: HashSet<_> = delegating_vals.into_iter().collect();
@@ -160,28 +133,12 @@ pub fn execute_era_bond(
         let stake_amount = pool_info.era_snapshot.bond - pool_info.era_snapshot.unbond;
         let validator_count = pool_info.validator_addrs.len() as u128;
 
-        deps.as_ref().api.debug(
-            format!(
-                "WASMDEBUG: execute_era_bond stake_amount: {}, validator_count is {}",
-                stake_amount, validator_count
-            )
-            .as_str(),
-        );
-
         if validator_count == 0 {
             return Err(ContractError::ValidatorCountIsZero {}.into());
         }
 
         let amount_per_validator = stake_amount.div(Uint128::from(validator_count));
         let remainder = stake_amount.sub(amount_per_validator.mul(Uint128::new(validator_count)));
-
-        deps.as_ref().api.debug(
-            format!(
-                "WASMDEBUG: execute_era_bond amount_per_validator: {}, remainder is {}",
-                amount_per_validator, remainder
-            )
-            .as_str(),
-        );
 
         for (index, validator_addr) in pool_info.validator_addrs.iter().enumerate() {
             let mut amount_for_this_validator = amount_per_validator;
@@ -190,14 +147,6 @@ pub fn execute_era_bond(
             if index == 0 {
                 amount_for_this_validator += remainder;
             }
-
-            deps.as_ref().api.debug(
-                format!(
-                    "Validator: {}, Bond: {}",
-                    validator_addr, amount_for_this_validator
-                )
-                .as_str(),
-            );
 
             let any_msg = gen_delegation_txs(
                 pool_addr.clone(),
@@ -222,10 +171,6 @@ pub fn execute_era_bond(
         fee,
     );
 
-    deps.as_ref()
-        .api
-        .debug(format!("WASMDEBUG: execute_era_bond cosmos_msg: {:?}", cosmos_msg).as_str());
-
     let submsg = msg_with_sudo_callback(
         deps.branch(),
         cosmos_msg,
@@ -237,10 +182,6 @@ pub fn execute_era_bond(
             tx_type: TxType::EraBond,
         },
     )?;
-
-    deps.as_ref()
-        .api
-        .debug(format!("WASMDEBUG: execute_era_bond submsg: {:?}", submsg).as_str());
 
     Ok(Response::default().add_submessage(submsg))
 }
@@ -272,7 +213,6 @@ fn allocate_unbond_amount(
 
         unbond_infos.push(ValidatorUnbondInfo {
             validator: delegation.validator.clone(),
-            delegation_amount: delegation.amount.amount,
             unbond_amount: current_unbond,
         });
     }

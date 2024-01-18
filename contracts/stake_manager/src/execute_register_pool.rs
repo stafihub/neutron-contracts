@@ -62,10 +62,6 @@ pub fn execute_register_pool(
         Some(register_fee.clone()),
     );
 
-    deps.as_ref()
-        .api
-        .debug(format!("WASMDEBUG: register pool msg is {:?}", register_pool_msg).as_str());
-
     let withdraw_ica_id = get_withdraw_ica_id(interchain_account_id.clone());
     let register_withdraw_msg = NeutronMsg::register_interchain_account(
         connection_id.clone(),
@@ -78,14 +74,6 @@ pub fn execute_register_pool(
         &interchain_account_id.clone(),
     );
     let ctrl_port_id_of_withdraw = get_port_id(env.contract.address.as_str(), &withdraw_ica_id);
-
-    deps.as_ref().api.debug(
-        format!(
-            "WASMDEBUG:  pool port is {:?} withdraw port is {:?} ",
-            ctrl_port_id_of_pool, ctrl_port_id_of_withdraw
-        )
-        .as_str(),
-    );
 
     INFO_OF_ICA_ID.save(
         deps.storage,

@@ -25,13 +25,6 @@ pub fn execute_era_collect_withdraw(
 
     // check era state
     if pool_info.era_process_status != BondEnded {
-        deps.as_ref().api.debug(
-            format!(
-                "WASMDEBUG: execute_era_collect_withdraw skip pool: {:?}",
-                pool_addr
-            )
-            .as_str(),
-        );
         return Err(ContractError::StatusNotAllow {}.into());
     }
     pool_info.era_process_status = WithdrawStarted;
@@ -61,15 +54,7 @@ pub fn execute_era_collect_withdraw(
                     .unwrap_or(Uint128::zero());
             }
         }
-        Err(_) => {
-            deps.as_ref().api.debug(
-                format!(
-                    "WASMDEBUG: execute_era_collect_withdraw withdraw_balances_result: {:?}",
-                    withdraw_balances_result
-                )
-                .as_str(),
-            );
-        }
+        Err(_) => {}
     }
 
     // leave gas
@@ -79,14 +64,6 @@ pub fn execute_era_collect_withdraw(
 
         return Ok(Response::default());
     }
-
-    deps.as_ref().api.debug(
-        format!(
-            "WASMDEBUG: execute_era_collect_withdraw withdraw_amount: {:?}",
-            withdraw_amount
-        )
-        .as_str(),
-    );
 
     let tx_withdraw_coin = cosmos_sdk_proto::cosmos::base::v1beta1::Coin {
         denom: pool_info.remote_denom.clone(),
@@ -118,14 +95,6 @@ pub fn execute_era_collect_withdraw(
         "".to_string(),
         DEFAULT_TIMEOUT_SECONDS,
         fee.clone(),
-    );
-
-    deps.as_ref().api.debug(
-        format!(
-            "WASMDEBUG: execute_era_collect_withdraw cosmos_msg: {:?}",
-            cosmos_msg
-        )
-        .as_str(),
     );
 
     let submsg = msg_with_sudo_callback(

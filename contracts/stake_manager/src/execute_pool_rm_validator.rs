@@ -40,23 +40,8 @@ pub fn execute_rm_pool_validator(
         return Err(ContractError::StatusNotAllow {}.into());
     }
 
-    deps.as_ref().api.debug(
-        format!(
-            "WASMDEBUG: execute_rm_pool_validators pool_info: {:?}",
-            pool_info
-        )
-        .as_str(),
-    );
-
     let delegations = query_delegation_by_addr(deps.as_ref(), pool_addr.clone())?;
 
-    deps.as_ref().api.debug(
-        format!(
-            "WASMDEBUG: execute_rm_pool_validators delegations: {:?}",
-            delegations
-        )
-        .as_str(),
-    );
     if pool_info.validator_addrs.len() <= 1 {
         return Err(ContractError::ValidatorAddressesListSize {}.into());
     }

@@ -29,9 +29,6 @@ pub fn execute_era_restake(
 
     // check era state
     if pool_info.era_process_status != WithdrawEnded {
-        deps.as_ref()
-            .api
-            .debug(format!("WASMDEBUG: execute_era_restake skip pool: {:?}", pool_addr).as_str());
         return Err(ContractError::StatusNotAllow {}.into());
     }
     pool_info.era_process_status = RestakeStarted;
@@ -51,39 +48,15 @@ pub fn execute_era_restake(
         return Ok(Response::default());
     }
 
-    deps.as_ref().api.debug(
-        format!(
-            "WASMDEBUG: execute_era_restake restake_amount: {:?}",
-            restake_amount
-        )
-        .as_str(),
-    );
-
     let validator_count = pool_info.validator_addrs.len() as u128;
 
     let mut msgs = vec![];
-    deps.as_ref().api.debug(
-        format!(
-            "WASMDEBUG: execute_era_restake stake_amount: {}, validator_count is {}",
-            restake_amount, validator_count
-        )
-        .as_str(),
-    );
-
     if validator_count == 0 {
         return Err(ContractError::ValidatorCountIsZero {}.into());
     }
 
     let amount_per_validator = restake_amount.div(Uint128::from(validator_count));
     let remainder = restake_amount.sub(amount_per_validator.mul(Uint128::new(validator_count)));
-
-    deps.as_ref().api.debug(
-        format!(
-            "WASMDEBUG: execute_era_restake amount_per_validator: {}, remainder is {}",
-            amount_per_validator, remainder
-        )
-        .as_str(),
-    );
 
     for (index, validator_addr) in pool_info.validator_addrs.iter().enumerate() {
         let mut amount_for_this_validator = amount_per_validator;
@@ -92,14 +65,6 @@ pub fn execute_era_restake(
         if index == 0 {
             amount_for_this_validator += remainder;
         }
-
-        deps.as_ref().api.debug(
-            format!(
-                "WASMDEBUG: execute_era_restake Validator: {}, Bond: {}",
-                validator_addr, amount_for_this_validator
-            )
-            .as_str(),
-        );
 
         let any_msg = gen_delegation_txs(
             pool_addr.clone(),
@@ -118,14 +83,6 @@ pub fn execute_era_restake(
         "".to_string(),
         DEFAULT_TIMEOUT_SECONDS,
         min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee),
-    );
-
-    deps.as_ref().api.debug(
-        format!(
-            "WASMDEBUG: execute_era_restake cosmos_msg: {:?}",
-            cosmos_msg
-        )
-        .as_str(),
     );
 
     let submsg = msg_with_sudo_callback(

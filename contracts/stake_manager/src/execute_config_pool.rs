@@ -19,10 +19,6 @@ pub fn execute_config_pool(
         return Err(ContractError::Unauthorized {}.into());
     }
 
-    deps.as_ref()
-        .api
-        .debug(format!("WASMDEBUG: execute_config_pool POOLS.load: {:?}", pool_info).as_str());
-
     if let Some(minimal_stake) = param.minimal_stake {
         pool_info.minimal_stake = minimal_stake;
     }

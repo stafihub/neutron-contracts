@@ -38,9 +38,6 @@ pub fn execute_era_update(
     if pool_info.era_process_status != EraPreprocessEnded
         || pool_info.validator_update_status != ValidatorUpdateStatus::End
     {
-        deps.as_ref()
-            .api
-            .debug(format!("WASMDEBUG: execute_era_update skip pool: {:?}", pool_addr).as_str());
         return Err(ContractError::StatusNotAllow {}.into());
     }
     let current_era = env
@@ -108,10 +105,6 @@ pub fn execute_era_update(
         fee: fee.clone(),
     };
 
-    deps.as_ref()
-        .api
-        .debug(format!("WASMDEBUG: IbcTransfer msg: {:?}", msg).as_str());
-
     let (pool_ica_info, _, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
 
     let submsg_pool_ibc_send = msg_with_sudo_callback(
@@ -125,13 +118,6 @@ pub fn execute_era_update(
         },
     )?;
 
-    deps.as_ref().api.debug(
-        format!(
-            "WASMDEBUG: execute_send: sent submsg: {:?}",
-            submsg_pool_ibc_send
-        )
-        .as_str(),
-    );
     POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
     Ok(Response::default().add_submessage(submsg_pool_ibc_send))
 }

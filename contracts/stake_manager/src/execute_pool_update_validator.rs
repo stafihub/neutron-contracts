@@ -34,14 +34,6 @@ pub fn execute_pool_update_validator(
         return Err(ContractError::EraProcessNotEnd {}.into());
     }
 
-    deps.as_ref().api.debug(
-        format!(
-            "WASMDEBUG: execute_pool_update_validator pool_info: {:?}",
-            pool_info
-        )
-        .as_str(),
-    );
-
     if pool_info.validator_update_status != ValidatorUpdateStatus::End {
         return Err(ContractError::StatusNotAllow {}.into());
     }
@@ -53,13 +45,6 @@ pub fn execute_pool_update_validator(
     }
 
     let delegations = query_delegation_by_addr(deps.as_ref(), pool_addr.clone())?;
-    deps.as_ref().api.debug(
-        format!(
-            "WASMDEBUG: execute_pool_update_validator delegations: {:?}",
-            delegations
-        )
-        .as_str(),
-    );
 
     let mut new_validators = pool_info.validator_addrs.clone();
     new_validators.retain(|x| x.as_str() != old_validator);

@@ -26,13 +26,13 @@ pub enum ContractError {
     #[error("Validator count is zero")]
     ValidatorCountIsZero {},
 
-    #[error("Delegation submission height is less than or equal to the bond/withdraw collect height of the pool era, which is not allowed.")]
+    #[error("Delegation submission height")]
     DelegationSubmissionHeight {},
 
-    #[error("Withdraw Addr balances submission height is less than or equal to the bond height of the pool era, which is not allowed.")]
+    #[error("Withdraw Addr balances submission height")]
     WithdrawAddrBalanceSubmissionHeight {},
 
-    #[error("Restake function call height is less than or equal to the bond height of the pool era, which is not allowed.")]
+    #[error("Restake height")]
     RestakeHeight {},
 
     #[error("Pool is paused")]
@@ -41,7 +41,7 @@ pub enum ContractError {
     #[error("Already latest era")]
     AlreadyLatestEra {},
 
-    #[error("Validator addresses list must contain between 1 and 5 addresses.")]
+    #[error("Validator addresses list")]
     ValidatorAddressesListSize {},
 
     #[error("Rate is zero")]

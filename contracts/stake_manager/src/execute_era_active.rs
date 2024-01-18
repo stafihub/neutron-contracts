@@ -24,23 +24,12 @@ pub fn execute_era_active(
     let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
     // check era state
     if pool_info.era_process_status != RestakeEnded {
-        deps.as_ref()
-            .api
-            .debug(format!("WASMDEBUG: execute_era_active skip pool: {:?}", pool_addr).as_str());
         return Err(ContractError::StatusNotAllow {}.into());
     }
 
     if pool_info.share_tokens.len() > 0 {
         return Err(ContractError::PendingShareNotEmpty {}.into());
     }
-
-    deps.as_ref().api.debug(
-        format!(
-            "WASMDEBUG: execute_era_active pool_era_shot: {:?}",
-            pool_info.era_snapshot
-        )
-        .as_str(),
-    );
 
     let delegations_result = query_delegation_by_addr(deps.as_ref(), pool_addr.clone());
 
@@ -59,13 +48,6 @@ pub fn execute_era_active(
             }
         }
         Err(_) => {
-            deps.as_ref().api.debug(
-                format!(
-                    "WASMDEBUG: execute_era_active delegations_result: {:?}",
-                    delegations_result
-                )
-                .as_str(),
-            );
             return Err(ContractError::DelegationsNotExist {}.into());
         }
     }
@@ -85,14 +67,6 @@ pub fn execute_era_active(
     } else {
         (Uint128::zero(), Uint128::zero())
     };
-
-    deps.as_ref().api.debug(
-        format!(
-            "WASMDEBUG: execute_era_active protocol_fee is: {:?}, total_amount is: {:?}",
-            platform_fee, total_amount
-        )
-        .as_str(),
-    );
 
     let cal_temp = pool_info.active.add(total_amount.amount);
     let new_active = if cal_temp > pool_info.era_snapshot.active {

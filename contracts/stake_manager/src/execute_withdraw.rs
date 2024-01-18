@@ -142,14 +142,6 @@ pub fn sudo_withdraw_callback(
     if let Some(mut unstakes) = UNSTAKES_INDEX_FOR_USER
         .may_load(deps.storage, (user_addr.clone(), payload.pool_addr.clone()))?
     {
-        deps.api.debug(
-            format!(
-                "WASMDEBUG: sudo_callback: UserWithdraw before unstakes: {:?}",
-                unstakes
-            )
-            .as_str(),
-        );
-
         unstakes.retain(|unstake_index| {
             if parts.contains(&unstake_index.to_string()) {
                 UNSTAKES_OF_INDEX.remove(deps.storage, (payload.pool_addr.clone(), *unstake_index));
@@ -158,14 +150,6 @@ pub fn sudo_withdraw_callback(
 
             true
         });
-
-        deps.api.debug(
-            format!(
-                "WASMDEBUG: sudo_callback: UserWithdraw after unstakes: {:?}",
-                unstakes
-            )
-            .as_str(),
-        );
 
         UNSTAKES_INDEX_FOR_USER.save(deps.storage, (user_addr, payload.pool_addr), &unstakes)?;
     }

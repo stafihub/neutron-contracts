@@ -43,10 +43,6 @@ pub fn execute_stake_lsm(
         return Err(ContractError::PoolIcqNotUpdated {}.into());
     }
 
-    deps.as_ref()
-        .api
-        .debug(format!("WASMDEBUG: pool_info {:?}", pool_info).as_str());
-
     let (pool_ica_info, _, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
     if pool_info.paused {
         return Err(ContractError::PoolIsPaused {}.into());
@@ -55,9 +51,6 @@ pub fn execute_stake_lsm(
         return Err(ContractError::ParamsErrorFundsNotMatch {}.into());
     }
 
-    deps.as_ref()
-        .api
-        .debug(format!("WASMDEBUG: funds {:?}", info.funds[0]).as_str());
     let share_token_amount = info.funds[0].amount;
     if share_token_amount < pool_info.minimal_stake {
         return Err(ContractError::LessThanMinimalStake {}.into());
@@ -67,15 +60,9 @@ pub fn execute_stake_lsm(
     if denom_parts.len() != 2 {
         return Err(ContractError::DenomNotMatch {}.into());
     }
-    deps.as_ref()
-        .api
-        .debug(format!("WASMDEBUG: denom_parts {:?}", denom_parts).as_str());
 
     let denom_hash = denom_parts.get(1).unwrap();
     let denom_trace = query_denom_trace(deps.as_ref(), denom_hash.to_string())?;
-    deps.as_ref()
-        .api
-        .debug(format!("WASMDEBUG: denom_trace {:?}", denom_trace).as_str());
 
     let share_token_ibc_denom = info.funds[0].denom.to_string();
     let share_token_denom = denom_trace.denom_trace.base_denom;
@@ -99,9 +86,6 @@ pub fn execute_stake_lsm(
         return Err(ContractError::ValidatorNotSupport {}.into());
     }
     let validators = query_validator_by_addr(deps.as_ref(), pool_addr.clone())?;
-    deps.as_ref()
-        .api
-        .debug(format!("WASMDEBUG: validators {:?}", validators).as_str());
 
     let sub_msg;
     if let Some(validator) = validators
@@ -158,10 +142,6 @@ pub fn execute_stake_lsm(
             },
         )?;
     } else {
-        deps.as_ref()
-            .api
-            .debug(format!("WASMDEBUG: no validator info").as_str());
-
         return Err(ContractError::NoValidatorInfo {}.into());
     }
 
@@ -172,9 +152,6 @@ pub fn sudo_stake_lsm_callback(
     deps: DepsMut,
     payload: SudoPayload,
 ) -> NeutronResult<Response<NeutronMsg>> {
-    deps.as_ref()
-        .api
-        .debug(format!("WASMDEBUG: sudo_stake_lsm_callback payload {:?}", payload).as_str());
     let parts: Vec<String> = payload.message.split('_').map(String::from).collect();
     if parts.len() != 5 {
         return Err(ContractError::UnsupportedMessage(payload.message).into());
@@ -230,17 +207,9 @@ pub fn sudo_stake_lsm_callback(
 }
 
 pub fn sudo_stake_lsm_failed_callback(
-    deps: DepsMut,
+    _: DepsMut,
     payload: SudoPayload,
 ) -> NeutronResult<Response<NeutronMsg>> {
-    deps.as_ref().api.debug(
-        format!(
-            "WASMDEBUG: sudo_stake_lsm_failed_callback payload {:?}",
-            payload
-        )
-        .as_str(),
-    );
-
     let parts: Vec<String> = payload.message.split('_').map(String::from).collect();
     if parts.len() != 5 {
         return Err(ContractError::UnsupportedMessage(payload.message).into());

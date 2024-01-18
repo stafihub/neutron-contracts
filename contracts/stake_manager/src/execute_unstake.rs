@@ -25,23 +25,11 @@ pub fn execute_unstake(
 
     let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
 
-    deps.as_ref()
-        .api
-        .debug(format!("WASMDEBUG: execute_unstake pool_info: {:?}", pool_info).as_str());
-
     let mut unstakes_index_for_user = UNSTAKES_INDEX_FOR_USER
         .load(deps.storage, (info.sender.clone(), pool_addr.clone()))
         .unwrap_or_else(|_| vec![]);
 
     let unstake_count = unstakes_index_for_user.len() as u64;
-
-    deps.as_ref().api.debug(
-        format!(
-            "WASMDEBUG: execute_unstake UNSTAKES_INDEX_FOR_USER: {:?}",
-            unstake_count
-        )
-        .as_str(),
-    );
 
     let unstake_limit = pool_info.unstake_times_limit;
     if unstake_count >= unstake_limit {
@@ -72,14 +60,6 @@ pub fn execute_unstake(
 
             rsp = rsp.add_message(mint_msg);
         }
-
-        deps.as_ref().api.debug(
-            format!(
-                "WASMDEBUG: execute_unstake cms_fee: {:?} lsd_token_amount: {:?}",
-                cms_fee, lsd_token_amount
-            )
-            .as_str(),
-        );
     }
     if will_burn_lsd_token_amount.is_zero() {
         return Err(ContractError::BurnLsdTokenAmountIsZero {}.into());
@@ -87,14 +67,6 @@ pub fn execute_unstake(
 
     // Calculate the number of tokens(atom)
     let token_amount = will_burn_lsd_token_amount.mul(pool_info.rate).div(CAL_BASE);
-
-    deps.as_ref().api.debug(
-        format!(
-            "WASMDEBUG: execute_unstake token_amount: {:?}",
-            token_amount
-        )
-        .as_str(),
-    );
 
     // update pool info
     pool_info.next_unstake_index += 1;
