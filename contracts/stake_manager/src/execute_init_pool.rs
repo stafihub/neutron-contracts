@@ -109,7 +109,7 @@ pub fn execute_init_pool(
     pool_info.paused = false;
     pool_info.lsm_support = false;
     pool_info.lsm_pending_limit = 100;
-    pool_info.rate_change_limit = Uint128::new(5000);
+    pool_info.rate_change_limit = Uint128::zero();
     pool_info.validator_update_status = ValidatorUpdateStatus::End;
 
     return deal_pool(

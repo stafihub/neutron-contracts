@@ -89,7 +89,7 @@ pub fn execute_migrate_pool(
     pool_info.paused = false;
     pool_info.lsm_support = true;
     pool_info.lsm_pending_limit = 50;
-    pool_info.rate_change_limit = Uint128::new(5000);
+    pool_info.rate_change_limit = Uint128::zero();
     pool_info.validator_update_status = ValidatorUpdateStatus::End;
 
     // check rate

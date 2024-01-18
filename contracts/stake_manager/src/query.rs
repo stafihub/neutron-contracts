@@ -1,7 +1,7 @@
-use std::vec;
-
+use crate::state::{QueryKind, INFO_OF_ICA_ID};
+use crate::state::{ADDRESS_TO_REPLY_ID, STACK};
+use crate::state::{POOLS, REPLY_ID_TO_QUERY_ID, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX};
 use cosmwasm_std::{to_json_binary, Addr, Binary, Deps, Env};
-
 use neutron_sdk::interchain_queries::v045::queries::{
     DelegatorDelegationsResponse, ValidatorResponse,
 };
@@ -16,10 +16,7 @@ use neutron_sdk::{
     },
     NeutronResult,
 };
-
-use crate::state::{QueryKind, INFO_OF_ICA_ID};
-use crate::state::{ADDRESS_TO_REPLY_ID, STACK};
-use crate::state::{POOLS, REPLY_ID_TO_QUERY_ID, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX};
+use std::vec;
 
 pub fn query_user_unstake(
     deps: Deps<NeutronQuery>,

@@ -96,6 +96,7 @@ pub fn execute_unstake(
         unstaker: info.sender.to_string(),
         amount: token_amount,
         status: WithdrawStatus::Default,
+        index: will_use_unstake_index,
     };
 
     unstakes_index_for_user.push(will_use_unstake_index);

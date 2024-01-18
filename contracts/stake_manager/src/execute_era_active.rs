@@ -87,21 +87,23 @@ pub fn execute_era_active(
         CAL_BASE
     };
 
-    let rate_change = if pool_info.rate > new_rate {
-        pool_info
-            .rate
-            .sub(new_rate)
-            .mul(CAL_BASE)
-            .div(pool_info.rate)
-    } else {
-        new_rate
-            .sub(pool_info.rate)
-            .mul(CAL_BASE)
-            .div(pool_info.rate)
-    };
+    if !pool_info.rate_change_limit.is_zero() {
+        let rate_change = if pool_info.rate > new_rate {
+            pool_info
+                .rate
+                .sub(new_rate)
+                .mul(CAL_BASE)
+                .div(pool_info.rate)
+        } else {
+            new_rate
+                .sub(pool_info.rate)
+                .mul(CAL_BASE)
+                .div(pool_info.rate)
+        };
 
-    if rate_change > pool_info.rate_change_limit {
-        return Err(ContractError::RateChangeOverLimit {}.into());
+        if rate_change > pool_info.rate_change_limit {
+            return Err(ContractError::RateChangeOverLimit {}.into());
+        }
     }
 
     pool_info.rate = new_rate;

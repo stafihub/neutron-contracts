@@ -1,5 +1,5 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Binary, from_json, StdResult, Storage, to_json_vec, Uint128};
+use cosmwasm_std::{from_json, to_json_vec, Addr, Binary, StdResult, Storage, Uint128};
 use cw_storage_plus::{Item, Map};
 
 pub const REPLY_ID_RANGE_START: u64 = 1_000_000_000;
@@ -104,6 +104,7 @@ pub struct UnstakeInfo {
     pub unstaker: String,
     pub amount: Uint128,
     pub status: WithdrawStatus,
+    pub index: u64,
 }
 
 // (poolAddress,unstakeIndex)
