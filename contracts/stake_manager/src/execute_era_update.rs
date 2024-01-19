@@ -65,7 +65,12 @@ pub fn execute_era_update(
     if pool_info.bond.is_zero() {
         pool_info.era_process_status = EraUpdateEnded;
         POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
-        return Ok(Response::default());
+        return Ok(Response::default().add_messages(get_update_pool_icq_msgs(
+            deps,
+            pool_addr,
+            pool_info.ica_id,
+            DEFAULT_FAST_PERIOD,
+        )?));
     }
 
     // funds use contract funds
@@ -84,7 +89,12 @@ pub fn execute_era_update(
     if amount == 0 {
         pool_info.era_process_status = EraUpdateEnded;
         POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
-        return Ok(Response::default());
+        return Ok(Response::default().add_messages(get_update_pool_icq_msgs(
+            deps,
+            pool_addr,
+            pool_info.ica_id,
+            DEFAULT_FAST_PERIOD,
+        )?));
     }
 
     let tx_coin = coin(amount, pool_info.ibc_denom.clone());
@@ -122,7 +132,6 @@ pub fn execute_era_update(
 
     let update_pool_icq_msgs =
         get_update_pool_icq_msgs(deps, pool_addr, pool_info.ica_id, DEFAULT_FAST_PERIOD)?;
-
 
     Ok(Response::default()
         .add_messages(update_pool_icq_msgs)
