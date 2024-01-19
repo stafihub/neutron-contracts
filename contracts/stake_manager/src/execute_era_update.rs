@@ -118,12 +118,15 @@ pub fn execute_era_update(
         },
     )?;
 
+    POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
+
     let update_pool_icq_msgs =
         get_update_pool_icq_msgs(deps, pool_addr, pool_info.ica_id, DEFAULT_FAST_PERIOD)?;
 
+
     Ok(Response::default()
-        .add_submessage(submsg_pool_ibc_send)
-        .add_messages(update_pool_icq_msgs))
+        .add_messages(update_pool_icq_msgs)
+        .add_submessage(submsg_pool_ibc_send))
 }
 
 pub fn sudo_era_update_callback(
