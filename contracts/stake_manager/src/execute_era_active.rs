@@ -8,8 +8,8 @@ use neutron_sdk::{
     NeutronResult,
 };
 
-use crate::contract::DEFAULT_UPDATE_PERIOD;
 use crate::helper::get_update_pool_icq_msgs;
+use crate::helper::DEFAULT_UPDATE_PERIOD;
 use crate::state::{
     EraProcessStatus::{ActiveEnded, RestakeEnded},
     STACK,

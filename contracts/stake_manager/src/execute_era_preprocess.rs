@@ -1,16 +1,13 @@
-use std::ops::{Add, Div};
-
+use crate::error_conversion::ContractError;
+use crate::helper::get_update_pool_icq_msgs;
+use crate::helper::DEFAULT_FAST_PERIOD;
+use crate::state::EraProcessStatus::{ActiveEnded, EraPreprocessEnded};
+use crate::state::{ValidatorUpdateStatus, POOLS};
 use cosmwasm_std::{DepsMut, Env, Response};
-
 use neutron_sdk::bindings::msg::NeutronMsg;
 use neutron_sdk::bindings::query::NeutronQuery;
 use neutron_sdk::NeutronResult;
-
-use crate::contract::DEFAULT_FAST_PERIOD;
-use crate::error_conversion::ContractError;
-use crate::helper::get_update_pool_icq_msgs;
-use crate::state::EraProcessStatus::{ActiveEnded, EraPreprocessEnded};
-use crate::state::{ValidatorUpdateStatus, POOLS};
+use std::ops::{Add, Div};
 
 pub fn execute_era_preprocess(
     deps: DepsMut<NeutronQuery>,

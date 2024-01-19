@@ -1,13 +1,13 @@
 use crate::helper::min_ntrn_ibc_fee;
 use crate::state::INFO_OF_ICA_ID;
 use crate::state::{ValidatorUpdateStatus, POOLS};
-use crate::{contract::DEFAULT_TIMEOUT_SECONDS, query::query_delegation_by_addr};
 use crate::{error_conversion::ContractError, state::EraProcessStatus};
 use crate::{
     helper::gen_redelegate_txs,
     state::{SudoPayload, TxType},
     tx_callback::msg_with_sudo_callback,
 };
+use crate::{helper::DEFAULT_TIMEOUT_SECONDS, query::query_delegation_by_addr};
 use cosmwasm_std::{DepsMut, Env, MessageInfo, Response};
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},

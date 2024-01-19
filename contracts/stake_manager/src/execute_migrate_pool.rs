@@ -1,15 +1,15 @@
 use crate::error_conversion::ContractError;
-use crate::execute_init_pool::deal_pool;
+use crate::helper::deal_pool;
 use crate::helper::CAL_BASE;
 use crate::msg::MigratePoolParams;
 use crate::state::ValidatorUpdateStatus;
 use crate::state::POOLS;
 use crate::state::{INFO_OF_ICA_ID, STACK};
-use cosmwasm_std::{instantiate2_address, Addr, Uint128};
+use cosmwasm_std::{Addr, Uint128};
 use cosmwasm_std::{DepsMut, Env, MessageInfo, Response};
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
-    NeutronError, NeutronResult,
+    NeutronResult,
 };
 use std::ops::{Div, Mul};
 
@@ -38,24 +38,6 @@ pub fn execute_migrate_pool(
         return Err(ContractError::RateIsZero {}.into());
     }
 
-    let code_id = match param.lsd_code_id {
-        Some(lsd_code_id) => lsd_code_id,
-        None => STACK.load(deps.storage)?.lsd_token_code_id,
-    };
-    let salt = &pool_ica_info.ica_addr.clone()[..40];
-
-    let code_info = deps.querier.query_wasm_code_info(code_id)?;
-    let creator_cannonical = deps.api.addr_canonicalize(env.contract.address.as_str())?;
-
-    let i2_address =
-        instantiate2_address(&code_info.checksum, &creator_cannonical, salt.as_bytes())
-            .map_err(|e| ContractError::Instantiate2AddressFailed(e.to_string()))?;
-
-    let contract_addr = deps
-        .api
-        .addr_humanize(&i2_address)
-        .map_err(NeutronError::Std)?;
-
     pool_info.bond = param.bond;
     pool_info.unbond = param.unbond;
     pool_info.active = param.active;
@@ -66,7 +48,6 @@ pub fn execute_migrate_pool(
     pool_info.remote_denom = param.remote_denom;
     pool_info.validator_addrs = param.validator_addrs.clone();
     pool_info.platform_fee_receiver = Addr::unchecked(param.platform_fee_receiver);
-    pool_info.lsd_token = contract_addr;
     pool_info.share_tokens = param.share_tokens;
     pool_info.total_platform_fee = param.total_platform_fee;
     pool_info.total_lsd_token_amount = param.total_lsd_token_amount;
@@ -105,6 +86,10 @@ pub fn execute_migrate_pool(
         return Err(ContractError::RateNotMatch {}.into());
     }
 
+    let code_id = match param.lsd_code_id {
+        Some(lsd_code_id) => lsd_code_id,
+        None => STACK.load(deps.storage)?.lsd_token_code_id,
+    };
     return deal_pool(
         deps,
         env,

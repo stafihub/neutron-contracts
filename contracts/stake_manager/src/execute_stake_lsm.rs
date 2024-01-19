@@ -1,8 +1,11 @@
-use std::{
-    ops::{Add, Div, Mul},
-    str::FromStr,
+use crate::{
+    error_conversion::ContractError,
+    helper::DEFAULT_TIMEOUT_SECONDS,
+    helper::{min_ntrn_ibc_fee, query_denom_trace_from_ibc_denom, CAL_BASE},
+    query::query_validator_by_addr,
+    state::{EraProcessStatus, SudoPayload, TxType, ValidatorUpdateStatus, INFO_OF_ICA_ID, POOLS},
+    tx_callback::msg_with_sudo_callback,
 };
-
 use cosmwasm_std::{
     coins, to_json_binary, BankMsg, Coin, DepsMut, Env, MessageInfo, Response, Uint128, WasmMsg,
 };
@@ -12,14 +15,9 @@ use neutron_sdk::{
     sudo::msg::RequestPacketTimeoutHeight,
     NeutronResult,
 };
-
-use crate::{
-    contract::DEFAULT_TIMEOUT_SECONDS,
-    error_conversion::ContractError,
-    helper::{min_ntrn_ibc_fee, query_denom_trace, CAL_BASE},
-    query::query_validator_by_addr,
-    state::{EraProcessStatus, SudoPayload, TxType, ValidatorUpdateStatus, INFO_OF_ICA_ID, POOLS},
-    tx_callback::msg_with_sudo_callback,
+use std::{
+    ops::{Add, Div, Mul},
+    str::FromStr,
 };
 
 pub fn execute_stake_lsm(
@@ -56,15 +54,10 @@ pub fn execute_stake_lsm(
         return Err(ContractError::LessThanMinimalStake {}.into());
     }
 
-    let denom_parts: Vec<String> = info.funds[0].denom.split("/").map(String::from).collect();
-    if denom_parts.len() != 2 {
-        return Err(ContractError::DenomNotMatch {}.into());
-    }
-
-    let denom_hash = denom_parts.get(1).unwrap();
-    let denom_trace = query_denom_trace(deps.as_ref(), denom_hash.to_string())?;
-
     let share_token_ibc_denom = info.funds[0].denom.to_string();
+    let denom_trace =
+        query_denom_trace_from_ibc_denom(deps.as_ref(), share_token_ibc_denom.clone())?;
+
     let share_token_denom = denom_trace.denom_trace.base_denom;
     let path_parts: Vec<String> = denom_trace
         .denom_trace

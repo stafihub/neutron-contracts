@@ -1,22 +1,19 @@
-use std::vec;
-
-use cosmwasm_std::{DepsMut, Env, MessageInfo, Response};
-
-use neutron_sdk::{
-    bindings::{msg::NeutronMsg, query::NeutronQuery},
-    query::min_ibc_fee::query_min_ibc_fee,
-    NeutronResult,
-};
-
-use crate::contract::DEFAULT_TIMEOUT_SECONDS;
 use crate::error_conversion::ContractError;
 use crate::helper::gen_redelegate_txs;
 use crate::helper::min_ntrn_ibc_fee;
+use crate::helper::DEFAULT_TIMEOUT_SECONDS;
 use crate::query::query_delegation_by_addr;
 use crate::state::{
     EraProcessStatus, SudoPayload, TxType, ValidatorUpdateStatus, INFO_OF_ICA_ID, POOLS,
 };
 use crate::tx_callback::msg_with_sudo_callback;
+use cosmwasm_std::{DepsMut, Env, MessageInfo, Response};
+use neutron_sdk::{
+    bindings::{msg::NeutronMsg, query::NeutronQuery},
+    query::min_ibc_fee::query_min_ibc_fee,
+    NeutronResult,
+};
+use std::vec;
 
 pub fn execute_rm_pool_validator(
     mut deps: DepsMut<NeutronQuery>,

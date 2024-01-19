@@ -2,13 +2,9 @@ use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{from_json, to_json_vec, Addr, Binary, StdResult, Storage, Uint128};
 use cw_storage_plus::{Item, Map};
 
-pub const REPLY_ID_RANGE_START: u64 = 1_000_000_000;
-pub const REPLY_ID_RANGE_SIZE: u64 = 1_000_000;
-pub const REPLY_ID_RANGE_END: u64 = REPLY_ID_RANGE_START + REPLY_ID_RANGE_SIZE;
-
-pub const QUERY_REPLY_ID_RANGE_START: u64 = 2_000_000_000;
-pub const QUERY_REPLY_ID_RANGE_SIZE: u64 = 1_000_000;
-pub const QUERY_REPLY_ID_RANGE_END: u64 = QUERY_REPLY_ID_RANGE_START + QUERY_REPLY_ID_RANGE_SIZE;
+use crate::helper::{
+    QUERY_REPLY_ID_RANGE_END, QUERY_REPLY_ID_RANGE_START, REPLY_ID_RANGE_END, REPLY_ID_RANGE_START,
+};
 
 #[cw_serde]
 pub struct Stack {

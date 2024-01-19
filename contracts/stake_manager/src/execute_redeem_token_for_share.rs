@@ -1,22 +1,20 @@
 use std::collections::HashSet;
 
-use cosmwasm_std::{DepsMut, MessageInfo, Response};
-
-use neutron_sdk::{
-    bindings::{msg::NeutronMsg, query::NeutronQuery},
-    query::min_ibc_fee::query_min_ibc_fee,
-    NeutronResult,
-};
-
 use crate::{
-    contract::DEFAULT_TIMEOUT_SECONDS,
     error_conversion::ContractError,
+    helper::DEFAULT_TIMEOUT_SECONDS,
     helper::{min_ntrn_ibc_fee, redeem_token_for_share_msg},
     state::POOLS,
 };
 use crate::{
     state::{SudoPayload, TxType, INFO_OF_ICA_ID},
     tx_callback::msg_with_sudo_callback,
+};
+use cosmwasm_std::{DepsMut, MessageInfo, Response};
+use neutron_sdk::{
+    bindings::{msg::NeutronMsg, query::NeutronQuery},
+    query::min_ibc_fee::query_min_ibc_fee,
+    NeutronResult,
 };
 
 pub fn execute_redeem_token_for_share(

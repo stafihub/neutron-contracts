@@ -1,15 +1,13 @@
-use cosmwasm_std::{CosmosMsg, DepsMut, Reply, Response, StdError, StdResult, SubMsg};
-
-use neutron_sdk::bindings::msg::NeutronMsg;
-use neutron_sdk::bindings::{msg::MsgRegisterInterchainQueryResponse, query::NeutronQuery};
-use neutron_sdk::NeutronResult;
-
-use crate::contract::DEFAULT_UPDATE_PERIOD;
+use crate::helper::DEFAULT_UPDATE_PERIOD;
 use crate::state::{QUERY_ID_TO_REPLY_ID, REPLY_ID_TO_NEED_UPDATE};
 use crate::{
     error_conversion::ContractError,
     state::{get_next_query_reply_id, QueryKind, ADDRESS_TO_REPLY_ID, REPLY_ID_TO_QUERY_ID},
 };
+use cosmwasm_std::{CosmosMsg, DepsMut, Reply, Response, StdError, StdResult, SubMsg};
+use neutron_sdk::bindings::msg::NeutronMsg;
+use neutron_sdk::bindings::{msg::MsgRegisterInterchainQueryResponse, query::NeutronQuery};
+use neutron_sdk::NeutronResult;
 
 pub fn register_query_submsg<C: Into<CosmosMsg<T>>, T>(
     deps: DepsMut<NeutronQuery>,

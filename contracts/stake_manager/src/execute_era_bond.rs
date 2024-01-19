@@ -11,20 +11,19 @@ use cosmos_sdk_proto::cosmos::{
 use cosmos_sdk_proto::prost::Message;
 use cosmwasm_std::{Binary, Delegation, DepsMut, Env, Response, Uint128};
 
+use crate::state::EraProcessStatus::{BondEnded, BondStarted, EraUpdateEnded};
+use crate::state::{SudoPayload, TxType, INFO_OF_ICA_ID, POOLS};
+use crate::tx_callback::msg_with_sudo_callback;
+use crate::{
+    error_conversion::ContractError,
+    helper::{gen_delegation_txs, min_ntrn_ibc_fee},
+};
+use crate::{helper::DEFAULT_TIMEOUT_SECONDS, query::query_delegation_by_addr};
 use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     query::min_ibc_fee::query_min_ibc_fee,
     NeutronResult,
-};
-
-use crate::state::EraProcessStatus::{BondEnded, BondStarted, EraUpdateEnded};
-use crate::state::{SudoPayload, TxType, INFO_OF_ICA_ID, POOLS};
-use crate::tx_callback::msg_with_sudo_callback;
-use crate::{contract::DEFAULT_TIMEOUT_SECONDS, query::query_delegation_by_addr};
-use crate::{
-    error_conversion::ContractError,
-    helper::{gen_delegation_txs, min_ntrn_ibc_fee},
 };
 
 #[derive(Clone, Debug)]

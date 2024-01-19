@@ -1,10 +1,16 @@
+use crate::error_conversion::ContractError;
+use crate::query_callback::register_query_submsg;
+use crate::state::{IcaInfo, PoolInfo, QueryKind, SudoPayload, TxType, POOLS};
+use crate::state::{ADDRESS_TO_REPLY_ID, INFO_OF_ICA_ID, REPLY_ID_TO_QUERY_ID};
+use crate::tx_callback::msg_with_sudo_callback;
 use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
+use cosmos_sdk_proto::cosmos::distribution::v1beta1::MsgSetWithdrawAddress;
 use cosmos_sdk_proto::cosmos::staking::v1beta1::{MsgBeginRedelegate, MsgDelegate};
 use cosmos_sdk_proto::prost::Message;
+use cosmwasm_std::{instantiate2_address, to_json_binary, WasmMsg};
 use cosmwasm_std::{Binary, Deps, DepsMut, QueryRequest, StdResult, Uint128};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
+use cosmwasm_std::{Env, MessageInfo, Response};
+use lsd_token::msg::InstantiateMinterData;
 use neutron_sdk::bindings::msg::{IbcFee, NeutronMsg};
 use neutron_sdk::bindings::query::NeutronQuery;
 use neutron_sdk::bindings::types::{KVKey, ProtobufAny};
@@ -12,12 +18,17 @@ use neutron_sdk::interchain_queries::helpers::decode_and_convert;
 use neutron_sdk::interchain_queries::v045::helpers::{
     create_delegation_key, create_params_store_key, create_validator_key,
 };
+use neutron_sdk::interchain_queries::v045::new_register_delegator_delegations_query_msg;
 use neutron_sdk::interchain_queries::v045::types::{
     KEY_BOND_DENOM, PARAMS_STORE_KEY, STAKING_STORE_KEY,
 };
+use neutron_sdk::interchain_queries::v045::{
+    new_register_balance_query_msg, new_register_staking_validators_query_msg,
+};
 use neutron_sdk::NeutronError;
-
-use crate::state::{QueryKind, ADDRESS_TO_REPLY_ID, INFO_OF_ICA_ID, REPLY_ID_TO_QUERY_ID};
+use neutron_sdk::{query::min_ibc_fee::query_min_ibc_fee, NeutronResult};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 const FEE_DENOM: &str = "untrn";
 pub const ICA_WITHDRAW_SUFIX: &str = "-withdraw_addr";
@@ -26,6 +37,19 @@ pub const CAL_BASE: Uint128 = Uint128::new(1_000_000);
 pub const DEFAULT_DECIMALS: u8 = 6;
 pub const DEFAULT_ERA_SECONDS: u64 = 86400; //24h
 pub const MIN_ERA_SECONDS: u64 = 28800; //8h
+
+// Default timeout for SubmitTX is 30h
+pub const DEFAULT_TIMEOUT_SECONDS: u64 = 30 * 60 * 60;
+pub const DEFAULT_UPDATE_PERIOD: u64 = 12000;
+pub const DEFAULT_FAST_PERIOD: u64 = 12;
+
+pub const REPLY_ID_RANGE_START: u64 = 1_000_000_000;
+pub const REPLY_ID_RANGE_SIZE: u64 = 1_000_000;
+pub const REPLY_ID_RANGE_END: u64 = REPLY_ID_RANGE_START + REPLY_ID_RANGE_SIZE;
+
+pub const QUERY_REPLY_ID_RANGE_START: u64 = 2_000_000_000;
+pub const QUERY_REPLY_ID_RANGE_SIZE: u64 = 1_000_000;
+pub const QUERY_REPLY_ID_RANGE_END: u64 = QUERY_REPLY_ID_RANGE_START + QUERY_REPLY_ID_RANGE_SIZE;
 
 pub fn min_ntrn_ibc_fee(fee: IbcFee) -> IbcFee {
     IbcFee {
@@ -207,14 +231,21 @@ pub struct QueryDenomTraceRequest {
     pub hash: ::prost::alloc::string::String,
 }
 
-pub fn query_denom_trace(
+pub fn query_denom_trace_from_ibc_denom(
     deps: Deps<NeutronQuery>,
-    hash: String,
+    ibc_denom: String,
 ) -> StdResult<QueryDenomTraceResponse> {
+    let denom_parts: Vec<String> = ibc_denom.split("/").map(String::from).collect();
+    if denom_parts.len() != 2 {
+        return Err(ContractError::DenomNotMatch {}.into());
+    }
+
+    let denom_hash = denom_parts.get(1).unwrap();
+
     let req = QueryRequest::Stargate {
         path: "/ibc.applications.transfer.v1.Query/DenomTrace".to_owned(),
         data: QueryDenomTraceRequest {
-            hash: hash.to_string(),
+            hash: denom_hash.to_string(),
         }
         .encode_to_vec()
         .into(),
@@ -273,4 +304,150 @@ pub fn get_update_pool_icq_msgs(
     msgs.push(update_pool_delegations_msg);
     msgs.push(update_pool_validators_msg);
     Ok(msgs)
+}
+
+pub fn deal_pool(
+    mut deps: DepsMut<NeutronQuery>,
+    env: Env,
+    info: MessageInfo,
+    mut pool_info: PoolInfo,
+    pool_ica_info: IcaInfo,
+    withdraw_ica_info: IcaInfo,
+    lsd_code_id: u64,
+    lsd_token_name: String,
+    lsd_token_symbol: String,
+) -> NeutronResult<Response<NeutronMsg>> {
+    let denom_trace = query_denom_trace_from_ibc_denom(deps.as_ref(), pool_info.ibc_denom.clone())?;
+    if denom_trace.denom_trace.base_denom != pool_info.remote_denom {
+        return Err(ContractError::DenomTraceNotMatch {}.into());
+    }
+
+    let salt = &pool_ica_info.ica_addr.clone()[..40];
+    let code_info = deps.querier.query_wasm_code_info(lsd_code_id)?;
+    let creator_cannonical = deps.api.addr_canonicalize(env.contract.address.as_str())?;
+    let i2_address =
+        instantiate2_address(&code_info.checksum, &creator_cannonical, salt.as_bytes())
+            .map_err(|e| ContractError::Instantiate2AddressFailed(e.to_string()))?;
+    let contract_addr = deps
+        .api
+        .addr_humanize(&i2_address)
+        .map_err(NeutronError::Std)?;
+
+    pool_info.lsd_token = contract_addr;
+
+    let instantiate_lsd_msg = WasmMsg::Instantiate2 {
+        admin: Option::from(info.sender.to_string()),
+        code_id: lsd_code_id,
+        msg: to_json_binary(
+            &(lsd_token::msg::InstantiateMsg {
+                name: lsd_token_name.clone(),
+                symbol: lsd_token_symbol,
+                decimals: DEFAULT_DECIMALS,
+                initial_balances: vec![],
+                mint: Option::from(InstantiateMinterData {
+                    admin: pool_info.admin.to_string(),
+                    minter: env.contract.address.to_string(),
+                    cap: None,
+                }),
+                marketing: None,
+            }),
+        )?,
+        funds: vec![],
+        label: lsd_token_name.clone(),
+        salt: salt.as_bytes().into(),
+    };
+
+    POOLS.save(deps.storage, pool_ica_info.ica_addr.clone(), &pool_info)?;
+
+    let register_balance_pool_submsg = register_query_submsg(
+        deps.branch(),
+        new_register_balance_query_msg(
+            pool_ica_info.ctrl_connection_id.clone(),
+            pool_ica_info.ica_addr.clone(),
+            pool_info.remote_denom.clone(),
+            DEFAULT_UPDATE_PERIOD,
+        )?,
+        pool_ica_info.ica_addr.clone(),
+        QueryKind::Balances,
+    )?;
+    let register_balance_withdraw_submsg = register_query_submsg(
+        deps.branch(),
+        new_register_balance_query_msg(
+            withdraw_ica_info.ctrl_connection_id.clone(),
+            withdraw_ica_info.ica_addr.clone(),
+            pool_info.remote_denom.clone(),
+            DEFAULT_UPDATE_PERIOD,
+        )?,
+        withdraw_ica_info.ica_addr.clone(),
+        QueryKind::Balances,
+    )?;
+    let register_delegation_submsg = register_query_submsg(
+        deps.branch(),
+        new_register_delegator_delegations_query_msg(
+            pool_ica_info.ctrl_connection_id.clone(),
+            pool_ica_info.ica_addr.clone(),
+            pool_info.validator_addrs.clone(),
+            DEFAULT_UPDATE_PERIOD,
+        )?,
+        pool_ica_info.ica_addr.clone(),
+        QueryKind::Delegations,
+    )?;
+
+    let register_validator_submsg = register_query_submsg(
+        deps.branch(),
+        new_register_staking_validators_query_msg(
+            pool_ica_info.ctrl_connection_id.clone(),
+            pool_info.validator_addrs.clone(),
+            6,
+        )?,
+        pool_ica_info.ica_addr.clone(),
+        QueryKind::Validators,
+    )?;
+
+    let set_withdraw_msg = MsgSetWithdrawAddress {
+        delegator_address: pool_ica_info.ica_addr.clone(),
+        withdraw_address: withdraw_ica_info.ica_addr.clone(),
+    };
+    let mut buf = Vec::new();
+    buf.reserve(set_withdraw_msg.encoded_len());
+
+    if let Err(e) = set_withdraw_msg.encode(&mut buf) {
+        return Err(ContractError::EncodeError(e.to_string()).into());
+    }
+
+    let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
+    let cosmos_msg = NeutronMsg::submit_tx(
+        pool_ica_info.ctrl_connection_id.clone(),
+        pool_info.ica_id.clone(),
+        vec![ProtobufAny {
+            type_url: "/cosmos.distribution.v1beta1.MsgSetWithdrawAddress".to_string(),
+            value: Binary::from(buf),
+        }],
+        "".to_string(),
+        DEFAULT_TIMEOUT_SECONDS,
+        fee.clone(),
+    );
+
+    // We use a submessage here because we need the process message reply to save
+    // the outgoing IBC packet identifier for later.
+    let submsg_set_withdraw = msg_with_sudo_callback(
+        deps.branch(),
+        cosmos_msg,
+        SudoPayload {
+            port_id: pool_ica_info.ctrl_port_id,
+            message: withdraw_ica_info.ica_addr,
+            pool_addr: pool_ica_info.ica_addr.clone(),
+            tx_type: TxType::SetWithdrawAddr,
+        },
+    )?;
+
+    Ok(Response::default()
+        .add_message(instantiate_lsd_msg)
+        .add_submessages(vec![
+            register_balance_pool_submsg,
+            register_balance_withdraw_submsg,
+            register_delegation_submsg,
+            register_validator_submsg,
+            submsg_set_withdraw,
+        ]))
 }

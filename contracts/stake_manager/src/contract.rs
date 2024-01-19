@@ -20,6 +20,9 @@ use crate::execute_stake_lsm::execute_stake_lsm;
 use crate::execute_unstake::execute_unstake;
 use crate::execute_update_query::execute_update_query;
 use crate::execute_withdraw::execute_withdraw;
+use crate::helper::{
+    QUERY_REPLY_ID_RANGE_END, QUERY_REPLY_ID_RANGE_START, REPLY_ID_RANGE_END, REPLY_ID_RANGE_START,
+};
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
 use crate::query::query_delegation_by_addr;
 use crate::query::query_era_snapshot;
@@ -31,10 +34,7 @@ use crate::query::{
     query_user_unstake,
 };
 use crate::query_callback::write_reply_id_to_query_id;
-use crate::state::{
-    Stack, QUERY_REPLY_ID_RANGE_END, QUERY_REPLY_ID_RANGE_START, REPLY_ID_RANGE_END,
-    REPLY_ID_RANGE_START, STACK,
-};
+use crate::state::{Stack, STACK};
 use crate::tx_callback::{prepare_sudo_payload, sudo_error, sudo_response, sudo_timeout};
 use crate::{error_conversion::ContractError, query_callback::sudo_kv_query_result};
 use cosmwasm_std::{
@@ -50,10 +50,6 @@ use neutron_sdk::{
 };
 use std::env;
 
-// Default timeout for SubmitTX is 30h
-pub const DEFAULT_TIMEOUT_SECONDS: u64 = 30 * 60 * 60;
-pub const DEFAULT_UPDATE_PERIOD: u64 = 12000;
-pub const DEFAULT_FAST_PERIOD: u64 = 12;
 
 const CONTRACT_NAME: &str = env!("CARGO_PKG_NAME");
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");

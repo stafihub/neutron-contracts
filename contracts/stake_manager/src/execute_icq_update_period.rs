@@ -1,13 +1,11 @@
-use cosmwasm_std::{DepsMut, MessageInfo, Response};
-
-use neutron_sdk::bindings::query::NeutronQuery;
-use neutron_sdk::{bindings::msg::NeutronMsg, NeutronResult};
-
-use crate::contract::DEFAULT_FAST_PERIOD;
 use crate::error_conversion::ContractError;
 use crate::helper::get_update_pool_icq_msgs;
+use crate::helper::DEFAULT_FAST_PERIOD;
 use crate::state::EraProcessStatus::ActiveEnded;
 use crate::state::{ValidatorUpdateStatus, POOLS};
+use cosmwasm_std::{DepsMut, MessageInfo, Response};
+use neutron_sdk::bindings::query::NeutronQuery;
+use neutron_sdk::{bindings::msg::NeutronMsg, NeutronResult};
 
 pub fn update_icq_update_period(
     deps: DepsMut<NeutronQuery>,

@@ -1,24 +1,21 @@
-use std::ops::{Div, Mul, Sub};
-
+use crate::state::EraProcessStatus::{RestakeEnded, RestakeStarted, WithdrawEnded};
+use crate::state::{INFO_OF_ICA_ID, POOLS};
+use crate::{
+    error_conversion::ContractError,
+    helper::{gen_delegation_txs, min_ntrn_ibc_fee},
+};
+use crate::{
+    helper::DEFAULT_TIMEOUT_SECONDS,
+    state::{SudoPayload, TxType},
+    tx_callback::msg_with_sudo_callback,
+};
 use cosmwasm_std::{DepsMut, Env, Response, Uint128};
-
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     query::min_ibc_fee::query_min_ibc_fee,
     NeutronResult,
 };
-
-use crate::state::EraProcessStatus::{RestakeEnded, RestakeStarted, WithdrawEnded};
-use crate::state::{INFO_OF_ICA_ID, POOLS};
-use crate::{
-    contract::DEFAULT_TIMEOUT_SECONDS,
-    state::{SudoPayload, TxType},
-    tx_callback::msg_with_sudo_callback,
-};
-use crate::{
-    error_conversion::ContractError,
-    helper::{gen_delegation_txs, min_ntrn_ibc_fee},
-};
+use std::ops::{Div, Mul, Sub};
 
 pub fn execute_era_restake(
     mut deps: DepsMut<NeutronQuery>,
