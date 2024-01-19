@@ -8,7 +8,7 @@ use neutron_sdk::{
     },
 };
 
-use crate::state::{EraSnapshot, IcaInfo, PoolInfo, Stack, UnstakeInfo};
+use crate::state::{EraSnapshot, IcaInfo, PoolInfo, QueryKind, Stack, UnstakeInfo};
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -20,6 +20,11 @@ pub struct InstantiateMsg {
 pub enum QueryMsg {
     #[returns(QueryRegisteredQueryResponse)]
     GetRegisteredQuery { query_id: u64 },
+    #[returns(QueryRegisteredQueryResponse)]
+    GetIcaRegisteredQuery {
+        ica_addr: String,
+        query_kind: QueryKind,
+    },
     #[returns(BalanceResponse)]
     Balance { ica_addr: String },
     #[returns(DelegatorDelegationsResponse)]
@@ -171,9 +176,6 @@ pub enum ExecuteMsg {
         new_validator: String,
     },
     PoolUpdateQuery {
-        pool_addr: String,
-    },
-    EraPreProcess {
         pool_addr: String,
     },
     EraUpdate {

@@ -2,8 +2,9 @@ use crate::state::{QueryKind, INFO_OF_ICA_ID};
 use crate::state::{ADDRESS_TO_REPLY_ID, STACK};
 use crate::state::{POOLS, REPLY_ID_TO_QUERY_ID, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX};
 use cosmwasm_std::{to_json_binary, Addr, Binary, Deps, Env};
-use neutron_sdk::interchain_queries::v045::queries::{
-    DelegatorDelegationsResponse, ValidatorResponse,
+use neutron_sdk::{
+    bindings::query::QueryRegisteredQueryResponse,
+    interchain_queries::v045::queries::{DelegatorDelegationsResponse, ValidatorResponse},
 };
 use neutron_sdk::{
     bindings::query::{NeutronQuery, QueryInterchainAccountAddressResponse},
@@ -174,4 +175,22 @@ pub fn query_interchain_address_contract(
 ) -> NeutronResult<Binary> {
     let res = INFO_OF_ICA_ID.may_load(deps.storage, interchain_account_id)?;
     Ok(to_json_binary(&res)?)
+}
+
+/// Queries registered query info by ica address and query kind
+pub fn get_ica_registered_query(
+    deps: Deps<NeutronQuery>,
+    ica_addr: String,
+    query_kind: QueryKind,
+) -> NeutronResult<QueryRegisteredQueryResponse> {
+    let contract_query_id =
+        ADDRESS_TO_REPLY_ID.load(deps.storage, (ica_addr,query_kind.to_string()))?;
+    let registered_query_id = REPLY_ID_TO_QUERY_ID.load(deps.storage, contract_query_id)?;
+
+    let query = NeutronQuery::RegisteredInterchainQuery {
+        query_id: registered_query_id,
+    };
+
+    let res: QueryRegisteredQueryResponse = deps.querier.query(&query.into())?;
+    Ok(res)
 }

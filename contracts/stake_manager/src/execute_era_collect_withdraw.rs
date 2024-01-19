@@ -36,23 +36,20 @@ pub fn execute_era_collect_withdraw(
     > = query_balance_by_addr(deps.as_ref(), withdraw_ica_info.ica_addr.clone());
 
     let mut withdraw_amount = Uint128::zero();
-    match withdraw_balances_result {
-        Ok(balance_response) => {
-            if balance_response.last_submitted_local_height <= pool_info.era_snapshot.bond_height {
-                return Err(ContractError::WithdrawAddrBalanceSubmissionHeight {}.into());
-            }
-
-            if !balance_response.balances.coins.is_empty() {
-                withdraw_amount = balance_response
-                    .balances
-                    .coins
-                    .iter()
-                    .find(|c| c.denom == pool_info.remote_denom.clone())
-                    .map(|c| c.amount)
-                    .unwrap_or(Uint128::zero());
-            }
+    if let Ok(balance_response) = withdraw_balances_result {
+        if balance_response.last_submitted_local_height <= pool_info.era_snapshot.bond_height {
+            return Err(ContractError::WithdrawAddrBalanceSubmissionHeight {}.into());
         }
-        Err(_) => {}
+
+        if !balance_response.balances.coins.is_empty() {
+            withdraw_amount = balance_response
+                .balances
+                .coins
+                .iter()
+                .find(|c| c.denom == pool_info.remote_denom.clone())
+                .map(|c| c.amount)
+                .unwrap_or(Uint128::zero());
+        }
     }
 
     // leave gas

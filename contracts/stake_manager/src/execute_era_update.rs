@@ -1,4 +1,16 @@
-use crate::state::EraProcessStatus::EraPreprocessEnded;
+use std::ops::{Add, Div, Sub};
+
+use cosmwasm_std::{coin, DepsMut, Env, Response, Uint128};
+
+use neutron_sdk::{
+    bindings::{msg::NeutronMsg, query::NeutronQuery},
+    query::min_ibc_fee::query_min_ibc_fee,
+    sudo::msg::RequestPacketTimeoutHeight,
+    NeutronResult,
+};
+
+use crate::helper::{get_update_pool_icq_msgs, DEFAULT_FAST_PERIOD, DEFAULT_TIMEOUT_SECONDS};
+use crate::state::EraSnapshot;
 use crate::state::{INFO_OF_ICA_ID, POOLS};
 use crate::{
     error_conversion::ContractError,
@@ -12,15 +24,6 @@ use crate::{
     state::{SudoPayload, TxType},
     tx_callback::msg_with_sudo_callback,
 };
-use crate::{helper::DEFAULT_TIMEOUT_SECONDS, state::EraSnapshot};
-use cosmwasm_std::{coin, DepsMut, Env, Response, Uint128};
-use neutron_sdk::{
-    bindings::{msg::NeutronMsg, query::NeutronQuery},
-    query::min_ibc_fee::query_min_ibc_fee,
-    sudo::msg::RequestPacketTimeoutHeight,
-    NeutronResult,
-};
-use std::ops::{Add, Div, Sub};
 
 pub fn execute_era_update(
     mut deps: DepsMut<NeutronQuery>,
@@ -32,7 +35,7 @@ pub fn execute_era_update(
         return Err(ContractError::PoolIsPaused {}.into());
     }
     // check era state
-    if pool_info.era_process_status != EraPreprocessEnded
+    if pool_info.era_process_status != ActiveEnded
         || pool_info.validator_update_status != ValidatorUpdateStatus::End
     {
         return Err(ContractError::StatusNotAllow {}.into());
@@ -115,8 +118,12 @@ pub fn execute_era_update(
         },
     )?;
 
-    POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
-    Ok(Response::default().add_submessage(submsg_pool_ibc_send))
+    let update_pool_icq_msgs =
+        get_update_pool_icq_msgs(deps, pool_addr, pool_info.ica_id, DEFAULT_FAST_PERIOD)?;
+
+    Ok(Response::default()
+        .add_submessage(submsg_pool_ibc_send)
+        .add_messages(update_pool_icq_msgs))
 }
 
 pub fn sudo_era_update_callback(

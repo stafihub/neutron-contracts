@@ -1,9 +1,8 @@
-use crate::execute_config_pool::execute_config_pool;
+use crate::{execute_config_pool::execute_config_pool, query::get_ica_registered_query};
 use crate::execute_config_stack::execute_config_stack;
 use crate::execute_era_active::execute_era_active;
 use crate::execute_era_bond::execute_era_bond;
 use crate::execute_era_collect_withdraw::execute_era_collect_withdraw;
-use crate::execute_era_preprocess::execute_era_preprocess;
 use crate::execute_era_restake::execute_era_restake;
 use crate::execute_era_update::execute_era_update;
 use crate::execute_icq_update_period::update_icq_update_period;
@@ -94,6 +93,10 @@ pub fn query(deps: Deps<NeutronQuery>, env: Env, msg: QueryMsg) -> NeutronResult
         QueryMsg::GetRegisteredQuery { query_id } => {
             Ok(to_json_binary(&get_registered_query(deps, query_id)?)?)
         }
+        QueryMsg::GetIcaRegisteredQuery {
+            ica_addr,
+            query_kind,
+        } => Ok(to_json_binary(&get_ica_registered_query(deps, ica_addr,query_kind)?)?),
         QueryMsg::Balance { ica_addr } => {
             Ok(to_json_binary(&query_balance_by_addr(deps, ica_addr)?)?)
         }
@@ -187,7 +190,6 @@ pub fn execute(
         ExecuteMsg::PoolUpdateQuery { pool_addr } => {
             execute_update_query(deps, env, info, pool_addr)
         }
-        ExecuteMsg::EraPreProcess { pool_addr } => execute_era_preprocess(deps, env, pool_addr),
         ExecuteMsg::EraUpdate { pool_addr } => execute_era_update(deps, env, pool_addr),
         ExecuteMsg::EraBond { pool_addr } => execute_era_bond(deps, env, pool_addr),
         ExecuteMsg::EraCollectWithdraw { pool_addr } => {

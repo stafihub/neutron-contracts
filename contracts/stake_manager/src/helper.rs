@@ -251,7 +251,7 @@ pub fn query_denom_trace_from_ibc_denom(
         .into(),
     };
     let denom_trace: QueryDenomTraceResponse = deps.querier.query(&req.into())?;
-    return Ok(denom_trace);
+    Ok(denom_trace)
 }
 
 pub fn get_query_id(
@@ -261,7 +261,7 @@ pub fn get_query_id(
 ) -> StdResult<u64> {
     let reply_id = ADDRESS_TO_REPLY_ID.load(deps.storage, (addr, query_kind.to_string()))?;
     let query_id = REPLY_ID_TO_QUERY_ID.load(deps.storage, reply_id)?;
-    return Ok(query_id);
+    Ok(query_id)
 }
 
 pub fn get_update_pool_icq_msgs(
