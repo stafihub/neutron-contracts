@@ -177,6 +177,14 @@ process_era() {
   neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq
 
   echo "--------------------------era active-------------------------------------"
+  echo "Waiting 10 seconds"
+  # shellcheck disable=SC2034
+  for i in $(seq 10); do
+    sleep 1
+    echo -n .
+  done
+  echo " done"
+
   # era_active_msg round 1
   era_active_msg=$(printf '{
   "era_active": {

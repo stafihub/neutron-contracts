@@ -1,14 +1,3 @@
-use std::ops::{Add, Div, Sub};
-
-use cosmwasm_std::{coin, DepsMut, Env, Response, Uint128};
-
-use neutron_sdk::{
-    bindings::{msg::NeutronMsg, query::NeutronQuery},
-    query::min_ibc_fee::query_min_ibc_fee,
-    sudo::msg::RequestPacketTimeoutHeight,
-    NeutronResult,
-};
-
 use crate::helper::{get_update_pool_icq_msgs, DEFAULT_FAST_PERIOD, DEFAULT_TIMEOUT_SECONDS};
 use crate::state::EraSnapshot;
 use crate::state::{INFO_OF_ICA_ID, POOLS};
@@ -24,6 +13,14 @@ use crate::{
     state::{SudoPayload, TxType},
     tx_callback::msg_with_sudo_callback,
 };
+use cosmwasm_std::{coin, DepsMut, Env, Response, Uint128};
+use neutron_sdk::{
+    bindings::{msg::NeutronMsg, query::NeutronQuery},
+    query::min_ibc_fee::query_min_ibc_fee,
+    sudo::msg::RequestPacketTimeoutHeight,
+    NeutronResult,
+};
+use std::ops::{Add, Div, Sub};
 
 pub fn execute_era_update(
     mut deps: DepsMut<NeutronQuery>,
@@ -61,16 +58,17 @@ pub fn execute_era_update(
         bond_height: 0,
         restake_amount: Uint128::zero(),
     };
+    let rsp = Response::default().add_messages(get_update_pool_icq_msgs(
+        deps.branch(),
+        pool_addr.clone(),
+        pool_info.ica_id.clone(),
+        DEFAULT_FAST_PERIOD,
+    )?);
 
     if pool_info.bond.is_zero() {
         pool_info.era_process_status = EraUpdateEnded;
         POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
-        return Ok(Response::default().add_messages(get_update_pool_icq_msgs(
-            deps,
-            pool_addr,
-            pool_info.ica_id,
-            DEFAULT_FAST_PERIOD,
-        )?));
+        return Ok(rsp);
     }
 
     // funds use contract funds
@@ -89,12 +87,7 @@ pub fn execute_era_update(
     if amount == 0 {
         pool_info.era_process_status = EraUpdateEnded;
         POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
-        return Ok(Response::default().add_messages(get_update_pool_icq_msgs(
-            deps,
-            pool_addr,
-            pool_info.ica_id,
-            DEFAULT_FAST_PERIOD,
-        )?));
+        return Ok(rsp);
     }
 
     let tx_coin = coin(amount, pool_info.ibc_denom.clone());
@@ -130,12 +123,7 @@ pub fn execute_era_update(
 
     POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
 
-    let update_pool_icq_msgs =
-        get_update_pool_icq_msgs(deps, pool_addr, pool_info.ica_id, DEFAULT_FAST_PERIOD)?;
-
-    Ok(Response::default()
-        .add_messages(update_pool_icq_msgs)
-        .add_submessage(submsg_pool_ibc_send))
+    Ok(rsp.add_submessage(submsg_pool_ibc_send))
 }
 
 pub fn sudo_era_update_callback(

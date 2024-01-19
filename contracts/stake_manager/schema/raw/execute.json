@@ -329,27 +329,6 @@
     {
       "type": "object",
       "required": [
-        "era_pre_process"
-      ],
-      "properties": {
-        "era_pre_process": {
-          "type": "object",
-          "required": [
-            "pool_addr"
-          ],
-          "properties": {
-            "pool_addr": {
-              "type": "string"
-            }
-          },
-          "additionalProperties": false
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
         "era_update"
       ],
       "properties": {
