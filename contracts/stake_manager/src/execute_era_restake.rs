@@ -1,3 +1,13 @@
+use std::ops::{Div, Mul, Sub};
+
+use cosmwasm_std::{DepsMut, Env, Response, Uint128};
+
+use neutron_sdk::{
+    bindings::{msg::NeutronMsg, query::NeutronQuery},
+    query::min_ibc_fee::query_min_ibc_fee,
+    NeutronResult,
+};
+
 use crate::state::EraProcessStatus::{RestakeEnded, RestakeStarted, WithdrawEnded};
 use crate::state::{INFO_OF_ICA_ID, POOLS};
 use crate::{
@@ -9,17 +19,10 @@ use crate::{
     state::{SudoPayload, TxType},
     tx_callback::msg_with_sudo_callback,
 };
-use cosmwasm_std::{DepsMut, Env, Response, Uint128};
-use neutron_sdk::{
-    bindings::{msg::NeutronMsg, query::NeutronQuery},
-    query::min_ibc_fee::query_min_ibc_fee,
-    NeutronResult,
-};
-use std::ops::{Div, Mul, Sub};
 
 pub fn execute_era_restake(
     mut deps: DepsMut<NeutronQuery>,
-    env: Env,
+    _: Env,
     pool_addr: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
@@ -31,10 +34,6 @@ pub fn execute_era_restake(
     pool_info.era_process_status = RestakeStarted;
 
     let (pool_ica_info, _, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
-
-    if env.block.height <= pool_info.era_snapshot.bond_height {
-        return Err(ContractError::RestakeHeight {}.into());
-    }
 
     let restake_amount = pool_info.era_snapshot.restake_amount;
 
@@ -104,7 +103,7 @@ pub fn sudo_era_restake_callback(
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
     pool_info.era_process_status = RestakeEnded;
-    pool_info.era_snapshot.bond_height = env.block.height;
+    pool_info.era_snapshot.last_step_height = env.block.height;
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
 
     Ok(Response::new())

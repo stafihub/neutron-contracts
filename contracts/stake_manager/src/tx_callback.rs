@@ -140,7 +140,7 @@ pub fn sudo_timeout(deps: DepsMut, req: RequestPacket) -> NeutronResult<Response
 
 fn sudo_callback(deps: DepsMut, env: Env, payload: SudoPayload) -> NeutronResult<Response<NeutronMsg>> {
     match payload.tx_type {
-        TxType::EraUpdate => sudo_era_update_callback(deps, payload),
+        TxType::EraUpdate => sudo_era_update_callback(deps, env,payload),
         TxType::EraBond => sudo_era_bond_callback(deps, env, payload),
         TxType::EraCollectWithdraw => sudo_era_collect_withdraw_callback(deps, env, payload),
         TxType::EraRestake => sudo_era_restake_callback(deps, env, payload),

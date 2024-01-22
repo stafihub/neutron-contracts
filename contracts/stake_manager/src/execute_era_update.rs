@@ -1,3 +1,14 @@
+use std::ops::{Add, Div, Sub};
+
+use cosmwasm_std::{coin, DepsMut, Env, Response, Uint128};
+
+use neutron_sdk::{
+    bindings::{msg::NeutronMsg, query::NeutronQuery},
+    query::min_ibc_fee::query_min_ibc_fee,
+    sudo::msg::RequestPacketTimeoutHeight,
+    NeutronResult,
+};
+
 use crate::helper::{get_update_pool_icq_msgs, DEFAULT_FAST_PERIOD, DEFAULT_TIMEOUT_SECONDS};
 use crate::state::EraSnapshot;
 use crate::state::{INFO_OF_ICA_ID, POOLS};
@@ -13,14 +24,6 @@ use crate::{
     state::{SudoPayload, TxType},
     tx_callback::msg_with_sudo_callback,
 };
-use cosmwasm_std::{coin, DepsMut, Env, Response, Uint128};
-use neutron_sdk::{
-    bindings::{msg::NeutronMsg, query::NeutronQuery},
-    query::min_ibc_fee::query_min_ibc_fee,
-    sudo::msg::RequestPacketTimeoutHeight,
-    NeutronResult,
-};
-use std::ops::{Add, Div, Sub};
 
 pub fn execute_era_update(
     mut deps: DepsMut<NeutronQuery>,
@@ -55,7 +58,7 @@ pub fn execute_era_update(
         bond: pool_info.bond,
         unbond: pool_info.unbond,
         active: pool_info.active,
-        bond_height: 0,
+        last_step_height: env.block.height,
         restake_amount: Uint128::zero(),
     };
     let rsp = Response::default().add_messages(get_update_pool_icq_msgs(
@@ -128,10 +131,12 @@ pub fn execute_era_update(
 
 pub fn sudo_era_update_callback(
     deps: DepsMut,
+    env: Env,
     payload: SudoPayload,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
     pool_info.era_process_status = EraUpdateEnded;
+    pool_info.era_snapshot.last_step_height = env.block.height;
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
 
     Ok(Response::new())
@@ -150,7 +155,7 @@ pub fn sudo_era_update_failed_callback(
         unbond: Uint128::zero(),
         active: Uint128::zero(),
         restake_amount: Uint128::zero(),
-        bond_height: 0,
+        last_step_height: 0,
     };
 
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;

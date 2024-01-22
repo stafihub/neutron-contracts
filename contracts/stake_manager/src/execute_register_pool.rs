@@ -184,7 +184,7 @@ pub fn sudo_open_ack(
                     unbond: Uint128::zero(),
                     active: Uint128::zero(),
                     restake_amount: Uint128::zero(),
-                    bond_height: 0,
+                    last_step_height: 0,
                 },
                 paused: true,
                 lsm_support: false,

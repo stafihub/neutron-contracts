@@ -1,18 +1,20 @@
-use crate::helper::{get_withdraw_ica_id, min_ntrn_ibc_fee};
-use crate::query::query_balance_by_addr;
-use crate::state::EraProcessStatus::{BondEnded, WithdrawEnded, WithdrawStarted};
-use crate::state::{SudoPayload, TxType, INFO_OF_ICA_ID, POOLS};
-use crate::tx_callback::msg_with_sudo_callback;
-use crate::{error_conversion::ContractError, helper::DEFAULT_TIMEOUT_SECONDS};
 use cosmos_sdk_proto::cosmos::bank::v1beta1::MsgSend;
 use cosmos_sdk_proto::prost::Message;
 use cosmwasm_std::{Binary, DepsMut, Env, Response, Uint128};
+
 use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     query::min_ibc_fee::query_min_ibc_fee,
     NeutronError, NeutronResult,
 };
+
+use crate::helper::{get_withdraw_ica_id, min_ntrn_ibc_fee};
+use crate::query::query_balance_by_addr;
+use crate::state::EraProcessStatus::{BondEnded, WithdrawEnded, WithdrawStarted};
+use crate::state::{SudoPayload, TxType, INFO_OF_ICA_ID, POOLS};
+use crate::tx_callback::msg_with_sudo_callback;
+use crate::{error_conversion::ContractError, helper::DEFAULT_TIMEOUT_SECONDS};
 
 pub fn execute_era_collect_withdraw(
     mut deps: DepsMut<NeutronQuery>,
@@ -37,7 +39,7 @@ pub fn execute_era_collect_withdraw(
 
     let mut withdraw_amount = Uint128::zero();
     if let Ok(balance_response) = withdraw_balances_result {
-        if balance_response.last_submitted_local_height <= pool_info.era_snapshot.bond_height {
+        if balance_response.last_submitted_local_height <= pool_info.era_snapshot.last_step_height {
             return Err(ContractError::WithdrawAddrBalanceSubmissionHeight {}.into());
         }
 
@@ -116,7 +118,7 @@ pub fn sudo_era_collect_withdraw_callback(
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
     pool_info.era_process_status = WithdrawEnded;
-    pool_info.era_snapshot.bond_height = env.block.height;
+    pool_info.era_snapshot.last_step_height = env.block.height;
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
 
     Ok(Response::new())

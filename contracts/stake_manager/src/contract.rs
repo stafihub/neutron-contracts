@@ -1,4 +1,3 @@
-use crate::{execute_config_pool::execute_config_pool, query::get_ica_registered_query};
 use crate::execute_config_stack::execute_config_stack;
 use crate::execute_era_active::execute_era_active;
 use crate::execute_era_bond::execute_era_bond;
@@ -36,6 +35,7 @@ use crate::query_callback::write_reply_id_to_query_id;
 use crate::state::{Stack, STACK};
 use crate::tx_callback::{prepare_sudo_payload, sudo_error, sudo_response, sudo_timeout};
 use crate::{error_conversion::ContractError, query_callback::sudo_kv_query_result};
+use crate::{execute_config_pool::execute_config_pool, query::get_ica_registered_query};
 use cosmwasm_std::{
     entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response,
     StdResult, Uint128,
@@ -48,7 +48,6 @@ use neutron_sdk::{
     NeutronResult,
 };
 use std::env;
-
 
 const CONTRACT_NAME: &str = env!("CARGO_PKG_NAME");
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -79,16 +78,12 @@ pub fn instantiate(
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
-    deps.api.debug("WASMDEBUG: migrate");
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     Ok(Response::default())
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps<NeutronQuery>, env: Env, msg: QueryMsg) -> NeutronResult<Binary> {
-    deps.api
-        .debug(format!("WASMDEBUG: query msg is {:?}", msg).as_str());
-
     match msg {
         QueryMsg::GetRegisteredQuery { query_id } => {
             Ok(to_json_binary(&get_registered_query(deps, query_id)?)?)
@@ -96,7 +91,9 @@ pub fn query(deps: Deps<NeutronQuery>, env: Env, msg: QueryMsg) -> NeutronResult
         QueryMsg::GetIcaRegisteredQuery {
             ica_addr,
             query_kind,
-        } => Ok(to_json_binary(&get_ica_registered_query(deps, ica_addr,query_kind)?)?),
+        } => Ok(to_json_binary(&get_ica_registered_query(
+            deps, ica_addr, query_kind,
+        )?)?),
         QueryMsg::Balance { ica_addr } => {
             Ok(to_json_binary(&query_balance_by_addr(deps, ica_addr)?)?)
         }
@@ -210,8 +207,6 @@ pub fn execute(
 
 #[entry_point]
 pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> StdResult<Response> {
-    deps.api
-        .debug(format!("WASMDEBUG: reply msg: {:?}", msg).as_str());
     match msg.id {
         // It's convenient to use range of ID's to handle multiple reply messages
         REPLY_ID_RANGE_START..=REPLY_ID_RANGE_END => prepare_sudo_payload(deps, env, msg),

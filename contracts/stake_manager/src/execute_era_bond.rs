@@ -11,6 +11,13 @@ use cosmos_sdk_proto::cosmos::{
 use cosmos_sdk_proto::prost::Message;
 use cosmwasm_std::{Binary, Delegation, DepsMut, Env, Response, Uint128};
 
+use neutron_sdk::bindings::types::ProtobufAny;
+use neutron_sdk::{
+    bindings::{msg::NeutronMsg, query::NeutronQuery},
+    query::min_ibc_fee::query_min_ibc_fee,
+    NeutronResult,
+};
+
 use crate::state::EraProcessStatus::{BondEnded, BondStarted, EraUpdateEnded};
 use crate::state::{SudoPayload, TxType, INFO_OF_ICA_ID, POOLS};
 use crate::tx_callback::msg_with_sudo_callback;
@@ -19,12 +26,6 @@ use crate::{
     helper::{gen_delegation_txs, min_ntrn_ibc_fee},
 };
 use crate::{helper::DEFAULT_TIMEOUT_SECONDS, query::query_delegation_by_addr};
-use neutron_sdk::bindings::types::ProtobufAny;
-use neutron_sdk::{
-    bindings::{msg::NeutronMsg, query::NeutronQuery},
-    query::min_ibc_fee::query_min_ibc_fee,
-    NeutronResult,
-};
 
 #[derive(Clone, Debug)]
 struct ValidatorUnbondInfo {
@@ -48,7 +49,6 @@ pub fn execute_era_bond(
     POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
 
     let mut msgs = vec![];
-    // Check whether the delegator-validator needs to manually withdraw
 
     if pool_info.era_snapshot.unbond >= pool_info.era_snapshot.bond {
         let unbond_amount = pool_info
@@ -57,6 +57,9 @@ pub fn execute_era_bond(
             .sub(pool_info.era_snapshot.bond);
 
         let delegations = query_delegation_by_addr(deps.as_ref(), pool_addr.clone())?;
+        if delegations.last_submitted_local_height <= pool_info.era_snapshot.last_step_height {
+            return Err(ContractError::DelegationSubmissionHeight {}.into());
+        }
         let delegating_vals: Vec<String> = delegations
             .delegations
             .iter()
@@ -93,6 +96,7 @@ pub fn execute_era_bond(
                 msgs.push(any_msg);
             }
         }
+        // Check whether the delegator-validator needs to manually withdraw
         if op_validators.len() != delegating_vals.len() {
             // Find the difference between delegation validator_addrs and op_validators
             let pool_validators: HashSet<_> = delegating_vals.into_iter().collect();
@@ -226,7 +230,7 @@ pub fn sudo_era_bond_callback(
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
     pool_info.era_process_status = BondEnded;
-    pool_info.era_snapshot.bond_height = env.block.height;
+    pool_info.era_snapshot.last_step_height = env.block.height;
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
 
     Ok(Response::new())
