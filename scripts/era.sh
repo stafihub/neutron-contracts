@@ -76,6 +76,13 @@ process_era() {
   echo "pool_info is: "
   echo "$query"
   neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq
+  echo "Waiting 40 seconds"
+  # shellcheck disable=SC2034
+  for i in $(seq 40); do
+    sleep 1
+    echo -n .
+  done
+  echo " done"
 
   echo "-------------------------- era bond -------------------------------------"
   # era_bond round 1
@@ -113,6 +120,13 @@ process_era() {
   neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq
 
   echo "--------------------------collect withdraw -------------------------------------"
+  echo "Waiting 40 seconds"
+  # shellcheck disable=SC2034
+  for i in $(seq 40); do
+    sleep 1
+    echo -n .
+  done
+  echo " done"
   # era_collect_withdraw_msg round 1
   era_collect_withdraw_msg=$(printf '{
   "era_collect_withdraw": {
@@ -177,9 +191,9 @@ process_era() {
   neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq
 
   echo "--------------------------era active-------------------------------------"
-  echo "Waiting 10 seconds"
+  echo "Waiting 40 seconds"
   # shellcheck disable=SC2034
-  for i in $(seq 10); do
+  for i in $(seq 40); do
     sleep 1
     echo -n .
   done
