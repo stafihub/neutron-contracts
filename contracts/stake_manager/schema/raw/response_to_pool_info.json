@@ -197,8 +197,8 @@
       "required": [
         "active",
         "bond",
-        "bond_height",
         "era",
+        "last_step_height",
         "restake_amount",
         "unbond"
       ],
@@ -209,12 +209,12 @@
         "bond": {
           "$ref": "#/definitions/Uint128"
         },
-        "bond_height": {
+        "era": {
           "type": "integer",
           "format": "uint64",
           "minimum": 0.0
         },
-        "era": {
+        "last_step_height": {
           "type": "integer",
           "format": "uint64",
           "minimum": 0.0

@@ -308,10 +308,10 @@
     {
       "type": "object",
       "required": [
-        "pool_update_query"
+        "pool_update_validators_icq"
       ],
       "properties": {
-        "pool_update_query": {
+        "pool_update_validators_icq": {
           "type": "object",
           "required": [
             "pool_addr"
