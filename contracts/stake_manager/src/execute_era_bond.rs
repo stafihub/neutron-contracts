@@ -18,11 +18,8 @@ use neutron_sdk::{
     NeutronResult,
 };
 
-use crate::state::{
-    EraProcessStatus::{BondEnded, BondStarted, EraUpdateEnded},
-    PoolInfo,
-};
-use crate::state::{SudoPayload, TxType, INFO_OF_ICA_ID, POOLS};
+use crate::state::EraProcessStatus::{BondEnded, BondStarted, EraUpdateEnded};
+use crate::state::{SudoPayload, TxType, INFO_OF_ICA_ID, POOLS, VALIDATORS_UNBONDS_TIME};
 use crate::tx_callback::msg_with_sudo_callback;
 use crate::{
     error_conversion::ContractError,
@@ -70,11 +67,12 @@ pub fn execute_era_bond(
         let mut op_validators = vec![];
         if unbond_amount.u128() > 0 {
             let unbond_infos = allocate_unbond_amount(
-                &mut pool_info,
+                deps.branch(),
                 env.block.time.seconds(),
                 &delegations.delegations,
                 unbond_amount,
-            );
+                pool_info.unbonding_period * pool_info.era_seconds,
+            )?;
             if unbond_infos.is_empty() {
                 return Err(ContractError::CanUserValidatorCountIsZero {}.into());
             }
@@ -202,11 +200,12 @@ pub fn execute_era_bond(
 }
 
 fn allocate_unbond_amount(
-    pool_info: &mut PoolInfo,
+    deps: DepsMut<NeutronQuery>,
     current_time: u64,
     delegations: &[Delegation],
     unbond_amount: Uint128,
-) -> Vec<ValidatorUnbondInfo> {
+    unbonding_period_seconds: u64,
+) -> NeutronResult<Vec<ValidatorUnbondInfo>> {
     let mut unbond_infos: Vec<ValidatorUnbondInfo> = Vec::new();
     let mut remaining_unbond = unbond_amount;
 
@@ -225,18 +224,22 @@ fn allocate_unbond_amount(
             current_unbond = delegation.amount.amount;
         }
 
-        if let Some(timestamps) = pool_info
-            .validators_unbonds_time
-            .get_mut(&delegation.validator)
+        if let Some(mut timestamps) =
+            VALIDATORS_UNBONDS_TIME.may_load(deps.storage, delegation.validator.clone())?
         {
             // clear timestamps
             if !timestamps.is_empty() {
                 let oldest_record_time = timestamps[0];
-                if current_time
-                    > oldest_record_time + pool_info.unbonding_period * pool_info.era_seconds
-                {
+                if current_time > oldest_record_time + unbonding_period_seconds {
                     timestamps.remove(0);
+
+                    VALIDATORS_UNBONDS_TIME.save(
+                        deps.storage,
+                        delegation.validator.clone(),
+                        &timestamps,
+                    )?;
                 }
+
                 if timestamps.len() >= 7 {
                     continue;
                 }
@@ -258,7 +261,7 @@ fn allocate_unbond_amount(
         }
     }
 
-    unbond_infos
+    Ok(unbond_infos)
 }
 
 pub fn sudo_era_bond_callback(
@@ -271,13 +274,15 @@ pub fn sudo_era_bond_callback(
         let unbond_validators: Vec<String> = payload.message.split("_").map(String::from).collect();
         let timestamp = env.block.time.seconds();
         for unbond_validator in unbond_validators {
-            if let Some(timestamps) = pool_info.validators_unbonds_time.get_mut(&unbond_validator) {
-                timestamps.push(timestamp)
+            let timestamps_op =
+                VALIDATORS_UNBONDS_TIME.may_load(deps.storage, unbond_validator.clone())?;
+            let final_timestamps = if let Some(mut timestamps) = timestamps_op {
+                timestamps.push(timestamp);
+                timestamps
             } else {
-                pool_info
-                    .validators_unbonds_time
-                    .insert(unbond_validator, vec![timestamp]);
-            }
+                vec![timestamp]
+            };
+            VALIDATORS_UNBONDS_TIME.save(deps.storage, unbond_validator, &final_timestamps)?;
         }
     }
 

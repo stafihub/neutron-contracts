@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use cosmwasm_std::{Addr, DepsMut, Env, MessageInfo, Response, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -47,10 +45,7 @@ pub fn execute_register_pool(
         return Err(ContractError::InvalidInterchainAccountId {}.into());
     }
 
-    if INFO_OF_ICA_ID
-        .load(deps.storage, interchain_account_id.clone())
-        .is_ok()
-    {
+    if INFO_OF_ICA_ID.has(deps.storage, interchain_account_id.clone()) {
         return Err(ContractError::InterchainAccountIdAlreadyExist {}.into());
     }
 
@@ -168,7 +163,6 @@ pub fn sudo_open_ack(
                 unstake_times_limit: 0,
                 next_unstake_index: 0,
                 unbonding_period: 0,
-                validators_unbonds_time: HashMap::new(),
                 era_process_status: EraProcessStatus::ActiveEnded,
                 validator_update_status: ValidatorUpdateStatus::End,
                 platform_fee_commission: Uint128::zero(),

@@ -1,7 +1,6 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{from_json, to_json_vec, Addr, Binary, StdResult, Storage, Uint128};
 use cw_storage_plus::{Item, Map};
-use std::collections::HashMap;
 
 use crate::helper::{
     QUERY_REPLY_ID_RANGE_END, QUERY_REPLY_ID_RANGE_START, REPLY_ID_RANGE_END, REPLY_ID_RANGE_START,
@@ -48,7 +47,6 @@ pub struct PoolInfo {
     pub unstake_times_limit: u64,
     pub next_unstake_index: u64,
     pub unbonding_period: u64,
-    pub validators_unbonds_time: HashMap<String, Vec<u64>>,
     pub era_process_status: EraProcessStatus,
     pub validator_update_status: ValidatorUpdateStatus,
     pub unbond_commission: Uint128,
@@ -123,12 +121,6 @@ pub const INFO_OF_ICA_ID: Map<String, (IcaInfo, IcaInfo, Addr)> = Map::new("info
 // (userAddress,poolAddress) => []unstakeIndex
 pub const UNSTAKES_INDEX_FOR_USER: Map<(Addr, String), Vec<u64>> =
     Map::new("unstakes_index_for_user");
-
-// #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-// pub struct StackInfo {
-
-// }
-// pub const STACK_INFO: Item<StackInfo> = Item::new("stack_info");
 
 // contains query kinds that we expect to handle in `sudo_kv_query_result`
 #[cw_serde]
@@ -248,3 +240,6 @@ pub const REPLY_ID_TO_QUERY_ID: Map<u64, u64> = Map::new("reply_id_to_query_id")
 // just save in validators query init
 pub const REPLY_ID_TO_NEED_UPDATE: Map<u64, bool> = Map::new("reply_id_to_need_update");
 pub const QUERY_ID_TO_REPLY_ID: Map<u64, u64> = Map::new("query_id_to_reply_id");
+
+// validator -> vec[timestamp]
+pub const VALIDATORS_UNBONDS_TIME: Map<String, Vec<u64>> = Map::new("validators_unbonds_time");
