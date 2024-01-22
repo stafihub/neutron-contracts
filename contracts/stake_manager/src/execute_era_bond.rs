@@ -74,7 +74,7 @@ pub fn execute_era_bond(
                 pool_info.unbonding_period * pool_info.era_seconds,
             )?;
             if unbond_infos.is_empty() {
-                return Err(ContractError::CanUserValidatorCountIsZero {}.into());
+                return Err(ContractError::ValidatorForUnbondNotEnough {}.into());
             }
             let unbond_validators: Vec<String> =
                 unbond_infos.iter().map(|u| u.validator.clone()).collect();
@@ -146,6 +146,9 @@ pub fn execute_era_bond(
     } else if pool_info.era_snapshot.unbond < pool_info.era_snapshot.bond {
         let stake_amount = pool_info.era_snapshot.bond - pool_info.era_snapshot.unbond;
         let validator_count = pool_info.validator_addrs.len() as u128;
+        if validator_count == 0 {
+            return Err(ContractError::ValidatorsEmpty {}.into());
+        }
 
         let amount_per_validator = stake_amount.div(Uint128::from(validator_count));
         let remainder = stake_amount.sub(amount_per_validator.mul(Uint128::new(validator_count)));
@@ -217,17 +220,10 @@ fn allocate_unbond_amount(
             break;
         }
 
-        let mut current_unbond = remaining_unbond;
-
-        // If the current validator delegate amount is less than the remaining delegate amount, all are discharged
-        if delegation.amount.amount < remaining_unbond {
-            current_unbond = delegation.amount.amount;
-        }
-
+        // clear timestamps
         if let Some(mut timestamps) =
             VALIDATORS_UNBONDS_TIME.may_load(deps.storage, delegation.validator.clone())?
         {
-            // clear timestamps
             if !timestamps.is_empty() {
                 let oldest_record_time = timestamps[0];
                 if current_time > oldest_record_time + unbonding_period_seconds {
@@ -244,21 +240,23 @@ fn allocate_unbond_amount(
                     continue;
                 }
             }
-
-            remaining_unbond -= current_unbond;
-
-            unbond_infos.push(ValidatorUnbondInfo {
-                validator: delegation.validator.clone(),
-                unbond_amount: current_unbond,
-            });
-        } else {
-            remaining_unbond -= current_unbond;
-
-            unbond_infos.push(ValidatorUnbondInfo {
-                validator: delegation.validator.clone(),
-                unbond_amount: current_unbond,
-            });
         }
+
+        let mut current_unbond = remaining_unbond;
+        // If the current validator delegate amount is less than the remaining delegate amount, all are discharged
+        if delegation.amount.amount < remaining_unbond {
+            current_unbond = delegation.amount.amount;
+        }
+
+        remaining_unbond -= current_unbond;
+        unbond_infos.push(ValidatorUnbondInfo {
+            validator: delegation.validator.clone(),
+            unbond_amount: current_unbond,
+        });
+    }
+
+    if !remaining_unbond.is_zero() {
+        return Err(ContractError::ValidatorForUnbondNotEnough {}.into());
     }
 
     Ok(unbond_infos)

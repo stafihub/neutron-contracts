@@ -48,7 +48,7 @@ pub fn execute_era_restake(
 
     let mut msgs = vec![];
     if validator_count == 0 {
-        return Err(ContractError::CanUserValidatorCountIsZero {}.into());
+        return Err(ContractError::ValidatorsEmpty {}.into());
     }
 
     let amount_per_validator = restake_amount.div(Uint128::from(validator_count));

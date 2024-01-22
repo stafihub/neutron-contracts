@@ -23,8 +23,8 @@ pub enum ContractError {
     #[error("Encode error: {0}")]
     EncodeError(String),
 
-    #[error("Can use validator count is zero")]
-    CanUserValidatorCountIsZero {},
+    #[error("Validator for unbond not enough")]
+    ValidatorForUnbondNotEnough {},
 
     #[error("Delegation submission height")]
     DelegationSubmissionHeight {},
@@ -64,6 +64,9 @@ pub enum ContractError {
 
     #[error("Validator already exit")]
     ValidatorAlreadyExit {},
+
+    #[error("Validators empty")]
+    ValidatorsEmpty {},
 
     #[error("Old validator not exist")]
     OldValidatorNotExist {},
