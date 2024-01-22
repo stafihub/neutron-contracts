@@ -36,7 +36,7 @@ use crate::{error_conversion::ContractError, query_callback::sudo_kv_query_resul
 use crate::{execute_config_pool::execute_config_pool, query::get_ica_registered_query};
 use crate::{
     execute_config_stack::execute_config_stack,
-    execute_update_icq_query::execute_update_validators_icq,
+    execute_update_validators_icq::execute_update_validators_icq,
 };
 use cosmwasm_std::{
     entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response,

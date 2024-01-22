@@ -18,7 +18,10 @@ use neutron_sdk::{
     NeutronResult,
 };
 
-use crate::state::EraProcessStatus::{BondEnded, BondStarted, EraUpdateEnded};
+use crate::state::{
+    EraProcessStatus::{BondEnded, BondStarted, EraUpdateEnded},
+    PoolInfo,
+};
 use crate::state::{SudoPayload, TxType, INFO_OF_ICA_ID, POOLS};
 use crate::tx_callback::msg_with_sudo_callback;
 use crate::{
@@ -35,7 +38,7 @@ struct ValidatorUnbondInfo {
 
 pub fn execute_era_bond(
     mut deps: DepsMut<NeutronQuery>,
-    _: Env,
+    env: Env,
     pool_addr: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
@@ -68,7 +71,17 @@ pub fn execute_era_bond(
 
         let mut op_validators = vec![];
         if unbond_amount.u128() > 0 {
-            let unbond_infos = allocate_unbond_amount(&delegations.delegations, unbond_amount);
+            let unbond_infos = allocate_unbond_amount(
+                &mut pool_info,
+                env.block.time.seconds(),
+                &delegations.delegations,
+                unbond_amount,
+            );
+
+            if unbond_infos.is_empty() {
+                return Err(ContractError::CanUserValidatorCountIsZero {}.into());
+            }
+
             for info in unbond_infos {
                 op_validators.push(info.validator.clone());
 
@@ -136,10 +149,6 @@ pub fn execute_era_bond(
         let stake_amount = pool_info.era_snapshot.bond - pool_info.era_snapshot.unbond;
         let validator_count = pool_info.validator_addrs.len() as u128;
 
-        if validator_count == 0 {
-            return Err(ContractError::ValidatorCountIsZero {}.into());
-        }
-
         let amount_per_validator = stake_amount.div(Uint128::from(validator_count));
         let remainder = stake_amount.sub(amount_per_validator.mul(Uint128::new(validator_count)));
 
@@ -190,6 +199,8 @@ pub fn execute_era_bond(
 }
 
 fn allocate_unbond_amount(
+    pool_info: &mut PoolInfo,
+    current_time: u64,
     delegations: &[Delegation],
     unbond_amount: Uint128,
 ) -> Vec<ValidatorUnbondInfo> {
@@ -212,12 +223,42 @@ fn allocate_unbond_amount(
             current_unbond = delegation.amount.amount;
         }
 
-        remaining_unbond -= current_unbond;
+        if let Some(timestamps) = pool_info
+            .era_snapshot
+            .validators_unbonds_time
+            .get_mut(&delegation.validator)
+        {
+            if !timestamps.is_empty() {
+                let oldest_record_time = timestamps[0];
+                if current_time - oldest_record_time
+                    > pool_info.unbonding_period * pool_info.era_seconds
+                {
+                    timestamps.remove(0);
+                }
+                if timestamps.len() >= 7 {
+                    continue;
+                }
+            }
+            timestamps.push(current_time);
+            remaining_unbond -= current_unbond;
 
-        unbond_infos.push(ValidatorUnbondInfo {
-            validator: delegation.validator.clone(),
-            unbond_amount: current_unbond,
-        });
+            unbond_infos.push(ValidatorUnbondInfo {
+                validator: delegation.validator.clone(),
+                unbond_amount: current_unbond,
+            });
+        } else {
+            // Handle the case where the validator is not in the hashmap
+            pool_info
+                .era_snapshot
+                .validators_unbonds_time
+                .insert(delegation.validator.clone(), vec![current_time]);
+            remaining_unbond -= current_unbond;
+
+            unbond_infos.push(ValidatorUnbondInfo {
+                validator: delegation.validator.clone(),
+                unbond_amount: current_unbond,
+            });
+        }
     }
 
     unbond_infos
@@ -231,6 +272,7 @@ pub fn sudo_era_bond_callback(
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
     pool_info.era_process_status = BondEnded;
     pool_info.era_snapshot.last_step_height = env.block.height;
+    pool_info.validators_unbonds_time = pool_info.clone().era_snapshot.validators_unbonds_time;
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
 
     Ok(Response::new())
@@ -242,6 +284,7 @@ pub fn sudo_era_bond_failed_callback(
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
     pool_info.era_process_status = EraUpdateEnded;
+    pool_info.era_snapshot.validators_unbonds_time = pool_info.clone().validators_unbonds_time;
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
 
     Ok(Response::new())

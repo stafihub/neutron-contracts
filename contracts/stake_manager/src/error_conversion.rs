@@ -23,8 +23,8 @@ pub enum ContractError {
     #[error("Encode error: {0}")]
     EncodeError(String),
 
-    #[error("Validator count is zero")]
-    ValidatorCountIsZero {},
+    #[error("Can use validator count is zero")]
+    CanUserValidatorCountIsZero {},
 
     #[error("Delegation submission height")]
     DelegationSubmissionHeight {},

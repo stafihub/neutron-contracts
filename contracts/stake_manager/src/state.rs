@@ -1,6 +1,7 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{from_json, to_json_vec, Addr, Binary, StdResult, Storage, Uint128};
 use cw_storage_plus::{Item, Map};
+use std::collections::HashMap;
 
 use crate::helper::{
     QUERY_REPLY_ID_RANGE_END, QUERY_REPLY_ID_RANGE_START, REPLY_ID_RANGE_END, REPLY_ID_RANGE_START,
@@ -26,6 +27,7 @@ pub struct EraSnapshot {
     pub active: Uint128,
     pub restake_amount: Uint128,
     pub last_step_height: u64,
+    pub validators_unbonds_time: HashMap<String, Vec<u64>>,
 }
 
 #[cw_serde]
@@ -47,6 +49,7 @@ pub struct PoolInfo {
     pub unstake_times_limit: u64,
     pub next_unstake_index: u64,
     pub unbonding_period: u64,
+    pub validators_unbonds_time: HashMap<String, Vec<u64>>,
     pub era_process_status: EraProcessStatus,
     pub validator_update_status: ValidatorUpdateStatus,
     pub unbond_commission: Uint128,

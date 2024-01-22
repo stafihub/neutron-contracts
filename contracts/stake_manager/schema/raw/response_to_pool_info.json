@@ -34,7 +34,8 @@
     "unbonding_period",
     "unstake_times_limit",
     "validator_addrs",
-    "validator_update_status"
+    "validator_update_status",
+    "validators_unbonds_time"
   ],
   "properties": {
     "active": {
@@ -155,6 +156,17 @@
     },
     "validator_update_status": {
       "$ref": "#/definitions/ValidatorUpdateStatus"
+    },
+    "validators_unbonds_time": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      }
     }
   },
   "additionalProperties": false,
@@ -200,7 +212,8 @@
         "era",
         "last_step_height",
         "restake_amount",
-        "unbond"
+        "unbond",
+        "validators_unbonds_time"
       ],
       "properties": {
         "active": {
@@ -224,6 +237,17 @@
         },
         "unbond": {
           "$ref": "#/definitions/Uint128"
+        },
+        "validators_unbonds_time": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
         }
       },
       "additionalProperties": false

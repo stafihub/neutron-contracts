@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use cosmwasm_std::{Addr, DepsMut, Env, MessageInfo, Response, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -166,6 +168,7 @@ pub fn sudo_open_ack(
                 unstake_times_limit: 0,
                 next_unstake_index: 0,
                 unbonding_period: 0,
+                validators_unbonds_time: HashMap::new(),
                 era_process_status: EraProcessStatus::ActiveEnded,
                 validator_update_status: ValidatorUpdateStatus::End,
                 platform_fee_commission: Uint128::zero(),
@@ -185,6 +188,7 @@ pub fn sudo_open_ack(
                     active: Uint128::zero(),
                     restake_amount: Uint128::zero(),
                     last_step_height: 0,
+                    validators_unbonds_time: HashMap::new(),
                 },
                 paused: true,
                 lsm_support: false,

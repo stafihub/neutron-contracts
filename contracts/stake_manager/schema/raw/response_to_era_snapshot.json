@@ -8,7 +8,8 @@
     "era",
     "last_step_height",
     "restake_amount",
-    "unbond"
+    "unbond",
+    "validators_unbonds_time"
   ],
   "properties": {
     "active": {
@@ -32,6 +33,17 @@
     },
     "unbond": {
       "$ref": "#/definitions/Uint128"
+    },
+    "validators_unbonds_time": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      }
     }
   },
   "additionalProperties": false,
