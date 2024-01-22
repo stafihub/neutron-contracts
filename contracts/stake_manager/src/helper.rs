@@ -1,8 +1,3 @@
-use crate::error_conversion::ContractError;
-use crate::query_callback::register_query_submsg;
-use crate::state::{IcaInfo, PoolInfo, QueryKind, SudoPayload, TxType, POOLS};
-use crate::state::{ADDRESS_TO_REPLY_ID, INFO_OF_ICA_ID, REPLY_ID_TO_QUERY_ID};
-use crate::tx_callback::msg_with_sudo_callback;
 use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
 use cosmos_sdk_proto::cosmos::distribution::v1beta1::MsgSetWithdrawAddress;
 use cosmos_sdk_proto::cosmos::staking::v1beta1::{MsgBeginRedelegate, MsgDelegate};
@@ -10,25 +5,25 @@ use cosmos_sdk_proto::prost::Message;
 use cosmwasm_std::{instantiate2_address, to_json_binary, WasmMsg};
 use cosmwasm_std::{Binary, Deps, DepsMut, QueryRequest, StdResult, Uint128};
 use cosmwasm_std::{Env, MessageInfo, Response};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
 use lsd_token::msg::InstantiateMinterData;
 use neutron_sdk::bindings::msg::{IbcFee, NeutronMsg};
 use neutron_sdk::bindings::query::NeutronQuery;
-use neutron_sdk::bindings::types::{KVKey, ProtobufAny};
-use neutron_sdk::interchain_queries::helpers::decode_and_convert;
-use neutron_sdk::interchain_queries::v045::helpers::{
-    create_delegation_key, create_params_store_key, create_validator_key,
-};
+use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::interchain_queries::v045::new_register_delegator_delegations_query_msg;
-use neutron_sdk::interchain_queries::v045::types::{
-    KEY_BOND_DENOM, PARAMS_STORE_KEY, STAKING_STORE_KEY,
-};
 use neutron_sdk::interchain_queries::v045::{
     new_register_balance_query_msg, new_register_staking_validators_query_msg,
 };
 use neutron_sdk::NeutronError;
 use neutron_sdk::{query::min_ibc_fee::query_min_ibc_fee, NeutronResult};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+
+use crate::error_conversion::ContractError;
+use crate::query_callback::register_query_submsg;
+use crate::state::{IcaInfo, PoolInfo, QueryKind, SudoPayload, TxType, POOLS};
+use crate::state::{ADDRESS_TO_REPLY_ID, INFO_OF_ICA_ID, REPLY_ID_TO_QUERY_ID};
+use crate::tx_callback::msg_with_sudo_callback;
 
 const FEE_DENOM: &str = "untrn";
 pub const ICA_WITHDRAW_SUFIX: &str = "-withdraw_addr";
@@ -124,42 +119,6 @@ pub fn gen_redelegate_txs(
         type_url: "/cosmos.staking.v1beta1.BeginRedelegate".to_string(),
         value: Binary::from(buf),
     }
-}
-
-pub fn new_register_delegator_delegations_keys(
-    delegator: String,
-    validators: Vec<String>,
-) -> Option<Vec<KVKey>> {
-    let delegator_addr = decode_and_convert(delegator.as_str()).ok()?;
-
-    // Allocate memory for such KV keys as:
-    // * staking module params to get staking denomination
-    // * validators structures to calculate amount of delegated tokens
-    // * delegations structures to get info about delegations itself
-    let mut keys: Vec<KVKey> = Vec::with_capacity(validators.len() * 2 + 1);
-
-    // create KV key to get BondDenom from staking module params
-    keys.push(KVKey {
-        path: PARAMS_STORE_KEY.to_string(),
-        key: Binary(create_params_store_key(STAKING_STORE_KEY, KEY_BOND_DENOM)),
-    });
-
-    for v in &validators {
-        // create delegation key to get delegation structure
-        let val_addr = decode_and_convert(v.as_str()).ok()?;
-        keys.push(KVKey {
-            path: STAKING_STORE_KEY.to_string(),
-            key: Binary(create_delegation_key(&delegator_addr, &val_addr).ok()?),
-        });
-
-        // create validator key to get validator structure
-        keys.push(KVKey {
-            path: STAKING_STORE_KEY.to_string(),
-            key: Binary(create_validator_key(&val_addr).ok()?),
-        })
-    }
-
-    Some(keys)
 }
 
 pub fn get_withdraw_ica_id(interchain_account_id: String) -> String {
@@ -450,4 +409,49 @@ pub fn deal_pool(
             register_validator_submsg,
             submsg_set_withdraw,
         ]))
+}
+
+pub fn deal_validators_icq_update(
+    deps: DepsMut<NeutronQuery>,
+    pool_addr: String,
+    pool_info: PoolInfo,
+    ctrl_connection_id: String,
+) -> NeutronResult<Response<NeutronMsg>> {
+    let new_delegations_keys = match new_register_delegator_delegations_query_msg(
+        ctrl_connection_id.clone(),
+        pool_addr.clone(),
+        pool_info.validator_addrs.clone(),
+        DEFAULT_UPDATE_PERIOD,
+    ) {
+        Ok(NeutronMsg::RegisterInterchainQuery { keys, .. }) => keys,
+        _ => return Err(ContractError::ICQNewKeyBuildFailed {}.into()),
+    };
+
+    let update_pool_delegations_msg = NeutronMsg::update_interchain_query(
+        get_query_id(deps.as_ref(), pool_addr.clone(), QueryKind::Delegations)?,
+        Some(new_delegations_keys),
+        None,
+        None,
+    )?;
+
+    let new_validators_keys = match new_register_staking_validators_query_msg(
+        ctrl_connection_id,
+        pool_info.validator_addrs.clone(),
+        DEFAULT_UPDATE_PERIOD,
+    ) {
+        Ok(NeutronMsg::RegisterInterchainQuery { keys, .. }) => keys,
+        _ => return Err(ContractError::ICQNewKeyBuildFailed {}.into()),
+    };
+
+    let update_pool_validators_msg = NeutronMsg::update_interchain_query(
+        get_query_id(deps.as_ref(), pool_addr.clone(), QueryKind::Validators)?,
+        Some(new_validators_keys),
+        None,
+        None,
+    )?;
+
+    Ok(Response::default().add_messages(vec![
+        update_pool_delegations_msg,
+        update_pool_validators_msg,
+    ]))
 }
