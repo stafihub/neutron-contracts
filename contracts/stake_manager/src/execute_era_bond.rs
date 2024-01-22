@@ -48,9 +48,6 @@ pub fn execute_era_bond(
         return Err(ContractError::StatusNotAllow {}.into());
     }
 
-    pool_info.era_process_status = BondStarted;
-    POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
-
     let mut msgs = vec![];
 
     if pool_info.era_snapshot.unbond >= pool_info.era_snapshot.bond {
@@ -194,6 +191,9 @@ pub fn execute_era_bond(
             tx_type: TxType::EraBond,
         },
     )?;
+
+    pool_info.era_process_status = BondStarted;
+    POOLS.save(deps.storage, pool_addr, &pool_info)?;
 
     Ok(Response::default().add_submessage(submsg))
 }
