@@ -1,4 +1,3 @@
-use crate::execute_config_stack::execute_config_stack;
 use crate::execute_era_active::execute_era_active;
 use crate::execute_era_bond::execute_era_bond;
 use crate::execute_era_collect_withdraw::execute_era_collect_withdraw;
@@ -16,7 +15,6 @@ use crate::execute_register_pool::{execute_register_pool, sudo_open_ack};
 use crate::execute_stake::execute_stake;
 use crate::execute_stake_lsm::execute_stake_lsm;
 use crate::execute_unstake::execute_unstake;
-use crate::execute_update_query::execute_update_query;
 use crate::execute_withdraw::execute_withdraw;
 use crate::helper::{
     QUERY_REPLY_ID_RANGE_END, QUERY_REPLY_ID_RANGE_START, REPLY_ID_RANGE_END, REPLY_ID_RANGE_START,
@@ -36,6 +34,10 @@ use crate::state::{Stack, STACK};
 use crate::tx_callback::{prepare_sudo_payload, sudo_error, sudo_response, sudo_timeout};
 use crate::{error_conversion::ContractError, query_callback::sudo_kv_query_result};
 use crate::{execute_config_pool::execute_config_pool, query::get_ica_registered_query};
+use crate::{
+    execute_config_stack::execute_config_stack,
+    execute_update_icq_query::execute_update_validators_icq,
+};
 use cosmwasm_std::{
     entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response,
     StdResult, Uint128,
@@ -184,8 +186,8 @@ pub fn execute(
         } => {
             execute_pool_update_validator(deps, env, info, pool_addr, old_validator, new_validator)
         }
-        ExecuteMsg::PoolUpdateQuery { pool_addr } => {
-            execute_update_query(deps, env, info, pool_addr)
+        ExecuteMsg::PoolUpdateValidatorsIcq { pool_addr } => {
+            execute_update_validators_icq(deps, env, info, pool_addr)
         }
         ExecuteMsg::EraUpdate { pool_addr } => execute_era_update(deps, env, pool_addr),
         ExecuteMsg::EraBond { pool_addr } => execute_era_bond(deps, env, pool_addr),

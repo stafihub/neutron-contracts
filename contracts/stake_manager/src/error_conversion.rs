@@ -167,6 +167,9 @@ pub enum ContractError {
     #[error("ICQ error: Failed to parse response: {0}")]
     ICQErrFailedParse(String),
 
+    #[error("ICQ error: New key build failed")]
+    ICQNewKeyBuildFailed {},
+
     #[error("Callback error: Sequence not found")]
     CallBackErrSequenceNotFound {},
 

@@ -175,7 +175,7 @@ pub enum ExecuteMsg {
         old_validator: String,
         new_validator: String,
     },
-    PoolUpdateQuery {
+    PoolUpdateValidatorsIcq {
         pool_addr: String,
     },
     EraUpdate {
