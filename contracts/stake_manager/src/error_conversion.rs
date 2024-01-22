@@ -106,7 +106,7 @@ pub enum ContractError {
 
     #[error("Less than minimal stake")]
     LessThanMinimalStake {},
-    
+
     #[error("Less than minimal era seconds")]
     LessThanMinimalEraSeconds {},
 

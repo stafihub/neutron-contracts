@@ -11,7 +11,7 @@ pub enum ContractError {
 
     #[error("NotExist")]
     NotExist {},
-    
+
     #[error("Relayers len not match")]
     RelayersLenNotMatch {},
 
@@ -20,7 +20,7 @@ pub enum ContractError {
 
     #[error("Duplicate")]
     Duplicate {},
-    
+
     #[error("Already executed")]
     AlreadyExecuted {},
 }

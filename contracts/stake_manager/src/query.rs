@@ -184,7 +184,7 @@ pub fn get_ica_registered_query(
     query_kind: QueryKind,
 ) -> NeutronResult<QueryRegisteredQueryResponse> {
     let contract_query_id =
-        ADDRESS_TO_REPLY_ID.load(deps.storage, (ica_addr,query_kind.to_string()))?;
+        ADDRESS_TO_REPLY_ID.load(deps.storage, (ica_addr, query_kind.to_string()))?;
     let registered_query_id = REPLY_ID_TO_QUERY_ID.load(deps.storage, contract_query_id)?;
 
     let query = NeutronQuery::RegisteredInterchainQuery {
