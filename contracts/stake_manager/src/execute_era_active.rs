@@ -40,9 +40,7 @@ pub fn execute_era_active(
 
     match delegations_result {
         Ok(delegations_resp) => {
-            if delegations_resp.last_submitted_local_height
-                <= pool_info.era_snapshot.last_step_height
-            {
+            if delegations_resp.last_submitted_local_height <= pool_info.era_snapshot.bond_height {
                 return Err(ContractError::DelegationSubmissionHeight {}.into());
             }
             for delegation in delegations_resp.delegations {

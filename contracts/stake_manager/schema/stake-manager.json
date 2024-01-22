@@ -1330,11 +1330,10 @@
       "required": [
         "active",
         "bond",
+        "bond_height",
         "era",
-        "last_step_height",
         "restake_amount",
-        "unbond",
-        "validators_unbonds_time"
+        "unbond"
       ],
       "properties": {
         "active": {
@@ -1343,12 +1342,12 @@
         "bond": {
           "$ref": "#/definitions/Uint128"
         },
-        "era": {
+        "bond_height": {
           "type": "integer",
           "format": "uint64",
           "minimum": 0.0
         },
-        "last_step_height": {
+        "era": {
           "type": "integer",
           "format": "uint64",
           "minimum": 0.0
@@ -1358,17 +1357,6 @@
         },
         "unbond": {
           "$ref": "#/definitions/Uint128"
-        },
-        "validators_unbonds_time": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "array",
-            "items": {
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0.0
-            }
-          }
         }
       },
       "additionalProperties": false,
@@ -1879,8 +1867,7 @@
         "unbonding_period",
         "unstake_times_limit",
         "validator_addrs",
-        "validator_update_status",
-        "validators_unbonds_time"
+        "validator_update_status"
       ],
       "properties": {
         "active": {
@@ -2001,17 +1988,6 @@
         },
         "validator_update_status": {
           "$ref": "#/definitions/ValidatorUpdateStatus"
-        },
-        "validators_unbonds_time": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "array",
-            "items": {
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0.0
-            }
-          }
         }
       },
       "additionalProperties": false,
@@ -2054,11 +2030,10 @@
           "required": [
             "active",
             "bond",
+            "bond_height",
             "era",
-            "last_step_height",
             "restake_amount",
-            "unbond",
-            "validators_unbonds_time"
+            "unbond"
           ],
           "properties": {
             "active": {
@@ -2067,12 +2042,12 @@
             "bond": {
               "$ref": "#/definitions/Uint128"
             },
-            "era": {
+            "bond_height": {
               "type": "integer",
               "format": "uint64",
               "minimum": 0.0
             },
-            "last_step_height": {
+            "era": {
               "type": "integer",
               "format": "uint64",
               "minimum": 0.0
@@ -2082,17 +2057,6 @@
             },
             "unbond": {
               "$ref": "#/definitions/Uint128"
-            },
-            "validators_unbonds_time": {
-              "type": "object",
-              "additionalProperties": {
-                "type": "array",
-                "items": {
-                  "type": "integer",
-                  "format": "uint64",
-                  "minimum": 0.0
-                }
-              }
             }
           },
           "additionalProperties": false

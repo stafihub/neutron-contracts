@@ -39,7 +39,7 @@ pub fn execute_era_collect_withdraw(
 
     let mut withdraw_amount = Uint128::zero();
     if let Ok(balance_response) = withdraw_balances_result {
-        if balance_response.last_submitted_local_height <= pool_info.era_snapshot.last_step_height {
+        if balance_response.last_submitted_local_height <= pool_info.era_snapshot.bond_height {
             return Err(ContractError::WithdrawAddrBalanceSubmissionHeight {}.into());
         }
 
@@ -118,7 +118,7 @@ pub fn sudo_era_collect_withdraw_callback(
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
     pool_info.era_process_status = WithdrawEnded;
-    pool_info.era_snapshot.last_step_height = env.block.height;
+    pool_info.era_snapshot.bond_height = env.block.height;
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
 
     Ok(Response::new())

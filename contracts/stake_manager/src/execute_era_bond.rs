@@ -55,7 +55,7 @@ pub fn execute_era_bond(
             .sub(pool_info.era_snapshot.bond);
 
         let delegations = query_delegation_by_addr(deps.as_ref(), pool_addr.clone())?;
-        if delegations.last_submitted_local_height <= pool_info.era_snapshot.last_step_height {
+        if delegations.last_submitted_local_height <= pool_info.era_snapshot.bond_height {
             return Err(ContractError::DelegationSubmissionHeight {}.into());
         }
         let delegating_vals: Vec<String> = delegations
@@ -287,7 +287,7 @@ pub fn sudo_era_bond_callback(
     }
 
     pool_info.era_process_status = BondEnded;
-    pool_info.era_snapshot.last_step_height = env.block.height;
+    pool_info.era_snapshot.bond_height = env.block.height;
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
 
     Ok(Response::new())

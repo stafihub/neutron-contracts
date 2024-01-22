@@ -25,7 +25,7 @@ pub struct EraSnapshot {
     pub unbond: Uint128,
     pub active: Uint128,
     pub restake_amount: Uint128,
-    pub last_step_height: u64,
+    pub bond_height: u64,
 }
 
 #[cw_serde]

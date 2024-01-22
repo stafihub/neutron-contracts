@@ -56,7 +56,7 @@ pub fn execute_era_update(
         bond: pool_info.bond,
         unbond: pool_info.unbond,
         active: pool_info.active,
-        last_step_height: env.block.height,
+        bond_height: env.block.height,
         restake_amount: Uint128::zero(),
     };
     let rsp = Response::default().add_messages(get_update_pool_icq_msgs(
@@ -134,7 +134,7 @@ pub fn sudo_era_update_callback(
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
     pool_info.era_process_status = EraUpdateEnded;
-    pool_info.era_snapshot.last_step_height = env.block.height;
+    pool_info.era_snapshot.bond_height = env.block.height;
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
 
     Ok(Response::new())
@@ -153,7 +153,7 @@ pub fn sudo_era_update_failed_callback(
         unbond: Uint128::zero(),
         active: Uint128::zero(),
         restake_amount: Uint128::zero(),
-        last_step_height: 0,
+        bond_height: 0,
     };
 
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;

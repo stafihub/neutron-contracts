@@ -103,7 +103,7 @@ pub fn sudo_era_restake_callback(
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
     pool_info.era_process_status = RestakeEnded;
-    pool_info.era_snapshot.last_step_height = env.block.height;
+    pool_info.era_snapshot.bond_height = env.block.height;
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
 
     Ok(Response::new())
