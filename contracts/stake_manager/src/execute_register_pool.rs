@@ -188,7 +188,6 @@ pub fn sudo_open_ack(
                     active: Uint128::zero(),
                     restake_amount: Uint128::zero(),
                     last_step_height: 0,
-                    validators_unbonds_time: HashMap::new(),
                 },
                 paused: true,
                 lsm_support: false,

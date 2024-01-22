@@ -1,16 +1,11 @@
-use std::{
-    collections::HashMap,
-    ops::{Add, Div, Sub},
-};
-
 use cosmwasm_std::{coin, DepsMut, Env, Response, Uint128};
-
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     query::min_ibc_fee::query_min_ibc_fee,
     sudo::msg::RequestPacketTimeoutHeight,
     NeutronResult,
 };
+use std::ops::{Add, Div, Sub};
 
 use crate::helper::{get_update_pool_icq_msgs, DEFAULT_FAST_PERIOD, DEFAULT_TIMEOUT_SECONDS};
 use crate::state::EraSnapshot;
@@ -63,7 +58,6 @@ pub fn execute_era_update(
         active: pool_info.active,
         last_step_height: env.block.height,
         restake_amount: Uint128::zero(),
-        validators_unbonds_time: pool_info.validators_unbonds_time.clone(),
     };
     let rsp = Response::default().add_messages(get_update_pool_icq_msgs(
         deps.branch(),
@@ -160,7 +154,6 @@ pub fn sudo_era_update_failed_callback(
         active: Uint128::zero(),
         restake_amount: Uint128::zero(),
         last_step_height: 0,
-        validators_unbonds_time: HashMap::new(),
     };
 
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;

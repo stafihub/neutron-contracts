@@ -27,7 +27,6 @@ pub struct EraSnapshot {
     pub active: Uint128,
     pub restake_amount: Uint128,
     pub last_step_height: u64,
-    pub validators_unbonds_time: HashMap<String, Vec<u64>>,
 }
 
 #[cw_serde]
