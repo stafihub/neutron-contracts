@@ -204,4 +204,6 @@ pub enum ExecuteMsg {
 }
 
 #[cw_serde]
-pub struct MigrateMsg {}
+pub struct MigrateMsg {
+    pub pool_addr: String,
+}
