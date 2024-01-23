@@ -7,6 +7,7 @@ use crate::execute_redeem_token_for_share::{
 };
 use crate::execute_stake_lsm::{sudo_stake_lsm_callback, sudo_stake_lsm_failed_callback};
 use crate::execute_withdraw::{sudo_withdraw_callback, sudo_withdraw_failed_callback};
+use crate::helper::sudo_set_withdraw_addr_failed_callback;
 use crate::state::{
     read_reply_payload, read_sudo_payload, save_reply_payload, save_sudo_payload, SudoPayload,
     TxType,
@@ -175,6 +176,7 @@ fn sudo_failed_callback(
     payload: SudoPayload,
 ) -> NeutronResult<Response<NeutronMsg>> {
     match payload.tx_type {
+        TxType::SetWithdrawAddr => sudo_set_withdraw_addr_failed_callback(deps, payload),
         TxType::EraUpdate => sudo_era_update_failed_callback(deps, payload),
         TxType::EraBond => sudo_era_bond_failed_callback(deps, payload),
         TxType::EraCollectWithdraw => sudo_era_collect_withdraw_failed_callback(deps, payload),

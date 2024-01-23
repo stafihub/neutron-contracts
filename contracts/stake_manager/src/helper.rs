@@ -2,7 +2,7 @@ use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
 use cosmos_sdk_proto::cosmos::distribution::v1beta1::MsgSetWithdrawAddress;
 use cosmos_sdk_proto::cosmos::staking::v1beta1::{MsgBeginRedelegate, MsgDelegate};
 use cosmos_sdk_proto::prost::Message;
-use cosmwasm_std::{instantiate2_address, to_json_binary, WasmMsg};
+use cosmwasm_std::{instantiate2_address, to_json_binary, SubMsg, WasmMsg};
 use cosmwasm_std::{Binary, Deps, DepsMut, QueryRequest, StdResult, Uint128};
 use cosmwasm_std::{Env, MessageInfo, Response};
 use schemars::JsonSchema;
@@ -276,106 +276,117 @@ pub fn deal_pool(
     lsd_token_name: String,
     lsd_token_symbol: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
-    let mut resp = Response::default();
-    let mut sub_msgs = vec![];
-
-    if pool_info.era_process_status == EraProcessStatus::InitNotCompleted {
-        let denom_trace =
-            query_denom_trace_from_ibc_denom(deps.as_ref(), pool_info.ibc_denom.clone())?;
-        if denom_trace.denom_trace.base_denom != pool_info.remote_denom {
-            return Err(ContractError::DenomTraceNotMatch {}.into());
-        }
-
-        let salt = &pool_ica_info.ica_addr.clone()[..40];
-        let code_info = deps.querier.query_wasm_code_info(lsd_code_id)?;
-        let creator_cannonical = deps.api.addr_canonicalize(env.contract.address.as_str())?;
-        let i2_address =
-            instantiate2_address(&code_info.checksum, &creator_cannonical, salt.as_bytes())
-                .map_err(|e| ContractError::Instantiate2AddressFailed(e.to_string()))?;
-        let contract_addr = deps
-            .api
-            .addr_humanize(&i2_address)
-            .map_err(NeutronError::Std)?;
-
-        pool_info.lsd_token = contract_addr;
-        pool_info.era_process_status = EraProcessStatus::InitWithdrawAddrNotSet;
-
-        let instantiate_lsd_msg = WasmMsg::Instantiate2 {
-            admin: Option::from(info.sender.to_string()),
-            code_id: lsd_code_id,
-            msg: to_json_binary(
-                &(lsd_token::msg::InstantiateMsg {
-                    name: lsd_token_name.clone(),
-                    symbol: lsd_token_symbol,
-                    decimals: DEFAULT_DECIMALS,
-                    initial_balances: vec![],
-                    mint: Option::from(InstantiateMinterData {
-                        admin: pool_info.admin.to_string(),
-                        minter: env.contract.address.to_string(),
-                        cap: None,
-                    }),
-                    marketing: None,
-                }),
-            )?,
-            funds: vec![],
-            label: lsd_token_name.clone(),
-            salt: salt.as_bytes().into(),
-        };
-
-        POOLS.save(deps.storage, pool_ica_info.ica_addr.clone(), &pool_info)?;
-
-        let register_balance_pool_submsg = register_query_submsg(
-            deps.branch(),
-            new_register_balance_query_msg(
-                pool_ica_info.ctrl_connection_id.clone(),
-                pool_ica_info.ica_addr.clone(),
-                pool_info.remote_denom.clone(),
-                DEFAULT_UPDATE_PERIOD,
-            )?,
-            pool_ica_info.ica_addr.clone(),
-            QueryKind::Balances,
-        )?;
-        let register_balance_withdraw_submsg = register_query_submsg(
-            deps.branch(),
-            new_register_balance_query_msg(
-                withdraw_ica_info.ctrl_connection_id.clone(),
-                withdraw_ica_info.ica_addr.clone(),
-                pool_info.remote_denom.clone(),
-                DEFAULT_UPDATE_PERIOD,
-            )?,
-            withdraw_ica_info.ica_addr.clone(),
-            QueryKind::Balances,
-        )?;
-        let register_delegation_submsg = register_query_submsg(
-            deps.branch(),
-            new_register_delegator_delegations_query_msg(
-                pool_ica_info.ctrl_connection_id.clone(),
-                pool_ica_info.ica_addr.clone(),
-                pool_info.validator_addrs.clone(),
-                DEFAULT_UPDATE_PERIOD,
-            )?,
-            pool_ica_info.ica_addr.clone(),
-            QueryKind::Delegations,
-        )?;
-
-        let register_validator_submsg = register_query_submsg(
-            deps.branch(),
-            new_register_staking_validators_query_msg(
-                pool_ica_info.ctrl_connection_id.clone(),
-                pool_info.validator_addrs.clone(),
-                6,
-            )?,
-            pool_ica_info.ica_addr.clone(),
-            QueryKind::Validators,
-        )?;
-
-        resp = resp.add_message(instantiate_lsd_msg);
-        sub_msgs.push(register_balance_pool_submsg);
-        sub_msgs.push(register_balance_withdraw_submsg);
-        sub_msgs.push(register_delegation_submsg);
-        sub_msgs.push(register_validator_submsg);
+    let denom_trace = query_denom_trace_from_ibc_denom(deps.as_ref(), pool_info.ibc_denom.clone())?;
+    if denom_trace.denom_trace.base_denom != pool_info.remote_denom {
+        return Err(ContractError::DenomTraceNotMatch {}.into());
     }
 
+    let salt = &pool_ica_info.ica_addr.clone()[..40];
+    let code_info = deps.querier.query_wasm_code_info(lsd_code_id)?;
+    let creator_cannonical = deps.api.addr_canonicalize(env.contract.address.as_str())?;
+    let i2_address =
+        instantiate2_address(&code_info.checksum, &creator_cannonical, salt.as_bytes())
+            .map_err(|e| ContractError::Instantiate2AddressFailed(e.to_string()))?;
+    let contract_addr = deps
+        .api
+        .addr_humanize(&i2_address)
+        .map_err(NeutronError::Std)?;
+
+    pool_info.lsd_token = contract_addr;
+    pool_info.era_process_status = EraProcessStatus::InitStarted;
+
+    let instantiate_lsd_msg = WasmMsg::Instantiate2 {
+        admin: Option::from(info.sender.to_string()),
+        code_id: lsd_code_id,
+        msg: to_json_binary(
+            &(lsd_token::msg::InstantiateMsg {
+                name: lsd_token_name.clone(),
+                symbol: lsd_token_symbol,
+                decimals: DEFAULT_DECIMALS,
+                initial_balances: vec![],
+                mint: Option::from(InstantiateMinterData {
+                    admin: pool_info.admin.to_string(),
+                    minter: env.contract.address.to_string(),
+                    cap: None,
+                }),
+                marketing: None,
+            }),
+        )?,
+        funds: vec![],
+        label: lsd_token_name.clone(),
+        salt: salt.as_bytes().into(),
+    };
+
+    POOLS.save(deps.storage, pool_ica_info.ica_addr.clone(), &pool_info)?;
+
+    let register_balance_pool_submsg = register_query_submsg(
+        deps.branch(),
+        new_register_balance_query_msg(
+            pool_ica_info.ctrl_connection_id.clone(),
+            pool_ica_info.ica_addr.clone(),
+            pool_info.remote_denom.clone(),
+            DEFAULT_UPDATE_PERIOD,
+        )?,
+        pool_ica_info.ica_addr.clone(),
+        QueryKind::Balances,
+    )?;
+    let register_balance_withdraw_submsg = register_query_submsg(
+        deps.branch(),
+        new_register_balance_query_msg(
+            withdraw_ica_info.ctrl_connection_id.clone(),
+            withdraw_ica_info.ica_addr.clone(),
+            pool_info.remote_denom.clone(),
+            DEFAULT_UPDATE_PERIOD,
+        )?,
+        withdraw_ica_info.ica_addr.clone(),
+        QueryKind::Balances,
+    )?;
+    let register_delegation_submsg = register_query_submsg(
+        deps.branch(),
+        new_register_delegator_delegations_query_msg(
+            pool_ica_info.ctrl_connection_id.clone(),
+            pool_ica_info.ica_addr.clone(),
+            pool_info.validator_addrs.clone(),
+            DEFAULT_UPDATE_PERIOD,
+        )?,
+        pool_ica_info.ica_addr.clone(),
+        QueryKind::Delegations,
+    )?;
+
+    let register_validator_submsg = register_query_submsg(
+        deps.branch(),
+        new_register_staking_validators_query_msg(
+            pool_ica_info.ctrl_connection_id.clone(),
+            pool_info.validator_addrs.clone(),
+            6,
+        )?,
+        pool_ica_info.ica_addr.clone(),
+        QueryKind::Validators,
+    )?;
+
+    let mut sub_msgs = vec![];
+    sub_msgs.push(register_balance_pool_submsg);
+    sub_msgs.push(register_balance_withdraw_submsg);
+    sub_msgs.push(register_delegation_submsg);
+    sub_msgs.push(register_validator_submsg);
+    sub_msgs.push(set_withdraw_sub_msg(
+        deps,
+        pool_info,
+        pool_ica_info,
+        withdraw_ica_info,
+    )?);
+
+    Ok(Response::default()
+        .add_message(instantiate_lsd_msg)
+        .add_submessages(sub_msgs))
+}
+
+pub fn set_withdraw_sub_msg(
+    mut deps: DepsMut<NeutronQuery>,
+    pool_info: PoolInfo,
+    pool_ica_info: IcaInfo,
+    withdraw_ica_info: IcaInfo,
+) -> NeutronResult<SubMsg<NeutronMsg>> {
     let set_withdraw_msg = MsgSetWithdrawAddress {
         delegator_address: pool_ica_info.ica_addr.clone(),
         withdraw_address: withdraw_ica_info.ica_addr.clone(),
@@ -412,11 +423,7 @@ pub fn deal_pool(
             tx_type: TxType::SetWithdrawAddr,
         },
     )?;
-
-    sub_msgs.push(submsg_set_withdraw);
-    resp = resp.add_submessages(sub_msgs);
-
-    Ok(resp)
+    Ok(submsg_set_withdraw)
 }
 
 pub fn sudo_set_withdraw_addr_callback(
@@ -426,7 +433,19 @@ pub fn sudo_set_withdraw_addr_callback(
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
 
     pool_info.era_process_status = EraProcessStatus::ActiveEnded;
-    pool_info.paused = false;
+
+    POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
+
+    Ok(Response::new())
+}
+
+pub fn sudo_set_withdraw_addr_failed_callback(
+    deps: DepsMut,
+    payload: SudoPayload,
+) -> NeutronResult<Response<NeutronMsg>> {
+    let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
+
+    pool_info.era_process_status = EraProcessStatus::InitFailed;
 
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
 

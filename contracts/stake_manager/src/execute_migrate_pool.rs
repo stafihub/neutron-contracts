@@ -1,4 +1,5 @@
 use crate::helper::deal_pool;
+use crate::helper::set_withdraw_sub_msg;
 use crate::helper::CAL_BASE;
 use crate::msg::MigratePoolParams;
 use crate::state::ValidatorUpdateStatus;
@@ -32,27 +33,19 @@ pub fn execute_migrate_pool(
         return Err(ContractError::Unauthorized {}.into());
     }
 
-    if pool_info.era_process_status == EraProcessStatus::InitWithdrawAddrNotSet {
-        return deal_pool(
+    if pool_info.era_process_status == EraProcessStatus::InitFailed {
+        return Ok(Response::new().add_submessage(set_withdraw_sub_msg(
             deps,
-            env,
-            info,
             pool_info,
             pool_ica_info,
             withdraw_ica_info,
-            0,
-            param.lsd_token_name,
-            param.lsd_token_symbol,
-        );
+        )?));
     }
 
-    if pool_info.era_process_status != EraProcessStatus::InitNotCompleted {
+    if pool_info.era_process_status != EraProcessStatus::RegisterEnded {
         return Err(ContractError::StatusNotAllow {}.into());
     }
 
-    if !pool_info.rate.is_zero() {
-        return Err(ContractError::PoolInited {}.into());
-    }
     if param.rate.is_zero() {
         return Err(ContractError::RateIsZero {}.into());
     }

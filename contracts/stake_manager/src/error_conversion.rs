@@ -47,9 +47,6 @@ pub enum ContractError {
     #[error("Rate is zero")]
     RateIsZero {},
 
-    #[error("Pool inited")]
-    PoolInited {},
-
     #[error("Instantiate2 address failed, err: {0}")]
     Instantiate2AddressFailed(String),
 

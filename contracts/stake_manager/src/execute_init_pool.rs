@@ -1,4 +1,6 @@
-use crate::helper::{deal_pool, CAL_BASE, DEFAULT_ERA_SECONDS, MIN_ERA_SECONDS};
+use crate::helper::{
+    deal_pool, set_withdraw_sub_msg, CAL_BASE, DEFAULT_ERA_SECONDS, MIN_ERA_SECONDS,
+};
 use crate::msg::InitPoolParams;
 use crate::state::ValidatorUpdateStatus;
 use crate::state::POOLS;
@@ -31,27 +33,17 @@ pub fn execute_init_pool(
     if info.sender != pool_info.admin {
         return Err(ContractError::Unauthorized {}.into());
     }
-
-    if pool_info.era_process_status == EraProcessStatus::InitWithdrawAddrNotSet {
-        return deal_pool(
+    if pool_info.era_process_status == EraProcessStatus::InitFailed {
+        return Ok(Response::new().add_submessage(set_withdraw_sub_msg(
             deps,
-            env,
-            info,
             pool_info,
             pool_ica_info,
             withdraw_ica_info,
-            0,
-            param.lsd_token_name,
-            param.lsd_token_symbol,
-        );
+        )?));
     }
 
-    if pool_info.era_process_status != EraProcessStatus::InitNotCompleted {
+    if pool_info.era_process_status != EraProcessStatus::RegisterEnded {
         return Err(ContractError::StatusNotAllow {}.into());
-    }
-
-    if !pool_info.rate.is_zero() {
-        return Err(ContractError::PoolInited {}.into());
     }
 
     pool_info.ibc_denom = param.ibc_denom;
@@ -94,6 +86,7 @@ pub fn execute_init_pool(
     pool_info.next_unstake_index = 0;
     pool_info.unstake_times_limit = 20;
     pool_info.unbond_commission = Uint128::zero();
+    pool_info.paused = false;
     pool_info.lsm_support = false;
     pool_info.lsm_pending_limit = 100;
     pool_info.rate_change_limit = Uint128::zero();
