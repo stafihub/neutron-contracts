@@ -187,7 +187,7 @@ pub enum ExecuteMsg {
     EraCollectWithdraw {
         pool_addr: String,
     },
-    EraRestake {
+    EraRebond {
         pool_addr: String,
     },
     EraActive {

@@ -1,7 +1,7 @@
 use crate::execute_era_active::execute_era_active;
 use crate::execute_era_bond::execute_era_bond;
 use crate::execute_era_collect_withdraw::execute_era_collect_withdraw;
-use crate::execute_era_restake::execute_era_restake;
+use crate::execute_era_rebond::execute_era_rebond;
 use crate::execute_era_update::execute_era_update;
 use crate::execute_icq_update_period::update_icq_update_period;
 use crate::execute_init_pool::execute_init_pool;
@@ -194,7 +194,7 @@ pub fn execute(
         ExecuteMsg::EraCollectWithdraw { pool_addr } => {
             execute_era_collect_withdraw(deps, env, pool_addr)
         }
-        ExecuteMsg::EraRestake { pool_addr } => execute_era_restake(deps, env, pool_addr),
+        ExecuteMsg::EraRebond { pool_addr } => execute_era_rebond(deps, env, pool_addr),
         ExecuteMsg::EraActive { pool_addr } => execute_era_active(deps, pool_addr),
         ExecuteMsg::StakeLsm {
             neutron_address,

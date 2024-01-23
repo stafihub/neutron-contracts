@@ -55,5 +55,3 @@ user_unstake
 process_era
 
 user_withdraw
-
-process_era

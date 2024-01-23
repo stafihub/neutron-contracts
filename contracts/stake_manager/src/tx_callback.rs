@@ -1,4 +1,4 @@
-use crate::execute_era_restake::sudo_era_restake_failed_callback;
+use crate::execute_era_rebond::sudo_era_rebond_failed_callback;
 use crate::execute_pool_rm_validator::{
     sudo_rm_validator_callback, sudo_rm_validator_failed_callback,
 };
@@ -14,7 +14,7 @@ use crate::state::{
     read_reply_payload, read_sudo_payload, save_reply_payload, save_sudo_payload, SudoPayload,
     TxType,
 };
-use crate::{error_conversion::ContractError, execute_era_restake::sudo_era_restake_callback};
+use crate::{error_conversion::ContractError, execute_era_rebond::sudo_era_rebond_callback};
 use crate::{
     execute_era_bond::sudo_era_bond_callback,
     execute_era_bond::sudo_era_bond_failed_callback,
@@ -157,7 +157,7 @@ fn sudo_callback(
         TxType::EraUpdate => sudo_era_update_callback(deps, env, payload),
         TxType::EraBond => sudo_era_bond_callback(deps, env, payload),
         TxType::EraCollectWithdraw => sudo_era_collect_withdraw_callback(deps, env, payload),
-        TxType::EraRestake => sudo_era_restake_callback(deps, env, payload),
+        TxType::EraRebond => sudo_era_rebond_callback(deps, env, payload),
         TxType::UserWithdraw => sudo_withdraw_callback(deps, payload),
         TxType::UpdateValidator => sudo_update_validator_callback(deps, payload),
         TxType::RmValidator => sudo_rm_validator_callback(deps, payload),
@@ -176,7 +176,7 @@ fn sudo_failed_callback(
         TxType::EraUpdate => sudo_era_update_failed_callback(deps, payload),
         TxType::EraBond => sudo_era_bond_failed_callback(deps, payload),
         TxType::EraCollectWithdraw => sudo_era_collect_withdraw_failed_callback(deps, payload),
-        TxType::EraRestake => sudo_era_restake_failed_callback(deps, payload),
+        TxType::EraRebond => sudo_era_rebond_failed_callback(deps, payload),
         TxType::UserWithdraw => sudo_withdraw_failed_callback(deps, payload),
         TxType::UpdateValidator => sudo_update_validator_failed_callback(deps, payload),
         TxType::RmValidator => sudo_rm_validator_failed_callback(deps, payload),

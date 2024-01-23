@@ -8,7 +8,7 @@ use neutron_sdk::{
     NeutronResult,
 };
 
-use crate::state::EraProcessStatus::{RestakeEnded, RestakeStarted, WithdrawEnded};
+use crate::state::EraProcessStatus::{RebondEnded, RebondStarted, WithdrawEnded};
 use crate::state::{INFO_OF_ICA_ID, POOLS};
 use crate::{
     error_conversion::ContractError,
@@ -20,7 +20,7 @@ use crate::{
     tx_callback::msg_with_sudo_callback,
 };
 
-pub fn execute_era_restake(
+pub fn execute_era_rebond(
     mut deps: DepsMut<NeutronQuery>,
     _: Env,
     pool_addr: String,
@@ -31,7 +31,7 @@ pub fn execute_era_restake(
     if pool_info.era_process_status != WithdrawEnded {
         return Err(ContractError::StatusNotAllow {}.into());
     }
-    pool_info.era_process_status = RestakeStarted;
+    pool_info.era_process_status = RebondStarted;
 
     let (pool_ica_info, _, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
 
@@ -39,7 +39,7 @@ pub fn execute_era_restake(
 
     // leave gas
     if restake_amount.is_zero() {
-        pool_info.era_process_status = RestakeEnded;
+        pool_info.era_process_status = RebondEnded;
         POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
         return Ok(Response::default());
     }
@@ -89,27 +89,27 @@ pub fn execute_era_restake(
             // the acknowledgement later
             message: "".to_string(),
             pool_addr: pool_addr.clone(),
-            tx_type: TxType::EraRestake,
+            tx_type: TxType::EraRebond,
         },
     )?;
 
     Ok(Response::default().add_submessage(submsg))
 }
 
-pub fn sudo_era_restake_callback(
+pub fn sudo_era_rebond_callback(
     deps: DepsMut,
     env: Env,
     payload: SudoPayload,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
-    pool_info.era_process_status = RestakeEnded;
+    pool_info.era_process_status = RebondEnded;
     pool_info.era_snapshot.bond_height = env.block.height;
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
 
     Ok(Response::new())
 }
 
-pub fn sudo_era_restake_failed_callback(
+pub fn sudo_era_rebond_failed_callback(
     deps: DepsMut,
     payload: SudoPayload,
 ) -> NeutronResult<Response<NeutronMsg>> {

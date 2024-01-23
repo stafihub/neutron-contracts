@@ -32,8 +32,8 @@ pub enum ContractError {
     #[error("Withdraw Addr balances submission height")]
     WithdrawAddrBalanceSubmissionHeight {},
 
-    #[error("Restake height")]
-    RestakeHeight {},
+    #[error("Rebond height")]
+    RebondHeight {},
 
     #[error("Pool is paused")]
     PoolIsPaused {},

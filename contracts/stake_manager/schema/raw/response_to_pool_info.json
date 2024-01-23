@@ -187,8 +187,8 @@
         "bond_ended",
         "withdraw_started",
         "withdraw_ended",
-        "restake_started",
-        "restake_ended",
+        "rebond_started",
+        "rebond_ended",
         "active_ended"
       ]
     },

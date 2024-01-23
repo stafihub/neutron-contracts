@@ -74,8 +74,8 @@ pub enum EraProcessStatus {
     BondEnded,
     WithdrawStarted,
     WithdrawEnded,
-    RestakeStarted,
-    RestakeEnded,
+    RebondStarted,
+    RebondEnded,
     ActiveEnded,
 }
 
@@ -184,7 +184,7 @@ pub enum TxType {
     EraUpdate,
     EraBond,
     EraCollectWithdraw,
-    EraRestake,
+    EraRebond,
     RedeemTokenForShare,
     StakeLsm,
 }

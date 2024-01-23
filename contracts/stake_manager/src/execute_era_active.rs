@@ -11,7 +11,7 @@ use neutron_sdk::{
 use crate::helper::get_update_pool_icq_msgs;
 use crate::helper::DEFAULT_UPDATE_PERIOD;
 use crate::state::{
-    EraProcessStatus::{ActiveEnded, RestakeEnded},
+    EraProcessStatus::{ActiveEnded, RebondEnded},
     STACK,
 };
 use crate::{error_conversion::ContractError, state::POOLS};
@@ -23,7 +23,7 @@ pub fn execute_era_active(
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
     // check era state
-    if pool_info.era_process_status != RestakeEnded {
+    if pool_info.era_process_status != RebondEnded {
         return Err(ContractError::StatusNotAllow {}.into());
     }
 

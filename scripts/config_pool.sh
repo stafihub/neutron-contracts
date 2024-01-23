@@ -127,7 +127,7 @@ config_pool() {
     "platform_fee_commission": "100000",
     "lsm_support": true,
     "paused": false,
-    "rate_change_limit": "500000",
+    "rate_change_limit": "0",
     "lsm_pending_limit": 60,
     "offset": 26
   }
