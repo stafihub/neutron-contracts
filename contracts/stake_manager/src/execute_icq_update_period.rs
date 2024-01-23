@@ -1,7 +1,7 @@
 use crate::error_conversion::ContractError;
 use crate::helper::get_update_pool_icq_msgs;
 use crate::helper::DEFAULT_FAST_PERIOD;
-use crate::state::EraProcessStatus::ActiveEnded;
+use crate::state::EraStatus::ActiveEnded;
 use crate::state::{ValidatorUpdateStatus, POOLS};
 use cosmwasm_std::{DepsMut, MessageInfo, Response};
 use neutron_sdk::bindings::query::NeutronQuery;
@@ -23,7 +23,7 @@ pub fn update_icq_update_period(
     }
 
     // check era state
-    if pool_info.era_process_status != ActiveEnded
+    if pool_info.status != ActiveEnded
         || pool_info.validator_update_status != ValidatorUpdateStatus::End
     {
         return Err(ContractError::StatusNotAllow {}.into());

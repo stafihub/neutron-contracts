@@ -3,7 +3,7 @@ use crate::{
     helper::DEFAULT_TIMEOUT_SECONDS,
     helper::{min_ntrn_ibc_fee, query_denom_trace_from_ibc_denom, CAL_BASE},
     query::query_validator_by_addr,
-    state::{EraProcessStatus, SudoPayload, TxType, ValidatorUpdateStatus, INFO_OF_ICA_ID, POOLS},
+    state::{EraStatus, SudoPayload, TxType, ValidatorUpdateStatus, INFO_OF_ICA_ID, POOLS},
     tx_callback::msg_with_sudo_callback,
 };
 use cosmwasm_std::{
@@ -34,7 +34,7 @@ pub fn execute_stake_lsm(
     if pool_info.share_tokens.len() >= pool_info.lsm_pending_limit as usize {
         return Err(ContractError::LsmPendingStakeOverLimit {}.into());
     }
-    if pool_info.era_process_status != EraProcessStatus::ActiveEnded {
+    if pool_info.status != EraStatus::ActiveEnded {
         return Err(ContractError::EraProcessNotEnd {}.into());
     }
     if pool_info.validator_update_status != ValidatorUpdateStatus::End {

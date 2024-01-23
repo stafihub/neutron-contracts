@@ -1,7 +1,7 @@
 use crate::helper::min_ntrn_ibc_fee;
 use crate::state::INFO_OF_ICA_ID;
 use crate::state::{ValidatorUpdateStatus, POOLS};
-use crate::{error_conversion::ContractError, state::EraProcessStatus};
+use crate::{error_conversion::ContractError, state::EraStatus};
 use crate::{
     helper::gen_redelegate_txs,
     state::{SudoPayload, TxType},
@@ -30,7 +30,7 @@ pub fn execute_pool_update_validator(
     if info.sender != pool_info.admin {
         return Err(ContractError::Unauthorized {}.into());
     }
-    if pool_info.era_process_status != EraProcessStatus::ActiveEnded {
+    if pool_info.status != EraStatus::ActiveEnded {
         return Err(ContractError::EraProcessNotEnd {}.into());
     }
 

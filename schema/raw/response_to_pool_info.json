@@ -8,7 +8,7 @@
     "bond",
     "channel_id_of_ibc_denom",
     "era",
-    "era_process_status",
+    "status",
     "era_seconds",
     "era_snapshot",
     "ibc_denom",
@@ -54,8 +54,8 @@
       "format": "uint64",
       "minimum": 0.0
     },
-    "era_process_status": {
-      "$ref": "#/definitions/EraProcessStatus"
+    "status": {
+      "$ref": "#/definitions/EraStatus"
     },
     "era_seconds": {
       "type": "integer",
@@ -178,7 +178,7 @@
         }
       }
     },
-    "EraProcessStatus": {
+    "EraStatus": {
       "type": "string",
       "enum": [
         "era_update_started",

@@ -5,7 +5,7 @@ use crate::msg::MigratePoolParams;
 use crate::state::ValidatorUpdateStatus;
 use crate::state::POOLS;
 use crate::state::{INFO_OF_ICA_ID, STACK};
-use crate::{error_conversion::ContractError, state::EraProcessStatus};
+use crate::{error_conversion::ContractError, state::EraStatus};
 use cosmwasm_std::{Addr, Uint128};
 use cosmwasm_std::{DepsMut, Env, MessageInfo, Response};
 use neutron_sdk::{
@@ -33,7 +33,7 @@ pub fn execute_migrate_pool(
         return Err(ContractError::Unauthorized {}.into());
     }
 
-    if pool_info.era_process_status == EraProcessStatus::InitFailed {
+    if pool_info.status == EraStatus::InitFailed {
         return Ok(Response::new().add_submessage(set_withdraw_sub_msg(
             deps,
             pool_info,
@@ -42,7 +42,7 @@ pub fn execute_migrate_pool(
         )?));
     }
 
-    if pool_info.era_process_status != EraProcessStatus::RegisterEnded {
+    if pool_info.status != EraStatus::RegisterEnded {
         return Err(ContractError::StatusNotAllow {}.into());
     }
 

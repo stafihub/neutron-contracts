@@ -13,7 +13,7 @@ use crate::state::{INFO_OF_ICA_ID, POOLS};
 use crate::{
     error_conversion::ContractError,
     state::{
-        EraProcessStatus::{ActiveEnded, EraUpdateEnded, EraUpdateStarted},
+        EraStatus::{ActiveEnded, EraUpdateEnded, EraUpdateStarted},
         ValidatorUpdateStatus,
     },
 };
@@ -33,7 +33,7 @@ pub fn execute_era_update(
         return Err(ContractError::PoolIsPaused {}.into());
     }
     // check era state
-    if pool_info.era_process_status != ActiveEnded
+    if pool_info.status != ActiveEnded
         || pool_info.validator_update_status != ValidatorUpdateStatus::End
     {
         return Err(ContractError::StatusNotAllow {}.into());
@@ -49,14 +49,14 @@ pub fn execute_era_update(
         return Err(ContractError::AlreadyLatestEra {}.into());
     }
 
-    pool_info.era_process_status = EraUpdateStarted;
+    pool_info.status = EraUpdateStarted;
     pool_info.era = pool_info.era.add(1);
     pool_info.era_snapshot = EraSnapshot {
         era: pool_info.era,
         bond: pool_info.bond,
         unbond: pool_info.unbond,
         active: pool_info.active,
-        bond_height: env.block.height,
+        last_step_height: env.block.height,
         restake_amount: Uint128::zero(),
     };
     let rsp = Response::default().add_messages(get_update_pool_icq_msgs(
@@ -67,7 +67,7 @@ pub fn execute_era_update(
     )?);
 
     if pool_info.bond.is_zero() {
-        pool_info.era_process_status = EraUpdateEnded;
+        pool_info.status = EraUpdateEnded;
         POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
         return Ok(rsp);
     }
@@ -86,7 +86,7 @@ pub fn execute_era_update(
     }
 
     if amount == 0 {
-        pool_info.era_process_status = EraUpdateEnded;
+        pool_info.status = EraUpdateEnded;
         POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
         return Ok(rsp);
     }
@@ -133,8 +133,8 @@ pub fn sudo_era_update_callback(
     payload: SudoPayload,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
-    pool_info.era_process_status = EraUpdateEnded;
-    pool_info.era_snapshot.bond_height = env.block.height;
+    pool_info.status = EraUpdateEnded;
+    pool_info.era_snapshot.last_step_height = env.block.height;
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
 
     Ok(Response::new())
@@ -146,14 +146,14 @@ pub fn sudo_era_update_failed_callback(
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
     pool_info.era = pool_info.era.sub(1);
-    pool_info.era_process_status = ActiveEnded;
+    pool_info.status = ActiveEnded;
     pool_info.era_snapshot = EraSnapshot {
         era: 0,
         bond: Uint128::zero(),
         unbond: Uint128::zero(),
         active: Uint128::zero(),
         restake_amount: Uint128::zero(),
-        bond_height: 0,
+        last_step_height: 0,
     };
 
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;

@@ -7,7 +7,7 @@ use neutron_sdk::{
 
 use crate::error_conversion::ContractError;
 use crate::helper::deal_validators_icq_update;
-use crate::state::{EraProcessStatus, INFO_OF_ICA_ID, POOLS};
+use crate::state::{EraStatus, INFO_OF_ICA_ID, POOLS};
 
 pub fn execute_add_pool_validators(
     deps: DepsMut<NeutronQuery>,
@@ -21,7 +21,7 @@ pub fn execute_add_pool_validators(
     if info.sender != pool_info.admin {
         return Err(ContractError::Unauthorized {}.into());
     }
-    if pool_info.era_process_status != EraProcessStatus::ActiveEnded {
+    if pool_info.status != EraStatus::ActiveEnded {
         return Err(ContractError::EraProcessNotEnd {}.into());
     }
 

@@ -8,7 +8,7 @@ use neutron_sdk::{
     NeutronResult,
 };
 
-use crate::state::EraProcessStatus::{RebondEnded, RebondStarted, WithdrawEnded};
+use crate::state::EraStatus::{RebondEnded, RebondStarted, WithdrawEnded};
 use crate::state::{INFO_OF_ICA_ID, POOLS};
 use crate::{
     error_conversion::ContractError,
@@ -28,10 +28,10 @@ pub fn execute_era_rebond(
     let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
 
     // check era state
-    if pool_info.era_process_status != WithdrawEnded {
+    if pool_info.status != WithdrawEnded {
         return Err(ContractError::StatusNotAllow {}.into());
     }
-    pool_info.era_process_status = RebondStarted;
+    pool_info.status = RebondStarted;
 
     let (pool_ica_info, _, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
 
@@ -39,7 +39,7 @@ pub fn execute_era_rebond(
 
     // leave gas
     if restake_amount.is_zero() {
-        pool_info.era_process_status = RebondEnded;
+        pool_info.status = RebondEnded;
         POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
         return Ok(Response::default());
     }
@@ -102,8 +102,8 @@ pub fn sudo_era_rebond_callback(
     payload: SudoPayload,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
-    pool_info.era_process_status = RebondEnded;
-    pool_info.era_snapshot.bond_height = env.block.height;
+    pool_info.status = RebondEnded;
+    pool_info.era_snapshot.last_step_height = env.block.height;
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
 
     Ok(Response::new())
@@ -114,7 +114,7 @@ pub fn sudo_era_rebond_failed_callback(
     payload: SudoPayload,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
-    pool_info.era_process_status = WithdrawEnded;
+    pool_info.status = WithdrawEnded;
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
 
     Ok(Response::new())

@@ -23,7 +23,7 @@ use crate::query_callback::register_query_submsg;
 use crate::state::{IcaInfo, PoolInfo, QueryKind, SudoPayload, TxType, POOLS};
 use crate::state::{ADDRESS_TO_REPLY_ID, INFO_OF_ICA_ID, REPLY_ID_TO_QUERY_ID};
 use crate::tx_callback::msg_with_sudo_callback;
-use crate::{error_conversion::ContractError, state::EraProcessStatus};
+use crate::{error_conversion::ContractError, state::EraStatus};
 
 const FEE_DENOM: &str = "untrn";
 pub const ICA_WITHDRAW_SUFIX: &str = "-withdraw_addr";
@@ -293,7 +293,7 @@ pub fn deal_pool(
         .map_err(NeutronError::Std)?;
 
     pool_info.lsd_token = contract_addr;
-    pool_info.era_process_status = EraProcessStatus::InitStarted;
+    pool_info.status = EraStatus::InitStarted;
 
     let instantiate_lsd_msg = WasmMsg::Instantiate2 {
         admin: Option::from(info.sender.to_string()),
@@ -432,7 +432,7 @@ pub fn sudo_set_withdraw_addr_callback(
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
 
-    pool_info.era_process_status = EraProcessStatus::ActiveEnded;
+    pool_info.status = EraStatus::ActiveEnded;
 
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
 
@@ -445,7 +445,7 @@ pub fn sudo_set_withdraw_addr_failed_callback(
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
 
-    pool_info.era_process_status = EraProcessStatus::InitFailed;
+    pool_info.status = EraStatus::InitFailed;
 
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
 

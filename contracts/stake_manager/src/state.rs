@@ -25,7 +25,7 @@ pub struct EraSnapshot {
     pub unbond: Uint128,
     pub active: Uint128,
     pub restake_amount: Uint128,
-    pub bond_height: u64,
+    pub last_step_height: u64,
 }
 
 #[cw_serde]
@@ -47,7 +47,7 @@ pub struct PoolInfo {
     pub unstake_times_limit: u64,
     pub next_unstake_index: u64,
     pub unbonding_period: u64,
-    pub era_process_status: EraProcessStatus,
+    pub status: EraStatus,
     pub validator_update_status: ValidatorUpdateStatus,
     pub unbond_commission: Uint128,
     pub platform_fee_commission: Uint128,
@@ -67,7 +67,7 @@ pub struct PoolInfo {
 pub const POOLS: Map<String, PoolInfo> = Map::new("pools");
 
 #[cw_serde]
-pub enum EraProcessStatus {
+pub enum EraStatus {
     RegisterEnded,
     InitStarted,
     InitFailed,

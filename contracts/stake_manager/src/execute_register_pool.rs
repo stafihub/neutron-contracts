@@ -14,7 +14,7 @@ use crate::{
 };
 use crate::{
     helper::{get_withdraw_ica_id, ICA_WITHDRAW_SUFIX, INTERCHAIN_ACCOUNT_ID_LEN_LIMIT},
-    state::{EraProcessStatus, IcaInfo, PoolInfo, INFO_OF_ICA_ID, POOLS},
+    state::{EraStatus, IcaInfo, PoolInfo, INFO_OF_ICA_ID, POOLS},
 };
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -163,7 +163,7 @@ pub fn sudo_open_ack(
                 unstake_times_limit: 0,
                 next_unstake_index: 0,
                 unbonding_period: 0,
-                era_process_status: EraProcessStatus::RegisterEnded,
+                status: EraStatus::RegisterEnded,
                 validator_update_status: ValidatorUpdateStatus::End,
                 platform_fee_commission: Uint128::zero(),
                 total_platform_fee: Uint128::zero(),
@@ -181,7 +181,7 @@ pub fn sudo_open_ack(
                     unbond: Uint128::zero(),
                     active: Uint128::zero(),
                     restake_amount: Uint128::zero(),
-                    bond_height: 0,
+                    last_step_height: 0,
                 },
                 paused: false,
                 lsm_support: false,

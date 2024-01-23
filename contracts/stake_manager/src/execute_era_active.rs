@@ -11,7 +11,7 @@ use neutron_sdk::{
 use crate::helper::get_update_pool_icq_msgs;
 use crate::helper::DEFAULT_UPDATE_PERIOD;
 use crate::state::{
-    EraProcessStatus::{ActiveEnded, RebondEnded},
+    EraStatus::{ActiveEnded, RebondEnded},
     STACK,
 };
 use crate::{error_conversion::ContractError, state::POOLS};
@@ -23,7 +23,7 @@ pub fn execute_era_active(
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
     // check era state
-    if pool_info.era_process_status != RebondEnded {
+    if pool_info.status != RebondEnded {
         return Err(ContractError::StatusNotAllow {}.into());
     }
 
@@ -40,7 +40,7 @@ pub fn execute_era_active(
 
     match delegations_result {
         Ok(delegations_resp) => {
-            if delegations_resp.last_submitted_local_height <= pool_info.era_snapshot.bond_height {
+            if delegations_resp.last_submitted_local_height <= pool_info.era_snapshot.last_step_height {
                 return Err(ContractError::DelegationSubmissionHeight {}.into());
             }
             for delegation in delegations_resp.delegations {
@@ -107,7 +107,7 @@ pub fn execute_era_active(
     }
 
     pool_info.rate = new_rate;
-    pool_info.era_process_status = ActiveEnded;
+    pool_info.status = ActiveEnded;
     pool_info.bond = Uint128::zero();
     pool_info.unbond = Uint128::zero();
     pool_info.active = new_active;

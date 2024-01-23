@@ -18,7 +18,7 @@ use neutron_sdk::{
     NeutronResult,
 };
 
-use crate::state::EraProcessStatus::{BondEnded, BondStarted, EraUpdateEnded};
+use crate::state::EraStatus::{BondEnded, BondStarted, EraUpdateEnded};
 use crate::state::{SudoPayload, TxType, INFO_OF_ICA_ID, POOLS, VALIDATORS_UNBONDS_TIME};
 use crate::tx_callback::msg_with_sudo_callback;
 use crate::{
@@ -41,7 +41,7 @@ pub fn execute_era_bond(
     let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
 
     // check era state
-    if pool_info.era_process_status != EraUpdateEnded {
+    if pool_info.status != EraUpdateEnded {
         return Err(ContractError::StatusNotAllow {}.into());
     }
 
@@ -55,7 +55,7 @@ pub fn execute_era_bond(
             .sub(pool_info.era_snapshot.bond);
 
         let delegations = query_delegation_by_addr(deps.as_ref(), pool_addr.clone())?;
-        if delegations.last_submitted_local_height <= pool_info.era_snapshot.bond_height {
+        if delegations.last_submitted_local_height <= pool_info.era_snapshot.last_step_height {
             return Err(ContractError::DelegationSubmissionHeight {}.into());
         }
         let delegating_vals: Vec<String> = delegations
@@ -196,7 +196,7 @@ pub fn execute_era_bond(
         },
     )?;
 
-    pool_info.era_process_status = BondStarted;
+    pool_info.status = BondStarted;
     POOLS.save(deps.storage, pool_addr, &pool_info)?;
 
     Ok(Response::default().add_submessage(submsg))
@@ -284,8 +284,8 @@ pub fn sudo_era_bond_callback(
         }
     }
 
-    pool_info.era_process_status = BondEnded;
-    pool_info.era_snapshot.bond_height = env.block.height;
+    pool_info.status = BondEnded;
+    pool_info.era_snapshot.last_step_height = env.block.height;
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
 
     Ok(Response::new())
@@ -296,7 +296,7 @@ pub fn sudo_era_bond_failed_callback(
     payload: SudoPayload,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
-    pool_info.era_process_status = EraUpdateEnded;
+    pool_info.status = EraUpdateEnded;
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
 
     Ok(Response::new())

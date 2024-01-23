@@ -11,7 +11,7 @@ use neutron_sdk::{
 
 use crate::helper::{get_withdraw_ica_id, min_ntrn_ibc_fee};
 use crate::query::query_balance_by_addr;
-use crate::state::EraProcessStatus::{BondEnded, WithdrawEnded, WithdrawStarted};
+use crate::state::EraStatus::{BondEnded, WithdrawEnded, WithdrawStarted};
 use crate::state::{SudoPayload, TxType, INFO_OF_ICA_ID, POOLS};
 use crate::tx_callback::msg_with_sudo_callback;
 use crate::{error_conversion::ContractError, helper::DEFAULT_TIMEOUT_SECONDS};
@@ -24,10 +24,10 @@ pub fn execute_era_collect_withdraw(
     let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
 
     // check era state
-    if pool_info.era_process_status != BondEnded {
+    if pool_info.status != BondEnded {
         return Err(ContractError::StatusNotAllow {}.into());
     }
-    pool_info.era_process_status = WithdrawStarted;
+    pool_info.status = WithdrawStarted;
 
     let (_, withdraw_ica_info, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
 
@@ -39,7 +39,7 @@ pub fn execute_era_collect_withdraw(
 
     let mut withdraw_amount = Uint128::zero();
     if let Ok(balance_response) = withdraw_balances_result {
-        if balance_response.last_submitted_local_height <= pool_info.era_snapshot.bond_height {
+        if balance_response.last_submitted_local_height <= pool_info.era_snapshot.last_step_height {
             return Err(ContractError::WithdrawAddrBalanceSubmissionHeight {}.into());
         }
 
@@ -56,7 +56,7 @@ pub fn execute_era_collect_withdraw(
 
     // leave gas
     if withdraw_amount.is_zero() {
-        pool_info.era_process_status = WithdrawEnded;
+        pool_info.status = WithdrawEnded;
         POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
 
         return Ok(Response::default());
@@ -117,8 +117,8 @@ pub fn sudo_era_collect_withdraw_callback(
     payload: SudoPayload,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
-    pool_info.era_process_status = WithdrawEnded;
-    pool_info.era_snapshot.bond_height = env.block.height;
+    pool_info.status = WithdrawEnded;
+    pool_info.era_snapshot.last_step_height = env.block.height;
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
 
     Ok(Response::new())
@@ -129,7 +129,7 @@ pub fn sudo_era_collect_withdraw_failed_callback(
     payload: SudoPayload,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, payload.pool_addr.clone())?;
-    pool_info.era_process_status = BondEnded;
+    pool_info.status = BondEnded;
     POOLS.save(deps.storage, payload.pool_addr.clone(), &pool_info)?;
 
     Ok(Response::new())

@@ -4,7 +4,7 @@ use crate::helper::min_ntrn_ibc_fee;
 use crate::helper::DEFAULT_TIMEOUT_SECONDS;
 use crate::query::query_delegation_by_addr;
 use crate::state::{
-    EraProcessStatus, SudoPayload, TxType, ValidatorUpdateStatus, INFO_OF_ICA_ID, POOLS,
+    EraStatus, SudoPayload, TxType, ValidatorUpdateStatus, INFO_OF_ICA_ID, POOLS,
 };
 use crate::tx_callback::msg_with_sudo_callback;
 use cosmwasm_std::{DepsMut, Env, MessageInfo, Response};
@@ -27,7 +27,7 @@ pub fn execute_rm_pool_validator(
     if info.sender != pool_info.admin {
         return Err(ContractError::Unauthorized {}.into());
     }
-    if pool_info.era_process_status != EraProcessStatus::ActiveEnded {
+    if pool_info.status != EraStatus::ActiveEnded {
         return Err(ContractError::EraProcessNotEnd {}.into());
     }
     if !pool_info.validator_addrs.contains(&validator_addr) {
