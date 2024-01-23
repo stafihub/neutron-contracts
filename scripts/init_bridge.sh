@@ -32,7 +32,7 @@ init_bridge() {
     "new_minter": "%s"
   }
 }' "$bridge_contract_address")
-  # echo $msg
+  echo $msg
   tx_result="$(neutrond tx wasm execute "$lsd_token_contract_address" "$msg" \
     --amount 300000000untrn \
     --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \

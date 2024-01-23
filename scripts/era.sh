@@ -157,10 +157,10 @@ process_era() {
   echo "$query"
   neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq
 
-  echo "-------------------------- era restake-------------------------------------"
+  echo "-------------------------- era rebond -------------------------------------"
 
   era_restake_msg=$(printf '{
-  "era_restake": {
+  "era_rebond": {
     "pool_addr": "%s"
   }
 }' "$pool_address")

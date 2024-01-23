@@ -1,9 +1,9 @@
-use crate::error_conversion::ContractError;
 use crate::helper::{deal_pool, CAL_BASE, DEFAULT_ERA_SECONDS, MIN_ERA_SECONDS};
 use crate::msg::InitPoolParams;
 use crate::state::ValidatorUpdateStatus;
 use crate::state::POOLS;
 use crate::state::{INFO_OF_ICA_ID, STACK};
+use crate::{error_conversion::ContractError, state::EraProcessStatus};
 use cosmwasm_std::{Addr, Uint128};
 use cosmwasm_std::{DepsMut, Env, MessageInfo, Response};
 use neutron_sdk::{
@@ -31,6 +31,25 @@ pub fn execute_init_pool(
     if info.sender != pool_info.admin {
         return Err(ContractError::Unauthorized {}.into());
     }
+
+    if pool_info.era_process_status == EraProcessStatus::InitWithdrawAddrNotSet {
+        return deal_pool(
+            deps,
+            env,
+            info,
+            pool_info,
+            pool_ica_info,
+            withdraw_ica_info,
+            0,
+            param.lsd_token_name,
+            param.lsd_token_symbol,
+        );
+    }
+
+    if pool_info.era_process_status != EraProcessStatus::InitNotCompleted {
+        return Err(ContractError::StatusNotAllow {}.into());
+    }
+
     if !pool_info.rate.is_zero() {
         return Err(ContractError::PoolInited {}.into());
     }
@@ -75,7 +94,6 @@ pub fn execute_init_pool(
     pool_info.next_unstake_index = 0;
     pool_info.unstake_times_limit = 20;
     pool_info.unbond_commission = Uint128::zero();
-    pool_info.paused = false;
     pool_info.lsm_support = false;
     pool_info.lsm_pending_limit = 100;
     pool_info.rate_change_limit = Uint128::zero();
@@ -86,7 +104,7 @@ pub fn execute_init_pool(
         None => STACK.load(deps.storage)?.lsd_token_code_id,
     };
 
-    return deal_pool(
+    deal_pool(
         deps,
         env,
         info,
@@ -96,5 +114,5 @@ pub fn execute_init_pool(
         code_id,
         param.lsd_token_name,
         param.lsd_token_symbol,
-    );
+    )
 }

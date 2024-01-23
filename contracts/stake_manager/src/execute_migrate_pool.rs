@@ -1,10 +1,10 @@
-use crate::error_conversion::ContractError;
 use crate::helper::deal_pool;
 use crate::helper::CAL_BASE;
 use crate::msg::MigratePoolParams;
 use crate::state::ValidatorUpdateStatus;
 use crate::state::POOLS;
 use crate::state::{INFO_OF_ICA_ID, STACK};
+use crate::{error_conversion::ContractError, state::EraProcessStatus};
 use cosmwasm_std::{Addr, Uint128};
 use cosmwasm_std::{DepsMut, Env, MessageInfo, Response};
 use neutron_sdk::{
@@ -31,6 +31,25 @@ pub fn execute_migrate_pool(
     if info.sender != pool_info.admin {
         return Err(ContractError::Unauthorized {}.into());
     }
+
+    if pool_info.era_process_status == EraProcessStatus::InitWithdrawAddrNotSet {
+        return deal_pool(
+            deps,
+            env,
+            info,
+            pool_info,
+            pool_ica_info,
+            withdraw_ica_info,
+            0,
+            param.lsd_token_name,
+            param.lsd_token_symbol,
+        );
+    }
+
+    if pool_info.era_process_status != EraProcessStatus::InitNotCompleted {
+        return Err(ContractError::StatusNotAllow {}.into());
+    }
+
     if !pool_info.rate.is_zero() {
         return Err(ContractError::PoolInited {}.into());
     }
@@ -90,7 +109,8 @@ pub fn execute_migrate_pool(
         Some(lsd_code_id) => lsd_code_id,
         None => STACK.load(deps.storage)?.lsd_token_code_id,
     };
-    return deal_pool(
+
+    deal_pool(
         deps,
         env,
         info,
@@ -100,5 +120,5 @@ pub fn execute_migrate_pool(
         code_id,
         param.lsd_token_name,
         param.lsd_token_symbol,
-    );
+    )
 }

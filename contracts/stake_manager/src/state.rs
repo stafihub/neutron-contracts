@@ -68,6 +68,8 @@ pub const POOLS: Map<String, PoolInfo> = Map::new("pools");
 
 #[cw_serde]
 pub enum EraProcessStatus {
+    InitNotCompleted,
+    InitWithdrawAddrNotSet,
     EraUpdateStarted,
     EraUpdateEnded,
     BondStarted,

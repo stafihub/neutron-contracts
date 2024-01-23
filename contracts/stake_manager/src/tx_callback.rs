@@ -1,7 +1,4 @@
 use crate::execute_era_rebond::sudo_era_rebond_failed_callback;
-use crate::execute_pool_rm_validator::{
-    sudo_rm_validator_callback, sudo_rm_validator_failed_callback,
-};
 use crate::execute_pool_update_validator::{
     sudo_update_validator_callback, sudo_update_validator_failed_callback,
 };
@@ -23,6 +20,10 @@ use crate::{
     },
     execute_era_update::sudo_era_update_callback,
     execute_era_update::sudo_era_update_failed_callback,
+};
+use crate::{
+    execute_pool_rm_validator::{sudo_rm_validator_callback, sudo_rm_validator_failed_callback},
+    helper::sudo_set_withdraw_addr_callback,
 };
 use cosmwasm_std::{
     from_json, Binary, CosmosMsg, DepsMut, Env, Reply, Response, StdError, StdResult, SubMsg,
@@ -154,6 +155,7 @@ fn sudo_callback(
     payload: SudoPayload,
 ) -> NeutronResult<Response<NeutronMsg>> {
     match payload.tx_type {
+        TxType::SetWithdrawAddr => sudo_set_withdraw_addr_callback(deps, payload),
         TxType::EraUpdate => sudo_era_update_callback(deps, env, payload),
         TxType::EraBond => sudo_era_bond_callback(deps, env, payload),
         TxType::EraCollectWithdraw => sudo_era_collect_withdraw_callback(deps, env, payload),

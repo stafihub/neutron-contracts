@@ -4,6 +4,8 @@
 . ./scripts/common.sh
 . ./scripts/deploy.sh
 . ./scripts/init_stack.sh
+. ./scripts/register_pool.sh
+. ./scripts/init_pool.sh
 . ./scripts/config_pool.sh
 . ./scripts/init_bridge.sh
 . ./scripts/era.sh
@@ -40,7 +42,10 @@ VALIDATOR="cosmosvaloper18hl5c9xn5dze2g50uaw0l2mr02ew57zk0auktn"
 
 deploy
 init_stack
+register_pool
+init_pool
 config_pool
+# init_pool
 init_bridge
 
 user_stake_lsm

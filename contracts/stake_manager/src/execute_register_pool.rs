@@ -163,7 +163,7 @@ pub fn sudo_open_ack(
                 unstake_times_limit: 0,
                 next_unstake_index: 0,
                 unbonding_period: 0,
-                era_process_status: EraProcessStatus::ActiveEnded,
+                era_process_status: EraProcessStatus::InitNotCompleted,
                 validator_update_status: ValidatorUpdateStatus::End,
                 platform_fee_commission: Uint128::zero(),
                 total_platform_fee: Uint128::zero(),
