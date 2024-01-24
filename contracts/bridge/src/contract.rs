@@ -253,10 +253,6 @@ pub fn execute_transfer_admin(
         return Err(ContractError::Unauthorized {});
     }
 
-    if bridge_info.admin != info.sender {
-        return Err(ContractError::Unauthorized {});
-    }
-
     if let Ok(admin) = deps.api.addr_validate(&new_admin) {
         bridge_info.admin = admin;
     } else {
