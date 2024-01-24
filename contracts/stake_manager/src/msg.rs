@@ -184,6 +184,10 @@ pub enum ExecuteMsg {
     EraBond {
         pool_addr: String,
     },
+    PoolBond {
+        pool_addr: String,
+        amount: Uint128,
+    },
     EraCollectWithdraw {
         pool_addr: String,
     },
@@ -204,6 +208,4 @@ pub enum ExecuteMsg {
 }
 
 #[cw_serde]
-pub struct MigrateMsg {
-    pub pool_addr: String,
-}
+pub struct MigrateMsg {}
