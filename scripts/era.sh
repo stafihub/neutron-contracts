@@ -16,7 +16,7 @@ redeem_token_for_share() {
   }
 }' "$pool_address" "$tokens")
 
-  echo "redeem mag: $redeem_msg"
+  echo "redeem msg: $redeem_msg"
   tx_result="$(neutrond tx wasm execute "$contract_address" "$redeem_msg" \
     --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
     --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \

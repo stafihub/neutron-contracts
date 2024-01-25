@@ -52,6 +52,7 @@ init_bridge
 
 user_stake_lsm
 user_stake
+user_stake_on_neutron
 user_allowance
 user_unstake
 

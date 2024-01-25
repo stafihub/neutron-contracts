@@ -43,7 +43,7 @@ register_pool() {
   echo "ICA(Pool) address: $pool_address"
   echo "withdraw_addr: $withdraw_addr"
 
-  echo "-------------------------- transfer utaom through ibc -------------------------------------"
+  echo "-------------------------- transfer uatom through ibc -------------------------------------"
 
   tx_result=$(gaiad tx ibc-transfer transfer transfer channel-0 \
     "$ADDRESS_1" 1000uatom \

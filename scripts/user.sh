@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 user_stake() {
-    echo "--------------------------user stake-------------------------------------"
+    echo "--------------------------user stake through ibc-------------------------------------"
 
     msg=$(
         cat <<EOF
@@ -26,6 +26,46 @@ EOF
         --keyring-backend=test --home="$HOME_2" \
         --chain-id="$CHAIN_ID_2" --node "$GAIA_NODE" \
         -y --output json | wait_tx_gaia)
+
+    #echo "$tx_result" | jq .
+    code="$(echo "$tx_result" | jq '.code')"
+    tx_hash="$(echo "$tx_result" | jq '.txhash')"
+    if [[ "$code" -ne 0 ]]; then
+        echo "Failed to send ibc hook to contract: $(echo "$tx_result" | jq '.raw_log')" && exit 1
+    fi
+    echo "$tx_hash"
+    echo "Waiting 15 seconds for stake (sometimes it takes a lot of time)…"
+    # shellcheck disable=SC2034
+    for i in $(seq 15); do
+        sleep 1
+        echo -n .
+    done
+    echo " done"
+
+    query="$(printf '{"balance": {"address": "%s"}}' "$ADDRESS_1")"
+    neutrond query wasm contract-state smart "$lsd_token_contract_address" "$query" --output json | jq
+
+}
+
+user_stake_on_neutron() {
+    echo "--------------------------user stake on neutron-------------------------------------"
+    query="$(printf '{"balance": {"address": "%s"}}' "$ADDRESS_1")"
+    neutrond query wasm contract-state smart "$lsd_token_contract_address" "$query" --output json | jq
+
+    stake_msg=$(printf '{
+  "stake": {
+    "neutron_address": "%s",
+    "pool_addr": "%s"
+  }
+}' "$ADDRESS_1" "$pool_address")
+
+    tx_result=$(
+        neutrond tx wasm execute "$contract_address" "$stake_msg" \
+            --amount 1000ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2 \
+            --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
+            --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \
+            --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx
+    )
 
     #echo "$tx_result" | jq .
     code="$(echo "$tx_result" | jq '.code')"
