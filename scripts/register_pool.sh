@@ -43,29 +43,29 @@ register_pool() {
   echo "ICA(Pool) address: $pool_address"
   echo "withdraw_addr: $withdraw_addr"
 
-#   echo "-------------------------- transfer utaom through ibc -------------------------------------"
+  echo "-------------------------- transfer utaom through ibc -------------------------------------"
 
-#   tx_result=$(gaiad tx ibc-transfer transfer transfer channel-0 \
-#     "$ADDRESS_1" 1000uatom \
-#     --gas auto --gas-adjustment 1.4 \
-#     --fees 1000uatom --from $ADDRESS_2 \
-#     --keyring-backend=test --home="$HOME_2" \
-#     --chain-id="$CHAIN_ID_2" --node "$GAIA_NODE" \
-#     -y --output json | wait_tx_gaia)
+  tx_result=$(gaiad tx ibc-transfer transfer transfer channel-0 \
+    "$ADDRESS_1" 1000uatom \
+    --gas auto --gas-adjustment 1.4 \
+    --fees 1000uatom --from $ADDRESS_2 \
+    --keyring-backend=test --home="$HOME_2" \
+    --chain-id="$CHAIN_ID_2" --node "$GAIA_NODE" \
+    -y --output json | wait_tx_gaia)
 
-#   #echo "$tx_result" | jq .
-#   code="$(echo "$tx_result" | jq '.code')"
-#   tx_hash="$(echo "$tx_result" | jq '.txhash')"
-#   if [[ "$code" -ne 0 ]]; then
-#     echo "Failed to send ibc hook to contract: $(echo "$tx_result" | jq '.raw_log')" && exit 1
-#   fi
-#   echo "$tx_hash"
+  #echo "$tx_result" | jq .
+  code="$(echo "$tx_result" | jq '.code')"
+  tx_hash="$(echo "$tx_result" | jq '.txhash')"
+  if [[ "$code" -ne 0 ]]; then
+    echo "Failed to send ibc hook to contract: $(echo "$tx_result" | jq '.raw_log')" && exit 1
+  fi
+  echo "$tx_hash"
 
-#   echo "Waiting 10 seconds for ibc relay (sometimes it takes a lot of time)…"
-#   # shellcheck disable=SC2034
-#   for i in $(seq 10); do
-#     sleep 1
-#     echo -n .
-#   done
-#   echo " done"
+  echo "Waiting 10 seconds for ibc relay (sometimes it takes a lot of time)…"
+  # shellcheck disable=SC2034
+  for i in $(seq 10); do
+    sleep 1
+    echo -n .
+  done
+  echo " done"
 }
