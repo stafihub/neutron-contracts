@@ -159,23 +159,23 @@ process_era() {
 
   echo "-------------------------- era rebond -------------------------------------"
 
-  era_restake_msg=$(printf '{
+  era_rebond_msg=$(printf '{
   "era_rebond": {
     "pool_addr": "%s"
   }
 }' "$pool_address")
 
-  tx_result="$(neutrond tx wasm execute "$contract_address" "$era_restake_msg" \
+  tx_result="$(neutrond tx wasm execute "$contract_address" "$era_rebond_msg" \
     --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
     --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \
     --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"
 
   code="$(echo "$tx_result" | jq '.code')"
   if [[ "$code" -ne 0 ]]; then
-    echo "Failed to era_restake_msg msg: $(echo "$tx_result" | jq '.raw_log')" && exit 1
+    echo "Failed to era_rebond_msg msg: $(echo "$tx_result" | jq '.raw_log')" && exit 1
   fi
 
-  echo "Waiting 10 seconds for era_restake_msg (sometimes it takes a lot of time)…"
+  echo "Waiting 10 seconds for era_rebond_msg (sometimes it takes a lot of time)…"
   # shellcheck disable=SC2034
   for i in $(seq 10); do
     sleep 1

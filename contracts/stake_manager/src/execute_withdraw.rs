@@ -111,20 +111,16 @@ pub fn execute_withdraw(
         cosmos_msg,
         SudoPayload {
             port_id: pool_ica_info.ctrl_port_id,
-            message: format!("{}_{}", info.sender, unstake_index_list_str),
+            message: format!(
+                "{}_{}_{}_{}",
+                total_withdraw_amount, info.sender, receiver, unstake_index_list_str
+            ),
             pool_addr: pool_addr.clone(),
             tx_type: TxType::UserWithdraw,
         },
     )?;
 
-    Ok(Response::new()
-        .add_attribute("action", "withdraw")
-        .add_attribute("from", info.sender)
-        .add_attribute("pool", pool_addr.clone())
-        .add_attribute("receiver", receiver)
-        .add_attribute("unstake_index_list", unstake_index_list_str)
-        .add_attribute("amount", total_withdraw_amount)
-        .add_submessage(submsg))
+    Ok(Response::new().add_submessage(submsg))
 }
 
 pub fn sudo_withdraw_callback(
@@ -132,26 +128,43 @@ pub fn sudo_withdraw_callback(
     payload: SudoPayload,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let parts: Vec<String> = payload.message.split('_').map(String::from).collect();
-    if parts.len() <= 1 {
+    if parts.len() <= 3 {
         return Err(ContractError::UnsupportedMessage(payload.message).into());
     }
-    let user_addr = Addr::unchecked(parts.get(0).unwrap());
+    let total_withdraw_amount = parts.get(0).unwrap();
+    let user_addr = Addr::unchecked(parts.get(1).unwrap());
+    let receiver = parts.get(2).unwrap();
+    let unstake_index_list_str = parts.get(3).unwrap();
 
-    if let Some(mut unstakes) = UNSTAKES_INDEX_FOR_USER
-        .may_load(deps.storage, (user_addr.clone(), payload.pool_addr.clone()))?
-    {
-        unstakes.retain(|unstake_index| {
-            if parts.contains(&unstake_index.to_string()) {
-                UNSTAKES_OF_INDEX.remove(deps.storage, (payload.pool_addr.clone(), *unstake_index));
-                return false;
-            }
+    if let Some((_, index_list)) = parts.split_first() {
+        if let Some(mut unstakes) = UNSTAKES_INDEX_FOR_USER
+            .may_load(deps.storage, (user_addr.clone(), payload.pool_addr.clone()))?
+        {
+            unstakes.retain(|unstake_index| {
+                if index_list.contains(&unstake_index.to_string()) {
+                    UNSTAKES_OF_INDEX
+                        .remove(deps.storage, (payload.pool_addr.clone(), *unstake_index));
+                    return false;
+                }
 
-            true
-        });
+                true
+            });
 
-        UNSTAKES_INDEX_FOR_USER.save(deps.storage, (user_addr, payload.pool_addr), &unstakes)?;
+            UNSTAKES_INDEX_FOR_USER.save(
+                deps.storage,
+                (user_addr.clone(), payload.pool_addr.clone()),
+                &unstakes,
+            )?;
+        }
     }
-    Ok(Response::new())
+
+    Ok(Response::new()
+        .add_attribute("action", "withdraw")
+        .add_attribute("from", user_addr)
+        .add_attribute("pool", payload.pool_addr.clone())
+        .add_attribute("receiver", receiver)
+        .add_attribute("unstake_index_list", unstake_index_list_str)
+        .add_attribute("amount", total_withdraw_amount))
 }
 
 pub fn sudo_withdraw_failed_callback(
@@ -160,20 +173,19 @@ pub fn sudo_withdraw_failed_callback(
 ) -> NeutronResult<Response<NeutronMsg>> {
     let parts: Vec<String> = payload.message.split('_').map(String::from).collect();
 
-    if let Some((_, index_list)) = parts.split_first() {
-        for index_str in index_list {
-            let index = index_str.parse::<u64>().unwrap();
-            let mut unstake_info =
-                UNSTAKES_OF_INDEX.load(deps.storage, (payload.pool_addr.clone(), index))?;
+    // skip withdraw_amount and user_addr and reviver
+    for index_str in parts.iter().skip(3) {
+        let index = index_str.parse::<u64>().unwrap();
+        let mut unstake_info =
+            UNSTAKES_OF_INDEX.load(deps.storage, (payload.pool_addr.clone(), index))?;
 
-            unstake_info.status = WithdrawStatus::Default;
+        unstake_info.status = WithdrawStatus::Default;
 
-            UNSTAKES_OF_INDEX.save(
-                deps.storage,
-                (payload.pool_addr.clone(), index),
-                &unstake_info,
-            )?;
-        }
+        UNSTAKES_OF_INDEX.save(
+            deps.storage,
+            (payload.pool_addr.clone(), index),
+            &unstake_info,
+        )?;
     }
 
     Ok(Response::new())
