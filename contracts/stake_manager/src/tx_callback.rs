@@ -74,16 +74,8 @@ pub fn sudo_response(
     deps: DepsMut,
     env: Env,
     req: RequestPacket,
-    data: Binary,
+    _: Binary,
 ) -> NeutronResult<Response<NeutronMsg>> {
-    deps.api.debug(
-        format!(
-            "WASMDEBUG: sudo_response: sudo received: {:?} {}",
-            req, data
-        )
-        .as_str(),
-    );
-
     let seq_id = req
         .sequence
         .ok_or_else(|| ContractError::CallBackErrSequenceNotFound {})?;
@@ -103,16 +95,8 @@ pub fn sudo_response(
 pub fn sudo_error(
     deps: DepsMut,
     req: RequestPacket,
-    data: String,
+    _: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
-    deps.api.debug(
-        format!(
-            "WASMDEBUG: sudo_error: sudo error received: {:?} {}",
-            req, data
-        )
-        .as_str(),
-    );
-
     let seq_id = req
         .sequence
         .ok_or_else(|| ContractError::CallBackErrSequenceNotFound {})?;
@@ -128,14 +112,6 @@ pub fn sudo_error(
 }
 
 pub fn sudo_timeout(deps: DepsMut, req: RequestPacket) -> NeutronResult<Response<NeutronMsg>> {
-    deps.api.debug(
-        format!(
-            "WASMDEBUG: sudo_timeout: sudo timeout ack received: {:?}",
-            req
-        )
-        .as_str(),
-    );
-
     let seq_id = req
         .sequence
         .ok_or_else(|| ContractError::CallBackErrSequenceNotFound {})?;

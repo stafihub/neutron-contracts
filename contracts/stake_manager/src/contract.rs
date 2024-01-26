@@ -133,9 +133,6 @@ pub fn execute(
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> NeutronResult<Response<NeutronMsg>> {
-    deps.as_ref()
-        .api
-        .debug(format!("WASMDEBUG: execute msg is {:?},info is:{:?}", msg, info).as_str());
     match msg {
         ExecuteMsg::RegisterPool {
             connection_id,
