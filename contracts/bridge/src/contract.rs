@@ -162,7 +162,11 @@ pub fn execute_vote_proposal(
 
     PROPOSALS.save(deps.storage, proposal_id, &proposal)?;
 
-    Ok(res.add_attribute("action", "vote_proposal"))
+    Ok(res
+        .add_attribute("action", "vote_proposal")
+        .add_attribute("executed", proposal.executed.to_string())
+        .add_attribute("recipient", proposal.recipient)
+        .add_attribute("amount", proposal.amount))
 }
 
 pub fn execute_add_relayer(
