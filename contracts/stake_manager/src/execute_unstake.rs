@@ -117,6 +117,7 @@ pub fn execute_unstake(
     Ok(rsp
         .add_message(CosmosMsg::Wasm(burn_msg))
         .add_attribute("action", "unstake")
+        .add_attribute("pool", pool_addr)
         .add_attribute("from", info.sender.to_string())
         .add_attribute("token_amount", token_amount.to_string())
         .add_attribute("lsd_token_amount", lsd_token_amount.to_string())

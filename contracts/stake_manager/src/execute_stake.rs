@@ -48,11 +48,12 @@ pub fn execute_stake(
     };
     pool_info.total_lsd_token_amount = pool_info.total_lsd_token_amount.add(lsd_token_amount);
 
-    POOLS.save(deps.storage, pool_addr, &pool_info)?;
+    POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
 
     Ok(Response::new()
         .add_message(CosmosMsg::Wasm(msg))
         .add_attribute("action", "stake")
+        .add_attribute("pool", pool_addr)
         .add_attribute("staker", neutron_address)
         .add_attribute("token_amount", token_amount)
         .add_attribute("lsd_token_amount", lsd_token_amount))

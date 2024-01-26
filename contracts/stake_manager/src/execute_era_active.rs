@@ -151,7 +151,7 @@ pub fn execute_era_active(
 
     let update_pool_icq_msgs = get_update_pool_icq_msgs(
         deps,
-        pool_addr,
+        pool_addr.clone(),
         pool_info.ica_id.clone(),
         DEFAULT_UPDATE_PERIOD,
     )?;
@@ -159,5 +159,6 @@ pub fn execute_era_active(
     Ok(resp
         .add_messages(update_pool_icq_msgs)
         .add_attribute("action", "era_active")
+        .add_attribute("pool", pool_addr)
         .add_attribute("rate", new_rate))
 }

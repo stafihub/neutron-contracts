@@ -166,6 +166,7 @@ pub fn execute_vote_proposal(
         .add_attribute("action", "vote_proposal")
         .add_attribute("executed", proposal.executed.to_string())
         .add_attribute("recipient", proposal.recipient)
+        .add_attribute("chain_id", chain_id.to_string())
         .add_attribute("amount", proposal.amount))
 }
 
