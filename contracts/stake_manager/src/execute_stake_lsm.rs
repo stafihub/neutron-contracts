@@ -196,7 +196,12 @@ pub fn sudo_stake_lsm_callback(
     // pool_info.share_tokens
     POOLS.save(deps.storage, payload.pool_addr, &pool_info)?;
 
-    Ok(Response::new().add_message(msg))
+    Ok(Response::new()
+        .add_message(msg)
+        .add_attribute("action", "stake_lsm")
+        .add_attribute("staker", staker_neutron_addr)
+        .add_attribute("token_amount", token_amount_use)
+        .add_attribute("lsd_token_amount", lsd_token_amount))
 }
 
 pub fn sudo_stake_lsm_failed_callback(

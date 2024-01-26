@@ -40,7 +40,9 @@ pub fn execute_era_active(
 
     match delegations_result {
         Ok(delegations_resp) => {
-            if delegations_resp.last_submitted_local_height <= pool_info.era_snapshot.last_step_height {
+            if delegations_resp.last_submitted_local_height
+                <= pool_info.era_snapshot.last_step_height
+            {
                 return Err(ContractError::DelegationSubmissionHeight {}.into());
             }
             for delegation in delegations_resp.delegations {
@@ -154,5 +156,8 @@ pub fn execute_era_active(
         DEFAULT_UPDATE_PERIOD,
     )?;
 
-    Ok(resp.add_messages(update_pool_icq_msgs))
+    Ok(resp
+        .add_messages(update_pool_icq_msgs)
+        .add_attribute("action", "era_active")
+        .add_attribute("rate", new_rate))
 }

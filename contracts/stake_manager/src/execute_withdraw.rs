@@ -121,6 +121,7 @@ pub fn execute_withdraw(
         .add_attribute("action", "withdraw")
         .add_attribute("from", info.sender)
         .add_attribute("pool", pool_addr.clone())
+        .add_attribute("receiver", receiver)
         .add_attribute("unstake_index_list", unstake_index_list_str)
         .add_attribute("amount", total_withdraw_amount)
         .add_submessage(submsg))

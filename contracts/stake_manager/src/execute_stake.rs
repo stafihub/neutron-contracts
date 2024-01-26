@@ -52,5 +52,8 @@ pub fn execute_stake(
 
     Ok(Response::new()
         .add_message(CosmosMsg::Wasm(msg))
-        .add_attribute("mint", lsd_token_amount.to_string()))
+        .add_attribute("action", "stake")
+        .add_attribute("staker", neutron_address)
+        .add_attribute("token_amount", token_amount)
+        .add_attribute("lsd_token_amount", lsd_token_amount))
 }
