@@ -1,6 +1,6 @@
 use cosmwasm_schema::write_api;
 
-use lsd_token::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
+use bridge::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 
 fn main() {
     write_api! {
