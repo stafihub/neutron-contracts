@@ -160,5 +160,6 @@ pub fn execute_era_active(
         .add_messages(update_pool_icq_msgs)
         .add_attribute("action", "era_active")
         .add_attribute("pool", pool_addr)
+        .add_attribute("era", pool_info.era.to_string())
         .add_attribute("rate", new_rate))
 }
