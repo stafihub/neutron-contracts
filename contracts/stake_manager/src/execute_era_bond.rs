@@ -221,9 +221,13 @@ fn allocate_unbond_amount(
         }
 
         // clear timestamps
-        if let Some(mut timestamps) =
-            VALIDATORS_UNBONDS_TIME.may_load(deps.storage, delegation.validator.clone())?
-        {
+        if let Some(mut timestamps) = VALIDATORS_UNBONDS_TIME.may_load(
+            deps.storage,
+            (
+                delegation.delegator.to_string(),
+                delegation.validator.clone(),
+            ),
+        )? {
             if !timestamps.is_empty() {
                 let oldest_record_time = timestamps[0];
                 if current_time > oldest_record_time + unbonding_period_seconds {
@@ -231,7 +235,10 @@ fn allocate_unbond_amount(
 
                     VALIDATORS_UNBONDS_TIME.save(
                         deps.storage,
-                        delegation.validator.clone(),
+                        (
+                            delegation.delegator.to_string(),
+                            delegation.validator.clone(),
+                        ),
                         &timestamps,
                     )?;
                 }
@@ -272,15 +279,21 @@ pub fn sudo_era_bond_callback(
         let unbond_validators: Vec<String> = payload.message.split("_").map(String::from).collect();
         let timestamp = env.block.time.seconds();
         for unbond_validator in unbond_validators {
-            let timestamps_op =
-                VALIDATORS_UNBONDS_TIME.may_load(deps.storage, unbond_validator.clone())?;
+            let timestamps_op = VALIDATORS_UNBONDS_TIME.may_load(
+                deps.storage,
+                (payload.pool_addr.clone(), unbond_validator.clone()),
+            )?;
             let final_timestamps = if let Some(mut timestamps) = timestamps_op {
                 timestamps.push(timestamp);
                 timestamps
             } else {
                 vec![timestamp]
             };
-            VALIDATORS_UNBONDS_TIME.save(deps.storage, unbond_validator, &final_timestamps)?;
+            VALIDATORS_UNBONDS_TIME.save(
+                deps.storage,
+                (payload.pool_addr.clone(), unbond_validator),
+                &final_timestamps,
+            )?;
         }
     }
 

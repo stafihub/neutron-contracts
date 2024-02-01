@@ -243,8 +243,9 @@ pub const REPLY_ID_TO_QUERY_ID: Map<u64, u64> = Map::new("reply_id_to_query_id")
 pub const REPLY_ID_TO_NEED_UPDATE: Map<u64, bool> = Map::new("reply_id_to_need_update");
 pub const QUERY_ID_TO_REPLY_ID: Map<u64, u64> = Map::new("query_id_to_reply_id");
 
-// validator -> vec[timestamp]
-pub const VALIDATORS_UNBONDS_TIME: Map<String, Vec<u64>> = Map::new("validators_unbonds_time");
+// (pool,validator) -> vec[timestamp]
+pub const VALIDATORS_UNBONDS_TIME: Map<(String, String), Vec<u64>> =
+    Map::new("validators_unbonds_time");
 
 // (pool, era) -> rate
 pub const ERA_RATE: Map<(String, u64), Uint128> = Map::new("era_rate");
