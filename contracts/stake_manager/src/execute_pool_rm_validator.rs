@@ -3,9 +3,7 @@ use crate::helper::gen_redelegate_txs;
 use crate::helper::min_ntrn_ibc_fee;
 use crate::helper::DEFAULT_TIMEOUT_SECONDS;
 use crate::query::query_delegation_by_addr;
-use crate::state::{
-    EraStatus, SudoPayload, TxType, ValidatorUpdateStatus, INFO_OF_ICA_ID, POOLS,
-};
+use crate::state::{EraStatus, SudoPayload, TxType, ValidatorUpdateStatus, INFO_OF_ICA_ID, POOLS};
 use crate::tx_callback::msg_with_sudo_callback;
 use cosmwasm_std::{DepsMut, Env, MessageInfo, Response};
 use neutron_sdk::{

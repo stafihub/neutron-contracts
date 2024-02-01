@@ -134,7 +134,12 @@ pub fn sudo_withdraw_callback(
     let total_withdraw_amount = parts.get(0).unwrap();
     let user_addr = Addr::unchecked(parts.get(1).unwrap());
     let receiver = parts.get(2).unwrap();
-    let unstake_index_list_str = parts.iter().skip(3).cloned().collect::<Vec<String>>().join("_");
+    let unstake_index_list_str = parts
+        .iter()
+        .skip(3)
+        .cloned()
+        .collect::<Vec<String>>()
+        .join("_");
 
     if let Some((_, index_list)) = parts.split_first() {
         if let Some(mut unstakes) = UNSTAKES_INDEX_FOR_USER

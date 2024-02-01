@@ -20,11 +20,11 @@ use crate::helper::{
     QUERY_REPLY_ID_RANGE_END, QUERY_REPLY_ID_RANGE_START, REPLY_ID_RANGE_END, REPLY_ID_RANGE_START,
 };
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
-use crate::query::query_delegation_by_addr;
 use crate::query::query_era_snapshot;
 use crate::query::query_stack_info;
 use crate::query::query_user_unstake_index;
 use crate::query::{query_balance_by_addr, query_validator_by_addr};
+use crate::query::{query_delegation_by_addr, query_era_rate};
 use crate::query::{
     query_interchain_address, query_interchain_address_contract, query_pool_info,
     query_user_unstake,
@@ -123,6 +123,7 @@ pub fn query(deps: Deps<NeutronQuery>, env: Env, msg: QueryMsg) -> NeutronResult
             pool_addr,
             user_neutron_addr,
         } => query_user_unstake_index(deps, pool_addr, user_neutron_addr),
+        QueryMsg::EraRate { pool_addr, era } => query_era_rate(deps, pool_addr, era),
     }
 }
 

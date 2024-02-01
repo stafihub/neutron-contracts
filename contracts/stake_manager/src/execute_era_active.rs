@@ -8,13 +8,13 @@ use neutron_sdk::{
     NeutronResult,
 };
 
-use crate::helper::get_update_pool_icq_msgs;
 use crate::helper::DEFAULT_UPDATE_PERIOD;
 use crate::state::{
     EraStatus::{ActiveEnded, RebondEnded},
     STACK,
 };
 use crate::{error_conversion::ContractError, state::POOLS};
+use crate::{helper::get_update_pool_icq_msgs, state::ERA_RATE};
 use crate::{helper::CAL_BASE, query::query_delegation_by_addr};
 
 pub fn execute_era_active(
@@ -148,6 +148,11 @@ pub fn execute_era_active(
 
     POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
     STACK.save(deps.storage, &stack_info)?;
+    ERA_RATE.save(
+        deps.storage,
+        (pool_addr.clone(), pool_info.era),
+        &pool_info.rate,
+    )?;
 
     let update_pool_icq_msgs = get_update_pool_icq_msgs(
         deps,

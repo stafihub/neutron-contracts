@@ -1,4 +1,4 @@
-use crate::state::{QueryKind, INFO_OF_ICA_ID};
+use crate::state::{QueryKind, ERA_RATE, INFO_OF_ICA_ID};
 use crate::state::{ADDRESS_TO_REPLY_ID, STACK};
 use crate::state::{POOLS, REPLY_ID_TO_QUERY_ID, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX};
 use cosmwasm_std::{to_json_binary, Addr, Binary, Deps, Env};
@@ -46,6 +46,16 @@ pub fn query_user_unstake_index(
 ) -> NeutronResult<Binary> {
     Ok(to_json_binary(
         &UNSTAKES_INDEX_FOR_USER.may_load(deps.storage, (user_neutron_addr, pool_addr))?,
+    )?)
+}
+
+pub fn query_era_rate(
+    deps: Deps<NeutronQuery>,
+    pool_addr: String,
+    era: u64,
+) -> NeutronResult<Binary> {
+    Ok(to_json_binary(
+        &ERA_RATE.may_load(deps.storage, (pool_addr, era))?,
     )?)
 }
 

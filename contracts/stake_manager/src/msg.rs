@@ -56,6 +56,8 @@ pub enum QueryMsg {
         pool_addr: String,
         user_neutron_addr: Addr,
     },
+    #[returns(Uint128)]
+    EraRate { pool_addr: String, era: u64 },
 }
 
 #[cw_serde]

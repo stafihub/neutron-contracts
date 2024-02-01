@@ -545,7 +545,6 @@ pub fn execute_upload_logo(
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
-
     match msg {
         QueryMsg::Balance { address } => to_json_binary(&query_balance(deps, address)?),
         QueryMsg::TokenInfo {} => to_json_binary(&query_token_info(deps)?),
