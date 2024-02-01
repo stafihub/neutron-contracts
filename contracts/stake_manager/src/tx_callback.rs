@@ -10,7 +10,7 @@ use crate::execute_withdraw::{sudo_withdraw_callback, sudo_withdraw_failed_callb
 use crate::helper::sudo_set_withdraw_addr_failed_callback;
 use crate::state::{
     read_reply_payload, read_sudo_payload, save_reply_payload, save_sudo_payload, SudoPayload,
-    TxType,
+    TxType, SUDO_PAYLOAD,
 };
 use crate::{error_conversion::ContractError, execute_era_rebond::sudo_era_rebond_callback};
 use crate::{
@@ -83,13 +83,12 @@ pub fn sudo_response(
         .source_channel
         .ok_or_else(|| ContractError::CallBackErrChannelIDNotFound {})?;
 
-    if let Ok(payload) = read_sudo_payload(deps.storage, channel_id, seq_id) {
+    if let Ok(payload) = read_sudo_payload(deps.storage, channel_id.clone(), seq_id) {
+        SUDO_PAYLOAD.remove(deps.storage, (channel_id, seq_id));
         return sudo_callback(deps, env, payload);
     }
 
     Err(ContractError::CallBackErrErrorMsg {}.into())
-    // at this place we can safely remove the data under (channel_id, seq_id) key
-    // but it costs an extra gas, so its on you how to use the storage
 }
 
 pub fn sudo_error(
@@ -104,11 +103,12 @@ pub fn sudo_error(
         .source_channel
         .ok_or_else(|| ContractError::CallBackErrChannelIDNotFound {})?;
 
-    if let Ok(payload) = read_sudo_payload(deps.storage, channel_id, seq_id) {
+    if let Ok(payload) = read_sudo_payload(deps.storage, channel_id.clone(), seq_id) {
+        SUDO_PAYLOAD.remove(deps.storage, (channel_id, seq_id));
         return sudo_failed_callback(deps, payload);
     }
 
-    Ok(Response::new())
+    Err(ContractError::CallBackErrErrorMsg {}.into())
 }
 
 pub fn sudo_timeout(deps: DepsMut, req: RequestPacket) -> NeutronResult<Response<NeutronMsg>> {
@@ -119,11 +119,12 @@ pub fn sudo_timeout(deps: DepsMut, req: RequestPacket) -> NeutronResult<Response
         .source_channel
         .ok_or_else(|| ContractError::CallBackErrChannelIDNotFound {})?;
 
-    if let Ok(payload) = read_sudo_payload(deps.storage, channel_id, seq_id) {
+    if let Ok(payload) = read_sudo_payload(deps.storage, channel_id.clone(), seq_id) {
+        SUDO_PAYLOAD.remove(deps.storage, (channel_id, seq_id));
         return sudo_failed_callback(deps, payload);
     }
 
-    Ok(Response::new())
+    Err(ContractError::CallBackErrErrorMsg {}.into())
 }
 
 fn sudo_callback(
@@ -142,8 +143,6 @@ fn sudo_callback(
         TxType::RmValidator => sudo_rm_validator_callback(deps, payload),
         TxType::StakeLsm => sudo_stake_lsm_callback(deps, payload),
         TxType::RedeemTokenForShare => sudo_redeem_token_for_share_callback(deps, payload),
-
-        _ => Ok(Response::new()),
     }
 }
 
@@ -162,7 +161,5 @@ fn sudo_failed_callback(
         TxType::RmValidator => sudo_rm_validator_failed_callback(deps, payload),
         TxType::StakeLsm => sudo_stake_lsm_failed_callback(deps, payload),
         TxType::RedeemTokenForShare => sudo_redeem_token_for_share_failed_callback(deps, payload),
-
-        _ => Ok(Response::new()),
     }
 }

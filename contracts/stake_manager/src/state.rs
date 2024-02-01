@@ -182,7 +182,6 @@ pub enum TxType {
     SetWithdrawAddr,
     UpdateValidator,
     RmValidator,
-    AddValidator,
     UserWithdraw,
     EraUpdate,
     EraBond,
