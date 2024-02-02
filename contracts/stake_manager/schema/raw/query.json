@@ -264,6 +264,33 @@
         }
       },
       "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "era_rate"
+      ],
+      "properties": {
+        "era_rate": {
+          "type": "object",
+          "required": [
+            "era",
+            "pool_addr"
+          ],
+          "properties": {
+            "era": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "pool_addr": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     }
   ],
   "definitions": {
