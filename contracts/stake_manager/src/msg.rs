@@ -136,7 +136,6 @@ pub enum ExecuteMsg {
     RegisterPool {
         connection_id: String,
         interchain_account_id: String,
-        register_fee: Vec<Coin>,
     },
     InitPool(Box<InitPoolParams>),
     MigratePool(Box<MigratePoolParams>),
@@ -145,7 +144,6 @@ pub enum ExecuteMsg {
     OpenChannel {
         pool_addr: String,
         closed_channel_id: String,
-        register_fee: Vec<Coin>,
     },
     RedeemTokenForShare {
         pool_addr: String,

@@ -138,15 +138,7 @@ pub fn execute(
         ExecuteMsg::RegisterPool {
             connection_id,
             interchain_account_id,
-            register_fee,
-        } => execute_register_pool(
-            deps,
-            env,
-            info,
-            connection_id,
-            interchain_account_id,
-            register_fee,
-        ),
+        } => execute_register_pool(deps, env, info, connection_id, interchain_account_id),
         ExecuteMsg::InitPool(params) => execute_init_pool(deps, env, info, *params),
         ExecuteMsg::MigratePool(params) => execute_migrate_pool(deps, env, info, *params),
         ExecuteMsg::ConfigPool(params) => execute_config_pool(deps, info, *params),
@@ -154,8 +146,7 @@ pub fn execute(
         ExecuteMsg::OpenChannel {
             pool_addr,
             closed_channel_id,
-            register_fee,
-        } => execute_open_channel(deps, env, info, pool_addr, closed_channel_id, register_fee),
+        } => execute_open_channel(deps, env, info, pool_addr, closed_channel_id),
         ExecuteMsg::RedeemTokenForShare { pool_addr, tokens } => {
             execute_redeem_token_for_share(deps, info, pool_addr, tokens)
         }

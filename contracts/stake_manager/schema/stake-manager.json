@@ -32,8 +32,7 @@
             "type": "object",
             "required": [
               "connection_id",
-              "interchain_account_id",
-              "register_fee"
+              "interchain_account_id"
             ],
             "properties": {
               "connection_id": {
@@ -41,12 +40,6 @@
               },
               "interchain_account_id": {
                 "type": "string"
-              },
-              "register_fee": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/definitions/Coin"
-                }
               }
             },
             "additionalProperties": false
@@ -112,8 +105,7 @@
             "type": "object",
             "required": [
               "closed_channel_id",
-              "pool_addr",
-              "register_fee"
+              "pool_addr"
             ],
             "properties": {
               "closed_channel_id": {
@@ -121,12 +113,6 @@
               },
               "pool_addr": {
                 "type": "string"
-              },
-              "register_fee": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/definitions/Coin"
-                }
               }
             },
             "additionalProperties": false

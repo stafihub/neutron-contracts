@@ -19,12 +19,16 @@ pub fn execute_open_channel(
     info: MessageInfo,
     pool_addr: String,
     closed_channel_id: String,
-    register_fee: Vec<cosmwasm_std::Coin>,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let pool_info = POOLS.load(deps.as_ref().storage, pool_addr)?;
     if info.sender != pool_info.admin {
         return Err(ContractError::Unauthorized {}.into());
     }
+    let register_fee = if !info.funds.is_empty() {
+        Some(info.funds)
+    } else {
+        None
+    };
 
     let mut msgs = vec![];
 
@@ -34,14 +38,14 @@ pub fn execute_open_channel(
         let register_pool_msg = NeutronMsg::register_interchain_account(
             pool_ica_info.ctrl_connection_id.clone(),
             pool_info.ica_id.clone(),
-            Some(register_fee.clone()),
+            register_fee.clone(),
         );
         msgs.push(register_pool_msg);
     } else if closed_channel_id.eq(&withdraw_ica_info.ctrl_channel_id.clone()) {
         let register_withdraw_msg = NeutronMsg::register_interchain_account(
             withdraw_ica_info.ctrl_connection_id.clone(),
             get_withdraw_ica_id(pool_info.ica_id),
-            Some(register_fee.clone()),
+            register_fee,
         );
         msgs.push(register_withdraw_msg);
     } else {
