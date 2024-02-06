@@ -66,32 +66,18 @@ pub fn execute_era_update(
         DEFAULT_FAST_PERIOD,
     )?);
 
-    if pool_info.bond.is_zero() {
+    if pool_info.era_snapshot.bond.is_zero() {
         pool_info.status = EraUpdateEnded;
         POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
         return Ok(rsp);
     }
 
-    // funds use contract funds
-    let balance = deps.querier.query_all_balances(&env.contract.address)?;
-    let mut amount = 0;
-    if !balance.is_empty() {
-        amount = u128::from(
-            balance
-                .iter()
-                .find(|c| c.denom == pool_info.ibc_denom.clone())
-                .map(|c| c.amount)
-                .unwrap_or(Uint128::zero()),
-        );
-    }
 
-    if amount == 0 {
-        pool_info.status = EraUpdateEnded;
-        POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
-        return Ok(rsp);
-    }
+    let tx_coin = coin(
+        pool_info.era_snapshot.bond.u128(),
+        pool_info.ibc_denom.clone(),
+    );
 
-    let tx_coin = coin(amount, pool_info.ibc_denom.clone());
     // See more info here: https://docs.neutron.org/neutron/feerefunder/overview
     let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
     let msg: NeutronMsg = NeutronMsg::IbcTransfer {
