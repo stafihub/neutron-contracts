@@ -72,7 +72,7 @@ pub fn execute_init_pool(
 
     // cal
     let offset = env.block.time.seconds().div(pool_info.era_seconds);
-    pool_info.offset = offset;
+    pool_info.offset = 0 - (offset as i64);
 
     // default
     pool_info.era = 0;

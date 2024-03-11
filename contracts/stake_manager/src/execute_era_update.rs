@@ -43,7 +43,7 @@ pub fn execute_era_update(
         .time
         .seconds()
         .div(pool_info.era_seconds)
-        .sub(pool_info.offset);
+        .saturating_add_signed(pool_info.offset);
 
     if current_era <= pool_info.era {
         return Err(ContractError::AlreadyLatestEra {}.into());
@@ -71,7 +71,6 @@ pub fn execute_era_update(
         POOLS.save(deps.storage, pool_addr.clone(), &pool_info)?;
         return Ok(rsp);
     }
-
 
     let tx_coin = coin(
         pool_info.era_snapshot.bond.u128(),

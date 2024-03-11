@@ -1,16 +1,23 @@
-use cosmwasm_std::{Addr, DepsMut, MessageInfo, Response};
+use std::ops::{Div, Sub};
+
+use cosmwasm_std::{Addr, DepsMut, Env, MessageInfo, Response};
 
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
     NeutronResult,
 };
 
-use crate::{error_conversion::ContractError, msg::ConfigPoolParams};
+use crate::{
+    error_conversion::ContractError,
+    helper::{MAX_ERA_SECONDS, UNBONDING_SECONDS},
+    msg::ConfigPoolParams,
+};
 use crate::{helper::MIN_ERA_SECONDS, state::POOLS};
 
 pub fn execute_config_pool(
     deps: DepsMut<NeutronQuery>,
     info: MessageInfo,
+    env: Env,
     param: ConfigPoolParams,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.as_ref().storage, param.pool_addr.clone())?;
@@ -38,10 +45,25 @@ pub fn execute_config_pool(
         if era_seconds < MIN_ERA_SECONDS {
             return Err(ContractError::LessThanMinimalEraSeconds {}.into());
         }
+        if era_seconds > MAX_ERA_SECONDS {
+            return Err(ContractError::ExceedMaxEraSeconds {}.into());
+        }
+        let current_era = env
+            .block
+            .time
+            .seconds()
+            .div(pool_info.era_seconds)
+            .saturating_add_signed(pool_info.offset);
+
         pool_info.era_seconds = era_seconds;
-    }
-    if let Some(offset) = param.offset {
-        pool_info.offset = offset;
+
+        pool_info.offset =
+            (current_era as i64).sub(env.block.time.seconds().div(pool_info.era_seconds) as i64);
+
+        pool_info.unbonding_period = ((UNBONDING_SECONDS as f64)
+            .div(pool_info.era_seconds as f64)
+            .ceil() as u64)
+            + 1;
     }
     if let Some(receiver) = param.platform_fee_receiver {
         pool_info.platform_fee_receiver = Addr::unchecked(receiver);

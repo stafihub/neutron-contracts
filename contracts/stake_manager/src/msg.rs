@@ -83,7 +83,7 @@ pub struct MigratePoolParams {
     pub unbonding_period: u64,
     pub platform_fee_commission: Option<Uint128>,
     pub era_seconds: u64,
-    pub offset: u64,
+    pub offset: i64,
 }
 
 #[cw_serde]
@@ -123,7 +123,6 @@ pub struct ConfigPoolParams {
     pub unbond_commission: Option<Uint128>,
     pub platform_fee_commission: Option<Uint128>,
     pub era_seconds: Option<u64>,
-    pub offset: Option<u64>,
     pub paused: Option<bool>,
     pub lsm_support: Option<bool>,
     pub lsm_pending_limit: Option<u64>,

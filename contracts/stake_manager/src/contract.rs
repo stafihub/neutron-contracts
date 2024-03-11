@@ -141,7 +141,7 @@ pub fn execute(
         } => execute_register_pool(deps, env, info, connection_id, interchain_account_id),
         ExecuteMsg::InitPool(params) => execute_init_pool(deps, env, info, *params),
         ExecuteMsg::MigratePool(params) => execute_migrate_pool(deps, env, info, *params),
-        ExecuteMsg::ConfigPool(params) => execute_config_pool(deps, info, *params),
+        ExecuteMsg::ConfigPool(params) => execute_config_pool(deps, info, env, *params),
         ExecuteMsg::ConfigStack(params) => execute_config_stack(deps, info, *params),
         ExecuteMsg::OpenChannel {
             pool_addr,

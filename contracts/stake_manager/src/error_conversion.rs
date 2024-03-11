@@ -110,6 +110,9 @@ pub enum ContractError {
     #[error("Less than minimal era seconds")]
     LessThanMinimalEraSeconds {},
 
+    #[error("Exceed max era seconds")]
+    ExceedMaxEraSeconds {},
+
     #[error("Denom not match")]
     DenomNotMatch {},
 

@@ -42,7 +42,7 @@ pub struct PoolInfo {
     pub era: u64,
     pub rate: Uint128,
     pub era_seconds: u64,
-    pub offset: u64,
+    pub offset: i64,
     pub minimal_stake: Uint128,
     pub unstake_times_limit: u64,
     pub next_unstake_index: u64,
