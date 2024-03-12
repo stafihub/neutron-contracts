@@ -22,6 +22,11 @@ pub fn execute_init_pool(
     info: MessageInfo,
     param: InitPoolParams,
 ) -> NeutronResult<Response<NeutronMsg>> {
+    let stack = STACK.load(deps.storage)?;
+    if stack.admin != info.sender {
+        return Err(ContractError::Unauthorized {}.into());
+    }
+
     let (pool_ica_info, withdraw_ica_info, _) =
         INFO_OF_ICA_ID.load(deps.storage, param.interchain_account_id.clone())?;
 

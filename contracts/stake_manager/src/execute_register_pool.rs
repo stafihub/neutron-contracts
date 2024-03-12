@@ -2,7 +2,7 @@ use std::ops::Div;
 
 use crate::{
     error_conversion::ContractError,
-    state::{EraSnapshot, ValidatorUpdateStatus},
+    state::{EraSnapshot, ValidatorUpdateStatus, STACK},
 };
 use crate::{
     helper::{get_withdraw_ica_id, ICA_WITHDRAW_SUFIX, INTERCHAIN_ACCOUNT_ID_LEN_LIMIT},
@@ -35,6 +35,11 @@ pub fn execute_register_pool(
     connection_id: String,
     interchain_account_id: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
+    let stack = STACK.load(deps.storage)?;
+    if stack.admin != info.sender {
+        return Err(ContractError::Unauthorized {}.into());
+    }
+
     if interchain_account_id.trim().is_empty()
         || interchain_account_id.contains(".")
         || interchain_account_id.contains("-")
