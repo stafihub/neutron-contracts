@@ -108,6 +108,14 @@ pub struct UnstakeInfo {
 // (poolAddress,unstakeIndex)
 pub const UNSTAKES_OF_INDEX: Map<(String, u64), UnstakeInfo> = Map::new("unstakes_of_index");
 
+// for rpc query
+#[cw_serde]
+pub struct IcaInfos {
+    pub pool_address_ica_info: IcaInfo,
+    pub withdraw_address_ica_info: IcaInfo,
+    pub admin: Addr,
+}
+
 #[cw_serde]
 pub struct IcaInfo {
     pub ctrl_connection_id: String,

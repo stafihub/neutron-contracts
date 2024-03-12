@@ -8,7 +8,7 @@ use neutron_sdk::{
     },
 };
 
-use crate::state::{EraSnapshot, IcaInfo, PoolInfo, QueryKind, Stack, UnstakeInfo};
+use crate::state::{EraSnapshot, IcaInfo, IcaInfos, PoolInfo, QueryKind, Stack, UnstakeInfo};
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -44,7 +44,7 @@ pub enum QueryMsg {
         connection_id: String,
     },
     // this query returns ICA from contract store, which saved from acknowledgement
-    #[returns((IcaInfo, IcaInfo, Addr))]
+    #[returns(IcaInfos)]
     InterchainAccountAddressFromContract { interchain_account_id: String },
     #[returns([UnstakeInfo])]
     UserUnstake {

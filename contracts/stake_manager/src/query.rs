@@ -1,4 +1,4 @@
-use crate::state::{QueryKind, ERA_RATE, INFO_OF_ICA_ID};
+use crate::state::{IcaInfos, QueryKind, ERA_RATE, INFO_OF_ICA_ID};
 use crate::state::{ADDRESS_TO_REPLY_ID, STACK};
 use crate::state::{POOLS, REPLY_ID_TO_QUERY_ID, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX};
 use cosmwasm_std::{to_json_binary, Addr, Binary, Deps, Env};
@@ -183,8 +183,13 @@ pub fn query_interchain_address_contract(
     _: Env,
     interchain_account_id: String,
 ) -> NeutronResult<Binary> {
-    let res = INFO_OF_ICA_ID.may_load(deps.storage, interchain_account_id)?;
-    Ok(to_json_binary(&res)?)
+    let (pool, withdraw, admin) = INFO_OF_ICA_ID.load(deps.storage, interchain_account_id)?;
+    let ica_info = IcaInfos {
+        pool_address_ica_info: pool,
+        withdraw_address_ica_info: withdraw,
+        admin,
+    };
+    Ok(to_json_binary(&ica_info)?)
 }
 
 /// Queries registered query info by ica address and query kind
