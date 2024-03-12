@@ -59,7 +59,7 @@ pub fn execute_pool_update_validator(
         let stake_amount = delegation.amount.amount;
 
         if stake_amount.is_zero() {
-            continue;
+            break;
         }
 
         let any_msg = gen_redelegate_txs(
