@@ -18,6 +18,7 @@ use neutron_sdk::{
     NeutronResult,
 };
 
+use crate::helper::STAKE_SPLIT_THRESHOLD;
 use crate::state::EraStatus::{BondEnded, BondStarted, EraUpdateEnded};
 use crate::state::{SudoPayload, TxType, INFO_OF_ICA_ID, POOLS, VALIDATORS_UNBONDS_TIME};
 use crate::tx_callback::msg_with_sudo_callback;
@@ -143,32 +144,63 @@ pub fn execute_era_bond(
                 msgs.push(any_msg);
             }
         }
-    } else if pool_info.era_snapshot.unbond < pool_info.era_snapshot.bond {
+    } else {
         let stake_amount = pool_info.era_snapshot.bond - pool_info.era_snapshot.unbond;
         let validator_count = pool_info.validator_addrs.len() as u128;
         if validator_count == 0 {
             return Err(ContractError::ValidatorsEmpty {}.into());
         }
+        if stake_amount < STAKE_SPLIT_THRESHOLD {
+            for (index, validator_addr) in pool_info.validator_addrs.iter().enumerate() {
+                if index == 0 {
+                    msgs.push(gen_delegation_txs(
+                        pool_addr.clone(),
+                        validator_addr.clone(),
+                        pool_info.remote_denom.clone(),
+                        stake_amount,
+                    ));
+                } else {
+                    let withdraw_msg = MsgWithdrawDelegatorReward {
+                        delegator_address: pool_addr.clone(),
+                        validator_address: validator_addr.clone(),
+                    };
 
-        let amount_per_validator = stake_amount.div(Uint128::from(validator_count));
-        let remainder = stake_amount.sub(amount_per_validator.mul(Uint128::new(validator_count)));
+                    let mut buf = Vec::new();
+                    buf.reserve(withdraw_msg.encoded_len());
 
-        for (index, validator_addr) in pool_info.validator_addrs.iter().enumerate() {
-            let mut amount_for_this_validator = amount_per_validator;
+                    if let Err(e) = withdraw_msg.encode(&mut buf) {
+                        return Err(ContractError::EncodeError(e.to_string()).into());
+                    }
 
-            // Add the remainder to the first validator
-            if index == 0 {
-                amount_for_this_validator += remainder;
+                    msgs.push(ProtobufAny {
+                        type_url: "/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward"
+                            .to_string(),
+                        value: Binary::from(buf),
+                    });
+                }
             }
+        } else {
+            let amount_per_validator = stake_amount.div(Uint128::from(validator_count));
+            let remainder =
+                stake_amount.sub(amount_per_validator.mul(Uint128::new(validator_count)));
 
-            let any_msg = gen_delegation_txs(
-                pool_addr.clone(),
-                validator_addr.clone(),
-                pool_info.remote_denom.clone(),
-                amount_for_this_validator,
-            );
+            for (index, validator_addr) in pool_info.validator_addrs.iter().enumerate() {
+                let mut amount_for_this_validator = amount_per_validator;
 
-            msgs.push(any_msg);
+                // Add the remainder to the first validator
+                if index == 0 {
+                    amount_for_this_validator += remainder;
+                }
+
+                let any_msg = gen_delegation_txs(
+                    pool_addr.clone(),
+                    validator_addr.clone(),
+                    pool_info.remote_denom.clone(),
+                    amount_for_this_validator,
+                );
+
+                msgs.push(any_msg);
+            }
         }
     }
 
