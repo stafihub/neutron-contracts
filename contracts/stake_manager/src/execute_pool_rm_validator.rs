@@ -54,6 +54,7 @@ pub fn execute_rm_pool_validator(
         .find(|d| d.validator == validator_addr)
     {
         if to_be_redelegate_delegation.amount.amount.is_zero() {
+            pool_info.validator_update_status = ValidatorUpdateStatus::WaitQueryUpdate;
             pool_info.validator_addrs = left_validators;
         } else {
             let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
@@ -90,6 +91,7 @@ pub fn execute_rm_pool_validator(
             pool_info.validator_update_status = ValidatorUpdateStatus::Start;
         }
     } else {
+        pool_info.validator_update_status = ValidatorUpdateStatus::WaitQueryUpdate;
         pool_info.validator_addrs = left_validators;
     }
 
