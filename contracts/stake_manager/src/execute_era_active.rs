@@ -8,7 +8,7 @@ use neutron_sdk::{
     NeutronResult,
 };
 
-use crate::helper::DEFAULT_UPDATE_PERIOD;
+use crate::helper::{DEFAULT_RATE, DEFAULT_UPDATE_PERIOD};
 use crate::state::{
     EraStatus::{ActiveEnded, RebondEnded},
     STACK,
@@ -71,7 +71,7 @@ pub fn execute_era_active(
     };
 
     let cal_temp = pool_info.active.add(total_amount.amount);
-    let new_active = if cal_temp > pool_info.era_snapshot.active {
+    let mut new_active = if cal_temp > pool_info.era_snapshot.active {
         cal_temp.sub(pool_info.era_snapshot.active)
     } else {
         Uint128::zero()
@@ -81,7 +81,7 @@ pub fn execute_era_active(
         .total_lsd_token_amount
         .add(platform_fee)
         .add(stack_fee);
-    let new_rate = if pool_info.total_lsd_token_amount.u128() > 0 {
+    let mut new_rate = if pool_info.total_lsd_token_amount.u128() > 0 {
         new_active
             .mul(CAL_BASE)
             .div(pool_info.total_lsd_token_amount)
@@ -106,6 +106,15 @@ pub fn execute_era_active(
         if rate_change > pool_info.rate_change_limit {
             return Err(ContractError::RateChangeOverLimit {}.into());
         }
+    }
+
+    // Solve first stake calculation accuracy
+    if pool_info.rate == DEFAULT_RATE
+        && new_rate < DEFAULT_RATE
+        && pool_info.active < new_active.add(Uint128::new(1000))
+    {
+        new_rate = DEFAULT_RATE;
+        new_active = pool_info.active;
     }
 
     pool_info.rate = new_rate;

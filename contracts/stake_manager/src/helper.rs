@@ -29,6 +29,7 @@ const FEE_DENOM: &str = "untrn";
 pub const ICA_WITHDRAW_SUFIX: &str = "-withdraw_addr";
 pub const INTERCHAIN_ACCOUNT_ID_LEN_LIMIT: usize = 10;
 pub const CAL_BASE: Uint128 = Uint128::new(1_000_000);
+pub const DEFAULT_RATE: Uint128 = Uint128::new(1_000_000);
 pub const DEFAULT_DECIMALS: u8 = 6;
 pub const DEFAULT_ERA_SECONDS: u64 = 86400; //24h
 pub const MIN_ERA_SECONDS: u64 = 28800; //8h

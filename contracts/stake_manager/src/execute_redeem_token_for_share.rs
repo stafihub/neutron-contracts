@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use crate::{
     error_conversion::ContractError,
     helper::DEFAULT_TIMEOUT_SECONDS,
