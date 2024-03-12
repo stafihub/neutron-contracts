@@ -116,6 +116,15 @@ pub struct IcaInfos {
     pub admin: Addr,
 }
 
+// for rpc query
+#[cw_serde]
+pub struct QueryIds {
+    pub withdraw_balance_query_id: u64,
+    pub pool_balance_query_id: u64,
+    pub pool_delegations_query_id: u64,
+    pub pool_validators_query_id: u64,
+}
+
 #[cw_serde]
 pub struct IcaInfo {
     pub ctrl_connection_id: String,

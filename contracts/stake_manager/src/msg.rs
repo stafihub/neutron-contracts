@@ -8,7 +8,9 @@ use neutron_sdk::{
     },
 };
 
-use crate::state::{EraSnapshot, IcaInfo, IcaInfos, PoolInfo, QueryKind, Stack, UnstakeInfo};
+use crate::state::{
+    EraSnapshot, IcaInfo, IcaInfos, PoolInfo, QueryIds, QueryKind, Stack, UnstakeInfo,
+};
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -58,6 +60,8 @@ pub enum QueryMsg {
     },
     #[returns(Uint128)]
     EraRate { pool_addr: String, era: u64 },
+    #[returns(QueryIds)]
+    QueryIds { pool_addr: String },
 }
 
 #[cw_serde]
