@@ -29,7 +29,6 @@ pub fn execute_redeem_token_for_share(
     let mut pool_info = POOLS.load(deps.as_ref().storage, pool_addr.clone())?;
     let (pool_ica_info, _, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
 
-    let mut denom_set: HashSet<String> = HashSet::new();
     let mut denoms = vec![];
     let mut msgs = vec![];
 
@@ -37,7 +36,10 @@ pub fn execute_redeem_token_for_share(
         if !pool_info.share_tokens.contains(token) {
             return Err(ContractError::ShareTokenNotExist {}.into());
         }
-        denom_set.insert(token.denom.clone());
+        if denoms.contains(&token.denom) {
+            return Err(ContractError::DuplicateToken {}.into());
+        }
+
         denoms.push(token.denom.clone());
         pool_info
             .redeemming_share_token_denom
@@ -47,9 +49,6 @@ pub fn execute_redeem_token_for_share(
             pool_ica_info.ica_addr.clone(),
             token.clone(),
         ));
-    }
-    if denoms.len() != denom_set.len() {
-        return Err(ContractError::DuplicateToken {}.into());
     }
 
     let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
