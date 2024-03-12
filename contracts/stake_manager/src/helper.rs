@@ -37,8 +37,8 @@ pub const MAX_ERA_SECONDS: u64 = 86400; //24h
 
 // Default timeout for SubmitTX is 30h
 pub const DEFAULT_TIMEOUT_SECONDS: u64 = 30 * 60 * 60;
-pub const DEFAULT_UPDATE_PERIOD: u64 = 12000;
-pub const DEFAULT_FAST_PERIOD: u64 = 45;
+pub const DEFAULT_UPDATE_PERIOD: u64 = 86400;
+pub const DEFAULT_FAST_PERIOD: u64 = 60;
 
 pub const UNBONDING_SECONDS: u64 = 1814400;
 
