@@ -89,8 +89,7 @@
     },
     "offset": {
       "type": "integer",
-      "format": "uint64",
-      "minimum": 0.0
+      "format": "int64"
     },
     "paused": {
       "type": "boolean"

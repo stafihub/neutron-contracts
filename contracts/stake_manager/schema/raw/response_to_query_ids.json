@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "QueryIds",
+  "type": "object",
+  "required": [
+    "pool_balance_query_id",
+    "pool_delegations_query_id",
+    "pool_validators_query_id",
+    "withdraw_balance_query_id"
+  ],
+  "properties": {
+    "pool_balance_query_id": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "pool_delegations_query_id": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "pool_validators_query_id": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "withdraw_balance_query_id": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    }
+  },
+  "additionalProperties": false
+}

@@ -538,14 +538,6 @@
             }
           ]
         },
-        "offset": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "uint64",
-          "minimum": 0.0
-        },
         "paused": {
           "type": [
             "boolean",
@@ -818,8 +810,7 @@
         },
         "offset": {
           "type": "integer",
-          "format": "uint64",
-          "minimum": 0.0
+          "format": "int64"
         },
         "platform_fee_commission": {
           "anyOf": [

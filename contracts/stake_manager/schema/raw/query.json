@@ -291,6 +291,27 @@
         }
       },
       "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "query_ids"
+      ],
+      "properties": {
+        "query_ids": {
+          "type": "object",
+          "required": [
+            "pool_addr"
+          ],
+          "properties": {
+            "pool_addr": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     }
   ],
   "definitions": {
