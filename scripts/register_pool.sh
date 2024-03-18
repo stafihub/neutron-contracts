@@ -33,7 +33,7 @@ register_pool() {
   echo "info of pool ica id is: "
   neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq
   pool_address=$(neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq '.data.pool_address_ica_info.ica_addr' | sed 's/\"//g')
-  withdraw_addr=$(neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq '.data.pool_address_ica_info.ica_addr' | sed 's/\"//g')
+  withdraw_addr=$(neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq '.data.withdraw_address_ica_info.ica_addr' | sed 's/\"//g')
 
   echo "ICA(Pool) address: $pool_address"
   echo "withdraw_addr: $withdraw_addr"
