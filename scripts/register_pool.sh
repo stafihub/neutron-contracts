@@ -32,8 +32,8 @@ register_pool() {
   query='{"interchain_account_address_from_contract":{"interchain_account_id":"test1"}}'
   echo "info of pool ica id is: "
   neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq
-  pool_address=$(neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq '.data[0].ica_addr' | sed 's/\"//g')
-  withdraw_addr=$(neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq '.data[1].ica_addr' | sed 's/\"//g')
+  pool_address=$(neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq '.data.pool_address_ica_info.ica_addr' | sed 's/\"//g')
+  withdraw_addr=$(neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq '.data.pool_address_ica_info.ica_addr' | sed 's/\"//g')
 
   echo "ICA(Pool) address: $pool_address"
   echo "withdraw_addr: $withdraw_addr"

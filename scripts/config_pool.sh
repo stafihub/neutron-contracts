@@ -2,7 +2,6 @@
 
 config_pool() {
   echo "-------------------------- config pool -------------------------------------"
-
   msg=$(printf '{
   "config_pool": {
     "pool_addr": "%s",
@@ -14,8 +13,7 @@ config_pool() {
     "lsm_support": true,
     "paused": false,
     "rate_change_limit": "0",
-    "lsm_pending_limit": 60,
-    "offset": 26
+    "lsm_pending_limit": 60
   }
 }' "$pool_address" "$ADDRESS_1")
   # echo "config pool msg is: $msg"
