@@ -88,13 +88,23 @@ pub fn execute_unstake(
         .total_lsd_token_amount
         .sub(will_burn_lsd_token_amount);
 
+    // fix precision issues
+    let receive_amount = if token_amount > Uint128::new(5) {
+        token_amount.sub(Uint128::new(5))
+    } else {
+        Uint128::zero()
+    };
+    if receive_amount.is_zero() {
+        return Err(ContractError::EncodeErrZeroWithdrawAmount {}.into());
+    }
+
     // update unstake info
     let will_use_unstake_index = pool_info.next_unstake_index;
     let unstake_info = UnstakeInfo {
         era: pool_info.era,
         pool_addr: pool_addr.clone(),
         unstaker: info.sender.to_string(),
-        amount: token_amount,
+        amount: receive_amount,
         status: WithdrawStatus::Default,
         index: will_use_unstake_index,
     };
