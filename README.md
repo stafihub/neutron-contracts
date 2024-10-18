@@ -14,7 +14,7 @@ runme:
 - `wasm32-unknown-unknown` target
 - Docker
 
-1. Install `rustup` via https://rustup.rs/
+1. Install `rustup` via <https://rustup.rs/>
 2. Run the following:
 
 ```sh {"id":"01HHK4WTYBBADD9AQ2C709HRAG"}
@@ -47,4 +47,3 @@ make build
 ```
 
 This performs several optimizations which can significantly reduce the final size of the contract binaries, which will be available inside the `artifacts/` directory.
-
