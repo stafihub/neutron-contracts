@@ -39,7 +39,7 @@ code_id="$(neutrond tx wasm store "$CONTRACT_PATH" \
     --broadcast-mode=sync --gas-prices 0.0025untrn -y \
     --output json --keyring-backend=test --home "$HOME_1" \
     --node "$NEUTRON_NODE" |
-    wait_tx | jq -r '.logs[0].events[] | select(.type == "store_code").attributes[] | select(.key == "code_id").value')"
+    wait_tx | jq -r '.events[] | select(.type == "store_code").attributes[] | select(.key == "code_id").value')"
 echo "Code ID: $code_id"
 
 echo "----------------------------- init lsd token -------------------------------"
@@ -59,7 +59,7 @@ contract_address=$(neutrond tx wasm instantiate "$code_id" "$instantiate_msg" \
     --keyring-backend=test --gas-prices 0.0025untrn --gas auto \
     --gas-adjustment 1.4 --home "$HOME_1" \
     --node "$NEUTRON_NODE" 2>/dev/null |
-    wait_tx | jq -r '.logs[0].events[] | select(.type == "instantiate").attributes[] | select(.key == "_contract_address").value')
+    wait_tx | jq -r '.events[] | select(.type == "instantiate").attributes[] | select(.key == "_contract_address").value')
 echo "Contract address: $contract_address"
 
 echo "----------------------------- mint lsd token -------------------------------"
@@ -88,7 +88,7 @@ ics_code_id="$(neutrond tx wasm store "$CW20_ICS0_CONTRACT_PATH" \
     --broadcast-mode=sync --gas-prices 0.0025untrn -y \
     --output json --keyring-backend=test --home "$HOME_1" \
     --node "$NEUTRON_NODE" |
-    wait_tx | jq -r '.logs[0].events[] | select(.type == "store_code").attributes[] | select(.key == "code_id").value')"
+    wait_tx | jq -r '.events[] | select(.type == "store_code").attributes[] | select(.key == "code_id").value')"
 echo "ics_code_id: $ics_code_id"
 
 init_ics20_msg='{"default_timeout":1000,"gov_contract":"'$ADDRESS_1'","allowlist":[{"contract":"'$contract_address'","gas_limit": 10000000}],"default_gas_limit": 10000000}'
@@ -101,7 +101,7 @@ ics20_contract_address=$(neutrond tx wasm instantiate "$ics_code_id" "$init_ics2
     --keyring-backend=test --gas-prices 0.0025untrn --gas auto \
     --gas-adjustment 1.4 --home "$HOME_1" \
     --node "$NEUTRON_NODE" 2>/dev/null |
-    wait_tx | jq -r '.logs[0].events[] | select(.type == "instantiate").attributes[] | select(.key == "_contract_address").value')
+    wait_tx | jq -r '.events[] | select(.type == "instantiate").attributes[] | select(.key == "_contract_address").value')
 echo "CW20 ICS20 Contract address: $ics20_contract_address"
 
 echo "----------------------------- get cw20 ics20 ibc port -------------------------------"

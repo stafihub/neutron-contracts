@@ -31,7 +31,11 @@ pub fn execute_era_active(
         return Err(ContractError::PendingShareNotEmpty {}.into());
     }
 
-    let delegations_result = query_delegation_by_addr(deps.as_ref(), pool_addr.clone());
+    let delegations_result = query_delegation_by_addr(
+        deps.as_ref(),
+        pool_addr.clone(),
+        pool_info.sdk_greater_or_equal_v047,
+    );
 
     let mut total_amount = cosmwasm_std::Coin {
         denom: pool_info.remote_denom.clone(),

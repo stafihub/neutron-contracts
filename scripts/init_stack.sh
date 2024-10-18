@@ -12,7 +12,7 @@ init_stack() {
     --keyring-backend=test --gas-prices 0.0025untrn --gas auto \
     --gas-adjustment 1.4 --home "$HOME_1" \
     --node "$NEUTRON_NODE" 2>/dev/null |
-    wait_tx | jq -r '.logs[0].events[] | select(.type == "instantiate").attributes[] | select(.key == "_contract_address").value')
+    wait_tx | jq -r '.events[] | select(.type == "instantiate").attributes[] | select(.key == "_contract_address").value')
   echo "Contract address: $contract_address"
 
   echo "--------------Sent money to contract to pay fees---------------------------"

@@ -25,6 +25,7 @@
     "rate_change_limit",
     "redeemming_share_token_denom",
     "remote_denom",
+    "sdk_greater_or_equal_v047",
     "share_tokens",
     "status",
     "total_lsd_token_amount",
@@ -114,6 +115,9 @@
     },
     "remote_denom": {
       "type": "string"
+    },
+    "sdk_greater_or_equal_v047": {
+      "type": "boolean"
     },
     "share_tokens": {
       "type": "array",

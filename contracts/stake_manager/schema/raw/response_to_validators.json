@@ -49,6 +49,18 @@
         "unbonding_height"
       ],
       "properties": {
+        "consensus_pubkey": {
+          "description": "consensus_pubkey is the consensus public key of the validator, as a Protobuf Any.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "integer",
+            "format": "uint8",
+            "minimum": 0.0
+          }
+        },
         "delegator_shares": {
           "description": "delegator_shares defines total shares issued to a validator's delegators.",
           "type": "string"

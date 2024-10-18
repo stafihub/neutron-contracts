@@ -1,10 +1,10 @@
+use crate::state::{DelegatorDelegationsResponse, ADDRESS_TO_REPLY_ID, STACK};
 use crate::state::{IcaInfos, QueryIds, QueryKind, ERA_RATE, INFO_OF_ICA_ID};
-use crate::state::{ADDRESS_TO_REPLY_ID, STACK};
 use crate::state::{POOLS, REPLY_ID_TO_QUERY_ID, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX};
 use cosmwasm_std::{to_json_binary, Addr, Binary, Deps, Env};
 use neutron_sdk::{
     bindings::query::QueryRegisteredQueryResponse,
-    interchain_queries::v045::queries::{DelegatorDelegationsResponse, ValidatorResponse},
+    interchain_queries::v045::queries::ValidatorResponse,
 };
 use neutron_sdk::{
     bindings::query::{NeutronQuery, QueryInterchainAccountAddressResponse},
@@ -14,6 +14,7 @@ use neutron_sdk::{
         v045::{
             queries::BalanceResponse, types::Balances, types::Delegations, types::StakingValidator,
         },
+        v047::types::Delegations as v047Delegations,
     },
     NeutronResult,
 };
@@ -125,6 +126,7 @@ pub fn query_balance_by_addr(
 pub fn query_delegation_by_addr(
     deps: Deps<NeutronQuery>,
     addr: String,
+    sdk_greater_or_equal_v047: bool,
 ) -> NeutronResult<DelegatorDelegationsResponse> {
     let contract_query_id =
         ADDRESS_TO_REPLY_ID.load(deps.storage, (addr, QueryKind::Delegations.to_string()))?;
@@ -135,16 +137,27 @@ pub fn query_delegation_by_addr(
 
     // check that query type is KV
     check_query_type(registered_query.registered_query.query_type, QueryType::KV)?;
-    // reconstruct a nice Balances structure from raw KV-storage values
-    let delegations: Delegations = query_kv_result(deps, registered_query_id)?;
+    if sdk_greater_or_equal_v047 {
+        let delegations: v047Delegations = query_kv_result(deps, registered_query_id)?;
+        Ok(DelegatorDelegationsResponse {
+            // last_submitted_height tells us when the query result was updated last time (block height)
+            last_submitted_local_height: registered_query
+                .registered_query
+                .last_submitted_result_local_height,
+            delegations: delegations.delegations,
+        })
+    } else {
+        // reconstruct a nice Balances structure from raw KV-storage values
+        let delegations: Delegations = query_kv_result(deps, registered_query_id)?;
 
-    Ok(DelegatorDelegationsResponse {
-        // last_submitted_height tells us when the query result was updated last time (block height)
-        last_submitted_local_height: registered_query
-            .registered_query
-            .last_submitted_result_local_height,
-        delegations: delegations.delegations,
-    })
+        Ok(DelegatorDelegationsResponse {
+            // last_submitted_height tells us when the query result was updated last time (block height)
+            last_submitted_local_height: registered_query
+                .registered_query
+                .last_submitted_result_local_height,
+            delegations: delegations.delegations,
+        })
+    }
 }
 
 pub fn query_validator_by_addr(

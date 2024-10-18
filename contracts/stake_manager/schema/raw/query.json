@@ -80,11 +80,15 @@
         "delegations": {
           "type": "object",
           "required": [
-            "pool_addr"
+            "pool_addr",
+            "sdk_greater_or_equal_v047"
           ],
           "properties": {
             "pool_addr": {
               "type": "string"
+            },
+            "sdk_greater_or_equal_v047": {
+              "type": "boolean"
             }
           },
           "additionalProperties": false

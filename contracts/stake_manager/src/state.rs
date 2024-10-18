@@ -62,6 +62,7 @@ pub struct PoolInfo {
     pub lsm_support: bool,
     pub lsm_pending_limit: u64,
     pub rate_change_limit: Uint128,
+    pub sdk_greater_or_equal_v047: bool,
 }
 
 pub const POOLS: Map<String, PoolInfo> = Map::new("pools");
@@ -107,6 +108,12 @@ pub struct UnstakeInfo {
 
 // (poolAddress,unstakeIndex)
 pub const UNSTAKES_OF_INDEX: Map<(String, u64), UnstakeInfo> = Map::new("unstakes_of_index");
+
+#[cw_serde]
+pub struct DelegatorDelegationsResponse {
+    pub delegations: Vec<cosmwasm_std::Delegation>,
+    pub last_submitted_local_height: u64,
+}
 
 // for rpc query
 #[cw_serde]

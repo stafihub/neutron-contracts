@@ -202,6 +202,7 @@ pub fn sudo_open_ack(
                 lsm_support: false,
                 lsm_pending_limit: 0,
                 rate_change_limit: Uint128::zero(),
+                sdk_greater_or_equal_v047: false,
             };
 
             POOLS.save(deps.storage, pool_ica_info.ica_addr.clone(), &pool_info)?;

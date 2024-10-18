@@ -15,7 +15,6 @@ use neutron_sdk::{
 use std::ops::Div;
 use std::vec;
 
-// add execute to config the validator addrs and withdraw address on reply
 pub fn execute_init_pool(
     deps: DepsMut<NeutronQuery>,
     env: Env,
@@ -58,6 +57,7 @@ pub fn execute_init_pool(
     pool_info.platform_fee_receiver = Addr::unchecked(param.platform_fee_receiver);
     pool_info.unbonding_period = param.unbonding_period;
     pool_info.minimal_stake = param.minimal_stake;
+    pool_info.sdk_greater_or_equal_v047 = param.sdk_greater_or_equal_v047;
 
     // option
     if let Some(platform_fee_commission) = param.platform_fee_commission {

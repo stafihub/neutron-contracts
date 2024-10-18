@@ -143,6 +143,12 @@ user_unstake() {
 user_withdraw() {
     echo "--------------------------user withdraw-------------------------------------"
 
+    echo "---- user balance before withdrawal ----"
+    gaiad query bank balances "$ADDRESS_2" --node "$GAIA_NODE"
+
+    echo "---- pool balance before user withdrawal ----"
+    gaiad query bank balances "$pool_address" --node "$GAIA_NODE"
+    
     withdraw_msg=$(printf '{
   "withdraw": {
     "pool_addr": "%s",
@@ -169,8 +175,12 @@ user_withdraw() {
     done
     echo " done"
 
-    echo "pool_address balance Query"
-    gaiad query bank balances "$pool_address" --node "$GAIA_NODE" --output json | jq
+    echo "---- user balance after withdrawal ----"
+    gaiad query bank balances "$ADDRESS_2" --node "$GAIA_NODE"
+
+    echo "---- pool balance after user withdrawal ----"
+    gaiad query bank balances "$pool_address" --node "$GAIA_NODE"
+
 }
 
 user_stake_lsm() {

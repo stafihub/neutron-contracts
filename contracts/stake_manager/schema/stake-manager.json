@@ -693,6 +693,7 @@
           "minimal_stake",
           "platform_fee_receiver",
           "remote_denom",
+          "sdk_greater_or_equal_v047",
           "unbonding_period",
           "validator_addrs"
         ],
@@ -747,6 +748,9 @@
           "remote_denom": {
             "type": "string"
           },
+          "sdk_greater_or_equal_v047": {
+            "type": "boolean"
+          },
           "unbonding_period": {
             "type": "integer",
             "format": "uint64",
@@ -778,6 +782,7 @@
           "platform_fee_receiver",
           "rate",
           "remote_denom",
+          "sdk_greater_or_equal_v047",
           "share_tokens",
           "total_lsd_token_amount",
           "total_platform_fee",
@@ -850,6 +855,9 @@
           },
           "remote_denom": {
             "type": "string"
+          },
+          "sdk_greater_or_equal_v047": {
+            "type": "boolean"
           },
           "share_tokens": {
             "type": "array",
@@ -968,11 +976,15 @@
           "delegations": {
             "type": "object",
             "required": [
-              "pool_addr"
+              "pool_addr",
+              "sdk_greater_or_equal_v047"
             ],
             "properties": {
               "pool_addr": {
                 "type": "string"
+              },
+              "sdk_greater_or_equal_v047": {
+                "type": "boolean"
               }
             },
             "additionalProperties": false
@@ -1296,6 +1308,7 @@
           "minimum": 0.0
         }
       },
+      "additionalProperties": false,
       "definitions": {
         "Addr": {
           "description": "A human readable address.\n\nIn Cosmos, this is typically bech32 encoded. But for multi-chain smart contracts no assumptions should be made other than being UTF-8 encoded and of reasonable length.\n\nThis type represents a validated address. It can be created in the following ways 1. Use `Addr::unchecked(input)` 2. Use `let checked: Addr = deps.api.addr_validate(input)?` 3. Use `let checked: Addr = deps.api.addr_humanize(canonical_addr)?` 4. Deserialize from JSON. This must only be done from JSON that was validated before such as a contract's state. `Addr` must not be used in messages sent by the user because this would result in unvalidated instances.\n\nThis type is immutable. If you really need to mutate it (Really? Are you sure?), create a mutable copy using `let mut mutable = Addr::to_string()` and operate on that `String` instance.",
@@ -1893,6 +1906,7 @@
         "rate_change_limit",
         "redeemming_share_token_denom",
         "remote_denom",
+        "sdk_greater_or_equal_v047",
         "share_tokens",
         "status",
         "total_lsd_token_amount",
@@ -1982,6 +1996,9 @@
         },
         "remote_denom": {
           "type": "string"
+        },
+        "sdk_greater_or_equal_v047": {
+          "type": "boolean"
         },
         "share_tokens": {
           "type": "array",
@@ -2308,6 +2325,18 @@
             "unbonding_height"
           ],
           "properties": {
+            "consensus_pubkey": {
+              "description": "consensus_pubkey is the consensus public key of the validator, as a Protobuf Any.",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "integer",
+                "format": "uint8",
+                "minimum": 0.0
+              }
+            },
             "delegator_shares": {
               "description": "delegator_shares defines total shares issued to a validator's delegators.",
               "type": "string"

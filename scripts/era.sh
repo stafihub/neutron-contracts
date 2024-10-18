@@ -229,7 +229,7 @@ process_era() {
   echo "$query"
   neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq
 
-  query="$(printf '{"delegations": {"pool_addr": "%s"}}' "$pool_address")"
+  query="$(printf '{"delegations": {"pool_addr": "%s", "sdk_greater_or_equal_v047": true}}' "$pool_address")"
   echo "the query is $query"
   neutrond query wasm contract-state smart "$contract_address" "$query" --node "$NEUTRON_NODE" --output json | jq
 

@@ -44,7 +44,11 @@ pub fn execute_pool_update_validator(
         return Err(ContractError::NewValidatorAlreadyExist {}.into());
     }
 
-    let delegations = query_delegation_by_addr(deps.as_ref(), pool_addr.clone())?;
+    let delegations = query_delegation_by_addr(
+        deps.as_ref(),
+        pool_addr.clone(),
+        pool_info.sdk_greater_or_equal_v047,
+    )?;
 
     let mut new_validators = pool_info.validator_addrs.clone();
     new_validators.retain(|x| x.as_str() != old_validator);

@@ -35,7 +35,11 @@ pub fn execute_rm_pool_validator(
         return Err(ContractError::StatusNotAllow {}.into());
     }
 
-    let delegations = query_delegation_by_addr(deps.as_ref(), pool_addr.clone())?;
+    let delegations = query_delegation_by_addr(
+        deps.as_ref(),
+        pool_addr.clone(),
+        pool_info.sdk_greater_or_equal_v047,
+    )?;
 
     if pool_info.validator_addrs.len() <= 1 {
         return Err(ContractError::ValidatorAddressesListSize {}.into());

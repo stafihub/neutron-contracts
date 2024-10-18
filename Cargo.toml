@@ -18,7 +18,7 @@ cw2 = "1.1.2"
 cw20 = "1.1.2"
 schemars = "0.8.15"
 serde = { version = "1.0.188", default-features = false }
-serde-json-wasm = "1.0.0"
+serde-json-wasm = "1.0.1"
 cw-storage-plus = "1.1.0"
 cosmwasm-schema = { version = "1.4.0", default-features = false }
 base64 = "0.21.4"

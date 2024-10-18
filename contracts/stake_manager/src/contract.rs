@@ -99,9 +99,14 @@ pub fn query(deps: Deps<NeutronQuery>, env: Env, msg: QueryMsg) -> NeutronResult
         QueryMsg::Balance { ica_addr } => {
             Ok(to_json_binary(&query_balance_by_addr(deps, ica_addr)?)?)
         }
-        QueryMsg::Delegations { pool_addr } => {
-            Ok(to_json_binary(&query_delegation_by_addr(deps, pool_addr)?)?)
-        }
+        QueryMsg::Delegations {
+            pool_addr,
+            sdk_greater_or_equal_v047,
+        } => Ok(to_json_binary(&query_delegation_by_addr(
+            deps,
+            pool_addr,
+            sdk_greater_or_equal_v047,
+        )?)?),
         QueryMsg::Validators { pool_addr } => {
             Ok(to_json_binary(&query_validator_by_addr(deps, pool_addr)?)?)
         }

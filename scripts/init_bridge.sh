@@ -18,7 +18,7 @@ init_bridge() {
     --keyring-backend=test --gas-prices 0.0025untrn --gas auto \
     --gas-adjustment 1.4 --home "$HOME_1" \
     --node "$NEUTRON_NODE" 2>/dev/null |
-    wait_tx | jq -r '.logs[0].events[] | select(.type == "instantiate").attributes[] | select(.key == "_contract_address").value')
+    wait_tx | jq -r '.events[] | select(.type == "instantiate").attributes[] | select(.key == "_contract_address").value')
   echo "Bridge contract address: $bridge_contract_address"
 
   query="$(printf '{"bridge_info": {}}')"
