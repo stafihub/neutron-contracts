@@ -1,28 +1,21 @@
-use std::ops::{Div, Mul, Sub};
-
-use cosmwasm_std::{DepsMut, Env, Response, Uint128};
-
-use neutron_sdk::{
-    bindings::{msg::NeutronMsg, query::NeutronQuery},
-    query::min_ibc_fee::query_min_ibc_fee,
-    NeutronResult,
-};
-
+use crate::error_conversion::ContractError;
 use crate::state::EraStatus::{RebondEnded, RebondStarted, WithdrawEnded};
 use crate::state::{INFO_OF_ICA_ID, POOLS};
 use crate::{
-    error_conversion::ContractError,
-    helper::{gen_delegation_txs, min_ntrn_ibc_fee},
-};
-use crate::{
-    helper::DEFAULT_TIMEOUT_SECONDS,
+    helper::{check_ibc_fee, gen_delegation_txs, DEFAULT_TIMEOUT_SECONDS},
     state::{SudoPayload, TxType},
     tx_callback::msg_with_sudo_callback,
 };
+use cosmwasm_std::{DepsMut, Env, MessageInfo, Response, Uint128};
+use neutron_sdk::{
+    bindings::{msg::NeutronMsg, query::NeutronQuery},
+    NeutronResult,
+};
+use std::ops::{Div, Mul, Sub};
 
 pub fn execute_era_rebond(
     mut deps: DepsMut<NeutronQuery>,
-    _: Env,
+    info: MessageInfo,
     pool_addr: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
@@ -72,13 +65,14 @@ pub fn execute_era_rebond(
         msgs.push(any_msg);
     }
 
+    let ibc_fee = check_ibc_fee(deps.as_ref(), &info)?;
     let cosmos_msg = NeutronMsg::submit_tx(
         pool_ica_info.ctrl_connection_id.clone(),
         pool_info.ica_id,
         msgs,
         "".to_string(),
         DEFAULT_TIMEOUT_SECONDS,
-        min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee),
+        ibc_fee,
     );
 
     let submsg = msg_with_sudo_callback(

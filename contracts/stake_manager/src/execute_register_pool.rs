@@ -2,6 +2,7 @@ use std::ops::Div;
 
 use crate::{
     error_conversion::ContractError,
+    helper,
     state::{EraSnapshot, ValidatorUpdateStatus, STACK},
 };
 use crate::{
@@ -53,16 +54,13 @@ pub fn execute_register_pool(
         return Err(ContractError::InterchainAccountIdAlreadyExist {}.into());
     }
 
-    let register_fee = if !info.funds.is_empty() {
-        let register_fee_raw: Vec<Coin> = info
-            .funds
-            .iter()
-            .map(|c| Coin::new(c.amount.u128().div(2), c.denom.clone()))
-            .collect();
-        Some(register_fee_raw)
-    } else {
-        None
-    };
+    if info.funds.len() != 1 || info.funds[0].denom != helper::FEE_DENOM {
+        return Err(ContractError::ParamsErrorFundsNotMatch {}.into());
+    }
+    let register_fee = Some(vec![Coin::new(
+        info.funds[0].amount.u128().div(2),
+        info.funds[0].denom.clone(),
+    )]);
 
     let register_pool_msg = NeutronMsg::register_interchain_account(
         connection_id.clone(),

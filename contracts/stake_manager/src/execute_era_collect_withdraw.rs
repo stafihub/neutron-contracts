@@ -1,24 +1,18 @@
-use cosmos_sdk_proto::cosmos::bank::v1beta1::MsgSend;
-use cosmos_sdk_proto::prost::Message;
-use cosmwasm_std::{Binary, DepsMut, Env, Response, Uint128};
-
-use neutron_sdk::bindings::types::ProtobufAny;
-use neutron_sdk::{
-    bindings::{msg::NeutronMsg, query::NeutronQuery},
-    query::min_ibc_fee::query_min_ibc_fee,
-    NeutronError, NeutronResult,
-};
-
-use crate::helper::{get_withdraw_ica_id, min_ntrn_ibc_fee};
+use crate::helper::{check_ibc_fee, gen_msg_send, get_withdraw_ica_id};
 use crate::query::query_balance_by_addr;
 use crate::state::EraStatus::{BondEnded, WithdrawEnded, WithdrawStarted};
 use crate::state::{SudoPayload, TxType, INFO_OF_ICA_ID, POOLS};
 use crate::tx_callback::msg_with_sudo_callback;
 use crate::{error_conversion::ContractError, helper::DEFAULT_TIMEOUT_SECONDS};
+use cosmwasm_std::{DepsMut, Env, MessageInfo, Response, Uint128};
+use neutron_sdk::{
+    bindings::{msg::NeutronMsg, query::NeutronQuery},
+    NeutronError, NeutronResult,
+};
 
 pub fn execute_era_collect_withdraw(
     mut deps: DepsMut<NeutronQuery>,
-    _: Env,
+    info: MessageInfo,
     pool_addr: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
@@ -62,36 +56,19 @@ pub fn execute_era_collect_withdraw(
         return Ok(Response::default());
     }
 
-    let tx_withdraw_coin = cosmos_sdk_proto::cosmos::base::v1beta1::Coin {
-        denom: pool_info.remote_denom.clone(),
-        amount: withdraw_amount.to_string(),
-    };
-
-    let inter_send = MsgSend {
-        from_address: withdraw_ica_info.ica_addr.clone(),
-        to_address: pool_addr.clone(),
-        amount: vec![tx_withdraw_coin],
-    };
-
-    let mut buf = Vec::new();
-    buf.reserve(inter_send.encoded_len());
-
-    if let Err(e) = inter_send.encode(&mut buf) {
-        return Err(ContractError::EncodeError(e.to_string()).into());
-    }
-    let any_msg = ProtobufAny {
-        type_url: "/cosmos.bank.v1beta1.MsgSend".to_string(),
-        value: Binary::from(buf),
-    };
-
-    let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
+    let ibc_fee = check_ibc_fee(deps.as_ref(), &info)?;
     let cosmos_msg = NeutronMsg::submit_tx(
         withdraw_ica_info.ctrl_connection_id.clone(),
         get_withdraw_ica_id(pool_info.ica_id.clone()),
-        vec![any_msg],
+        vec![gen_msg_send(
+            withdraw_ica_info.ica_addr.clone(),
+            pool_addr.clone(),
+            pool_info.remote_denom.clone(),
+            withdraw_amount.to_string(),
+        )?],
         "".to_string(),
         DEFAULT_TIMEOUT_SECONDS,
-        fee.clone(),
+        ibc_fee,
     );
 
     let submsg = msg_with_sudo_callback(

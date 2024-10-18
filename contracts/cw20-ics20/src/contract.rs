@@ -669,7 +669,7 @@ mod test {
     #[test]
     fn memo_is_backwards_compatible() {
         let mut deps = setup(&["channel-5", "channel-10"], &[]);
-        let transfer: TransferMsg = cosmwasm_std::from_slice(
+        let transfer: TransferMsg = cosmwasm_std::from_json(
             br#"{"channel": "channel-5", "remote_address": "foreign-address"}"#,
         )
         .unwrap();

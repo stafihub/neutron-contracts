@@ -33,6 +33,7 @@ migrate_pool() {
   tx_result="$(
     neutrond tx wasm execute "$contract_address" "$msg" \
       --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
+      --amount 4200000untrn \
       --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \
       --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx
   )"

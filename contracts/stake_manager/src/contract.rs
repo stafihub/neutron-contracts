@@ -165,11 +165,11 @@ pub fn execute(
             pool_addr,
             receiver,
             unstake_index_list,
-        } => execute_withdraw(deps, env, info, pool_addr, receiver, unstake_index_list),
+        } => execute_withdraw(deps, info, pool_addr, receiver, unstake_index_list),
         ExecuteMsg::PoolRmValidator {
             pool_addr,
             validator_addr,
-        } => execute_rm_pool_validator(deps, env, info, pool_addr, validator_addr),
+        } => execute_rm_pool_validator(deps, info, pool_addr, validator_addr),
         ExecuteMsg::PoolAddValidator {
             pool_addr,
             validator_addr,
@@ -178,18 +178,16 @@ pub fn execute(
             pool_addr,
             old_validator,
             new_validator,
-        } => {
-            execute_pool_update_validator(deps, env, info, pool_addr, old_validator, new_validator)
-        }
+        } => execute_pool_update_validator(deps, info, pool_addr, old_validator, new_validator),
         ExecuteMsg::PoolUpdateValidatorsIcq { pool_addr } => {
             execute_update_validators_icq(deps, env, info, pool_addr)
         }
-        ExecuteMsg::EraUpdate { pool_addr } => execute_era_update(deps, env, pool_addr),
-        ExecuteMsg::EraBond { pool_addr } => execute_era_bond(deps, env, pool_addr),
+        ExecuteMsg::EraUpdate { pool_addr } => execute_era_update(deps, env, info, pool_addr),
+        ExecuteMsg::EraBond { pool_addr } => execute_era_bond(deps, env, info, pool_addr),
         ExecuteMsg::EraCollectWithdraw { pool_addr } => {
-            execute_era_collect_withdraw(deps, env, pool_addr)
+            execute_era_collect_withdraw(deps, info, pool_addr)
         }
-        ExecuteMsg::EraRebond { pool_addr } => execute_era_rebond(deps, env, pool_addr),
+        ExecuteMsg::EraRebond { pool_addr } => execute_era_rebond(deps, info, pool_addr),
         ExecuteMsg::EraActive { pool_addr } => execute_era_active(deps, pool_addr),
         ExecuteMsg::StakeLsm {
             neutron_address,

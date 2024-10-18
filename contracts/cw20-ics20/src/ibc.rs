@@ -401,7 +401,7 @@ mod test {
     use crate::contract::{execute, migrate, query_channel};
     use crate::msg::{ExecuteMsg, MigrateMsg, TransferMsg};
     use cosmwasm_std::testing::{mock_env, mock_info};
-    use cosmwasm_std::{coins, to_vec, IbcEndpoint, IbcMsg, IbcTimeout, Timestamp};
+    use cosmwasm_std::{coins, to_json_vec, IbcEndpoint, IbcMsg, IbcTimeout, Timestamp};
     use cw20::Cw20ReceiveMsg;
 
     #[test]
@@ -409,10 +409,10 @@ mod test {
         let success = Ics20Ack::Result(b"1".into());
         let fail = Ics20Ack::Error("bad coin".into());
 
-        let success_json = String::from_utf8(to_vec(&success).unwrap()).unwrap();
+        let success_json = String::from_utf8(to_json_vec(&success).unwrap()).unwrap();
         assert_eq!(r#"{"result":"MQ=="}"#, success_json.as_str());
 
-        let fail_json = String::from_utf8(to_vec(&fail).unwrap()).unwrap();
+        let fail_json = String::from_utf8(to_json_vec(&fail).unwrap()).unwrap();
         assert_eq!(r#"{"error":"bad coin"}"#, fail_json.as_str());
     }
 
@@ -427,7 +427,7 @@ mod test {
         // Example message generated from the SDK
         let expected = r#"{"amount":"12345","denom":"ucosm","receiver":"wasm1fucynrfkrt684pm8jrt8la5h2csvs5cnldcgqc","sender":"cosmos1zedxv25ah8fksmg2lzrndrpkvsjqgk4zt5ff7n"}"#;
 
-        let encdoded = String::from_utf8(to_vec(&packet).unwrap()).unwrap();
+        let encdoded = String::from_utf8(to_json_vec(&packet).unwrap()).unwrap();
         assert_eq!(expected, encdoded.as_str());
     }
 

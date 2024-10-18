@@ -1,32 +1,25 @@
-use std::vec;
-use std::{
-    collections::HashSet,
-    ops::{Div, Mul, Sub},
-};
-
+use crate::helper::{check_ibc_fee, STAKE_SPLIT_THRESHOLD};
+use crate::state::EraStatus::{BondEnded, BondStarted, EraUpdateEnded};
+use crate::state::{SudoPayload, TxType, INFO_OF_ICA_ID, POOLS, VALIDATORS_UNBONDS_TIME};
+use crate::tx_callback::msg_with_sudo_callback;
+use crate::{error_conversion::ContractError, helper::gen_delegation_txs};
+use crate::{helper::DEFAULT_TIMEOUT_SECONDS, query::query_delegation_by_addr};
 use cosmos_sdk_proto::cosmos::staking::v1beta1::MsgUndelegate;
 use cosmos_sdk_proto::cosmos::{
     base::v1beta1::Coin, distribution::v1beta1::MsgWithdrawDelegatorReward,
 };
 use cosmos_sdk_proto::prost::Message;
-use cosmwasm_std::{Binary, Delegation, DepsMut, Env, Response, Uint128};
-
+use cosmwasm_std::{Binary, Delegation, DepsMut, Env, MessageInfo, Response, Uint128};
 use neutron_sdk::bindings::types::ProtobufAny;
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
-    query::min_ibc_fee::query_min_ibc_fee,
     NeutronResult,
 };
-
-use crate::helper::STAKE_SPLIT_THRESHOLD;
-use crate::state::EraStatus::{BondEnded, BondStarted, EraUpdateEnded};
-use crate::state::{SudoPayload, TxType, INFO_OF_ICA_ID, POOLS, VALIDATORS_UNBONDS_TIME};
-use crate::tx_callback::msg_with_sudo_callback;
-use crate::{
-    error_conversion::ContractError,
-    helper::{gen_delegation_txs, min_ntrn_ibc_fee},
+use std::vec;
+use std::{
+    collections::HashSet,
+    ops::{Div, Mul, Sub},
 };
-use crate::{helper::DEFAULT_TIMEOUT_SECONDS, query::query_delegation_by_addr};
 
 #[derive(Clone, Debug)]
 struct ValidatorUnbondInfo {
@@ -37,6 +30,7 @@ struct ValidatorUnbondInfo {
 pub fn execute_era_bond(
     mut deps: DepsMut<NeutronQuery>,
     env: Env,
+    info: MessageInfo,
     pool_addr: String,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
@@ -210,14 +204,14 @@ pub fn execute_era_bond(
 
     let (pool_ica_info, _, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
 
-    let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
+    let ibc_fee = check_ibc_fee(deps.as_ref(), &info)?;
     let cosmos_msg = NeutronMsg::submit_tx(
         pool_ica_info.ctrl_connection_id,
         pool_info.ica_id.clone(),
         msgs,
         "".to_string(),
         DEFAULT_TIMEOUT_SECONDS,
-        fee,
+        ibc_fee,
     );
 
     let submsg = msg_with_sudo_callback(

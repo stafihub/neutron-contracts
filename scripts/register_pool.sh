@@ -13,7 +13,6 @@ register_pool() {
     --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
     --broadcast-mode=sync --gas-prices 0.0055untrn --gas 2000000 \
     --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx)"
-  # --amount 2000000untrn \
 
   code="$(echo "$tx_result" | jq '.code')"
   if [[ "$code" -ne 0 ]]; then

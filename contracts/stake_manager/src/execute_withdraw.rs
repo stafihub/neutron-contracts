@@ -1,25 +1,19 @@
-use crate::helper::min_ntrn_ibc_fee;
+use crate::helper::{check_ibc_fee, gen_msg_send};
 use crate::state::{
     SudoPayload, TxType, WithdrawStatus, INFO_OF_ICA_ID, POOLS, UNSTAKES_INDEX_FOR_USER,
     UNSTAKES_OF_INDEX,
 };
 use crate::tx_callback::msg_with_sudo_callback;
 use crate::{error_conversion::ContractError, helper::DEFAULT_TIMEOUT_SECONDS};
-use cosmos_sdk_proto::cosmos::bank::v1beta1::MsgSend;
-use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
-use cosmos_sdk_proto::prost::Message;
-use cosmwasm_std::{Addr, Binary, DepsMut, Env, MessageInfo, Response, Uint128};
-use neutron_sdk::bindings::types::ProtobufAny;
+use cosmwasm_std::{Addr, DepsMut, MessageInfo, Response, Uint128};
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
-    query::min_ibc_fee::query_min_ibc_fee,
     NeutronResult,
 };
 use std::vec;
 
 pub fn execute_withdraw(
     mut deps: DepsMut<NeutronQuery>,
-    _: Env,
     info: MessageInfo,
     pool_addr: String,
     receiver: Addr,
@@ -73,35 +67,20 @@ pub fn execute_withdraw(
         .join("_");
 
     // interchain tx send atom
-    let fee = min_ntrn_ibc_fee(query_min_ibc_fee(deps.as_ref())?.min_fee);
-    let ica_send = MsgSend {
-        from_address: pool_addr.clone(),
-        to_address: receiver.to_string(),
-        amount: Vec::from([Coin {
-            denom: pool_info.remote_denom,
-            amount: total_withdraw_amount.to_string(),
-        }]),
-    };
-    let mut buf = Vec::new();
-    buf.reserve(ica_send.encoded_len());
-
-    if let Err(e) = ica_send.encode(&mut buf) {
-        return Err(ContractError::EncodeError(e.to_string()).into());
-    }
-
-    let send_msg = ProtobufAny {
-        type_url: "/cosmos.bank.v1beta1.MsgSend".to_string(),
-        value: Binary::from(buf),
-    };
-
+    let ibc_fee = check_ibc_fee(deps.as_ref(), &info)?;
     let (pool_ica_info, _, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
     let cosmos_msg = NeutronMsg::submit_tx(
         pool_ica_info.ctrl_connection_id.clone(),
         pool_info.ica_id.clone(),
-        vec![send_msg],
+        vec![gen_msg_send(
+            pool_addr.clone(),
+            receiver.to_string(),
+            pool_info.remote_denom,
+            total_withdraw_amount.to_string(),
+        )?],
         "".to_string(),
         DEFAULT_TIMEOUT_SECONDS,
-        fee,
+        ibc_fee,
     );
 
     // We use a submessage here because we need the process message reply to save
