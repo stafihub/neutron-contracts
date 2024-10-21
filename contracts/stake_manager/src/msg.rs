@@ -184,6 +184,10 @@ pub enum ExecuteMsg {
     PoolUpdateValidatorsIcq {
         pool_addr: String,
     },
+    PoolDelegate {
+        pool_addr: String,
+        stake_amount: Uint128,
+    },
     EraUpdate {
         pool_addr: String,
     },

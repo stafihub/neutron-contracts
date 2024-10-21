@@ -315,6 +315,31 @@
     {
       "type": "object",
       "required": [
+        "pool_delegate"
+      ],
+      "properties": {
+        "pool_delegate": {
+          "type": "object",
+          "required": [
+            "pool_addr",
+            "stake_amount"
+          ],
+          "properties": {
+            "pool_addr": {
+              "type": "string"
+            },
+            "stake_amount": {
+              "$ref": "#/definitions/Uint128"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
         "era_update"
       ],
       "properties": {

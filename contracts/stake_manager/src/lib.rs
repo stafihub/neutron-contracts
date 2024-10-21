@@ -15,6 +15,7 @@ pub mod execute_icq_update_period;
 pub mod execute_init_pool;
 pub mod execute_migrate_pool;
 pub mod execute_pool_add_validator;
+pub mod execute_pool_delegate;
 pub mod execute_pool_rm_validator;
 pub mod execute_pool_update_validator;
 pub mod execute_register_pool;

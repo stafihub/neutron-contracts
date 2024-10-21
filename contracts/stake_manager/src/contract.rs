@@ -8,6 +8,7 @@ use crate::execute_init_pool::execute_init_pool;
 use crate::execute_migrate_pool::execute_migrate_pool;
 use crate::execute_open_channel::execute_open_channel;
 use crate::execute_pool_add_validator::execute_add_pool_validators;
+use crate::execute_pool_delegate::execute_pool_delegate;
 use crate::execute_pool_rm_validator::execute_rm_pool_validator;
 use crate::execute_pool_update_validator::execute_pool_update_validator;
 use crate::execute_redeem_token_for_share::execute_redeem_token_for_share;
@@ -182,6 +183,10 @@ pub fn execute(
         ExecuteMsg::PoolUpdateValidatorsIcq { pool_addr } => {
             execute_update_validators_icq(deps, env, info, pool_addr)
         }
+        ExecuteMsg::PoolDelegate {
+            pool_addr,
+            stake_amount,
+        } => execute_pool_delegate(deps, info, pool_addr, stake_amount),
         ExecuteMsg::EraUpdate { pool_addr } => execute_era_update(deps, env, info, pool_addr),
         ExecuteMsg::EraBond { pool_addr } => execute_era_bond(deps, env, info, pool_addr),
         ExecuteMsg::EraCollectWithdraw { pool_addr } => {
