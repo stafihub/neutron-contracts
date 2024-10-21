@@ -11,12 +11,12 @@ pub struct Stack {
     pub admin: Addr,
     pub stack_fee_receiver: Addr,
     pub stack_fee_commission: Uint128,
-    pub total_stack_fee: Uint128,
     pub pools: Vec<String>,
     pub lsd_token_code_id: u64,
 }
 
 pub const STACK: Item<Stack> = Item::new("stack");
+pub const TOTAL_STACK_FEE: Map<String, Uint128> = Map::new("total_stack_fee");
 
 #[cw_serde]
 pub struct EraSnapshot {

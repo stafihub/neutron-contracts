@@ -1,14 +1,12 @@
-use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Coin, Uint128};
-
-use neutron_sdk::{
-    bindings::query::{QueryInterchainAccountAddressResponse, QueryRegisteredQueryResponse},
-    interchain_queries::v045::queries::{BalanceResponse, ValidatorResponse},
-};
-
 use crate::state::{
     DelegatorDelegationsResponse, EraSnapshot, IcaInfo, IcaInfos, PoolInfo, QueryIds, QueryKind,
     Stack, UnstakeInfo,
+};
+use cosmwasm_schema::{cw_serde, QueryResponses};
+use cosmwasm_std::{Addr, Coin, Uint128};
+use neutron_sdk::{
+    bindings::query::{QueryInterchainAccountAddressResponse, QueryRegisteredQueryResponse},
+    interchain_queries::v045::queries::{BalanceResponse, ValidatorResponse},
 };
 
 #[cw_serde]
@@ -39,6 +37,8 @@ pub enum QueryMsg {
     PoolInfo { pool_addr: String },
     #[returns(Stack)]
     StackInfo {},
+    #[returns(Uint128)]
+    TotalStackFee { pool_addr: String },
     #[returns(EraSnapshot)]
     EraSnapshot { pool_addr: String },
     /// this query goes to neutron and get stored ICA with a specific query
@@ -116,7 +116,6 @@ pub struct ConfigStackParams {
     pub stack_fee_receiver: Option<Addr>,
     pub new_admin: Option<Addr>,
     pub stack_fee_commission: Option<Uint128>,
-    pub total_stack_fee: Option<Uint128>,
     pub lsd_token_code_id: Option<u64>,
     pub add_entrusted_pool: Option<String>,
 }

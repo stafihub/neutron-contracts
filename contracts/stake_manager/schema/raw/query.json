@@ -154,6 +154,27 @@
     {
       "type": "object",
       "required": [
+        "total_stack_fee"
+      ],
+      "properties": {
+        "total_stack_fee": {
+          "type": "object",
+          "required": [
+            "pool_addr"
+          ],
+          "properties": {
+            "pool_addr": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
         "era_snapshot"
       ],
       "properties": {

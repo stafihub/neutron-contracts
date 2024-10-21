@@ -20,7 +20,6 @@ use crate::helper::{
     QUERY_REPLY_ID_RANGE_END, QUERY_REPLY_ID_RANGE_START, REPLY_ID_RANGE_END, REPLY_ID_RANGE_START,
 };
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
-use crate::query::query_stack_info;
 use crate::query::query_user_unstake_index;
 use crate::query::{query_balance_by_addr, query_validator_by_addr};
 use crate::query::{query_delegation_by_addr, query_era_rate};
@@ -29,6 +28,7 @@ use crate::query::{
     query_interchain_address, query_interchain_address_contract, query_pool_info,
     query_user_unstake,
 };
+use crate::query::{query_stack_info, query_total_stack_fee};
 use crate::query_callback::write_reply_id_to_query_id;
 use crate::state::{Stack, STACK};
 use crate::tx_callback::{prepare_sudo_payload, sudo_error, sudo_response, sudo_timeout};
@@ -69,7 +69,6 @@ pub fn instantiate(
             admin: info.sender.clone(),
             stack_fee_receiver: info.sender.clone(),
             stack_fee_commission: Uint128::new(100_000),
-            total_stack_fee: Uint128::zero(),
             pools: vec![],
             lsd_token_code_id: msg.lsd_token_code_id,
         }),
@@ -112,6 +111,7 @@ pub fn query(deps: Deps<NeutronQuery>, env: Env, msg: QueryMsg) -> NeutronResult
         }
         QueryMsg::PoolInfo { pool_addr } => query_pool_info(deps, env, pool_addr),
         QueryMsg::StackInfo {} => query_stack_info(deps),
+        QueryMsg::TotalStackFee { pool_addr } => query_total_stack_fee(deps, pool_addr),
         QueryMsg::EraSnapshot { pool_addr } => query_era_snapshot(deps, env, pool_addr),
         QueryMsg::InterchainAccountAddress {
             interchain_account_id,

@@ -7,8 +7,7 @@
     "lsd_token_code_id",
     "pools",
     "stack_fee_commission",
-    "stack_fee_receiver",
-    "total_stack_fee"
+    "stack_fee_receiver"
   ],
   "properties": {
     "admin": {
@@ -30,9 +29,6 @@
     },
     "stack_fee_receiver": {
       "$ref": "#/definitions/Addr"
-    },
-    "total_stack_fee": {
-      "$ref": "#/definitions/Uint128"
     }
   },
   "additionalProperties": false,

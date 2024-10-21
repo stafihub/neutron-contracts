@@ -1,5 +1,7 @@
 use crate::query_callback::register_query_submsg;
-use crate::state::{IcaInfo, PoolInfo, QueryKind, SudoPayload, TxType, ERA_RATE, POOLS};
+use crate::state::{
+    IcaInfo, PoolInfo, QueryKind, SudoPayload, TxType, ERA_RATE, POOLS, TOTAL_STACK_FEE,
+};
 use crate::state::{ADDRESS_TO_REPLY_ID, INFO_OF_ICA_ID, REPLY_ID_TO_QUERY_ID};
 use crate::tx_callback::msg_with_sudo_callback;
 use crate::{error_conversion::ContractError, state::EraStatus};
@@ -390,6 +392,11 @@ pub fn deal_pool(
         deps.storage,
         (pool_ica_info.ica_addr.clone(), pool_info.era),
         &pool_info.rate,
+    )?;
+    TOTAL_STACK_FEE.save(
+        deps.storage,
+        pool_ica_info.ica_addr.clone(),
+        &Uint128::zero(),
     )?;
 
     let register_balance_pool_submsg = register_query_submsg(

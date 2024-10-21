@@ -1,4 +1,4 @@
-use crate::state::{DelegatorDelegationsResponse, ADDRESS_TO_REPLY_ID, STACK};
+use crate::state::{DelegatorDelegationsResponse, ADDRESS_TO_REPLY_ID, STACK, TOTAL_STACK_FEE};
 use crate::state::{IcaInfos, QueryIds, QueryKind, ERA_RATE, INFO_OF_ICA_ID};
 use crate::state::{POOLS, REPLY_ID_TO_QUERY_ID, UNSTAKES_INDEX_FOR_USER, UNSTAKES_OF_INDEX};
 use cosmwasm_std::{to_json_binary, Addr, Binary, Deps, Env};
@@ -199,6 +199,12 @@ pub fn query_stack_info(deps: Deps<NeutronQuery>) -> NeutronResult<Binary> {
     let stack_info = STACK.load(deps.storage)?;
 
     Ok(to_json_binary(&stack_info)?)
+}
+
+pub fn query_total_stack_fee(deps: Deps<NeutronQuery>, pool_addr: String) -> NeutronResult<Binary> {
+    Ok(to_json_binary(
+        &TOTAL_STACK_FEE.load(deps.storage, pool_addr)?,
+    )?)
 }
 
 pub fn query_era_snapshot(

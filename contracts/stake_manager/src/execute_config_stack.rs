@@ -23,9 +23,6 @@ pub fn execute_config_stack(
     if let Some(stack_fee_commission) = param.stack_fee_commission {
         stack.stack_fee_commission = stack_fee_commission;
     }
-    if let Some(total_stack_fee) = param.total_stack_fee {
-        stack.total_stack_fee = total_stack_fee;
-    }
     if let Some(new_admin) = param.new_admin {
         stack.admin = new_admin;
     }
