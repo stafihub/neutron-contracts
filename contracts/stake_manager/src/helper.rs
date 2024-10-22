@@ -584,6 +584,8 @@ struct IcqParams {
     query_submit_timeout: Uint64,
     query_deposit: Vec<cosmwasm_std::Coin>,
     tx_query_removal_limit: Uint64,
+    max_kv_query_keys_count: Option<Uint64>,
+    max_transactions_filters: Option<Uint64>,
 }
 
 impl IcqParams {
