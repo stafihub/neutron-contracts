@@ -1,6 +1,8 @@
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
-use crate::state::{get_proposal_id, BridgeInfo, Proposal, BRIDGE_INFO, PROPOSALS};
+use crate::state::{
+    get_proposal_id, BridgeInfo, Proposal, BRIDGE_INFO, PROPOSALS, RESOURCE_ID_TO_TOKEN,
+};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
@@ -30,7 +32,6 @@ pub fn instantiate(
         deps.storage,
         &BridgeInfo {
             admin: msg.admin,
-            lsd_token: msg.lsd_token,
             threshold: msg.threshold,
             relayers: msg.relayers,
         },
@@ -42,7 +43,7 @@ pub fn instantiate(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
-    env: Env,
+    _env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
@@ -50,17 +51,30 @@ pub fn execute(
         ExecuteMsg::VoteProposal {
             chain_id,
             deposit_nonce,
+            resource_id,
             recipient,
             amount,
-        } => execute_vote_proposal(deps, env, info, chain_id, deposit_nonce, recipient, amount),
-        ExecuteMsg::AddRelayer { relayer } => execute_add_relayer(deps, env, info, relayer),
-        ExecuteMsg::RemoveRelayer { relayer } => execute_remove_relayer(deps, env, info, relayer),
+        } => execute_vote_proposal(
+            deps,
+            info,
+            chain_id,
+            deposit_nonce,
+            resource_id,
+            recipient,
+            amount,
+        ),
+        ExecuteMsg::AddRelayer { relayer } => execute_add_relayer(deps, info, relayer),
+        ExecuteMsg::RemoveRelayer { relayer } => execute_remove_relayer(deps, info, relayer),
+        ExecuteMsg::AddResourceIdToToken { resource_id, token } => {
+            execute_add_resource_id_to_token(deps, info, resource_id, token)
+        }
+        ExecuteMsg::RemoveResourceId { resource_id } => {
+            execute_remove_resource_id(deps, info, resource_id)
+        }
         ExecuteMsg::ChangeThreshold { threshold } => {
-            execute_change_threshold(deps, env, info, threshold)
+            execute_change_threshold(deps, info, threshold)
         }
-        ExecuteMsg::TransferAdmin { new_admin } => {
-            execute_transfer_admin(deps, env, info, new_admin)
-        }
+        ExecuteMsg::TransferAdmin { new_admin } => execute_transfer_admin(deps, info, new_admin),
     }
 }
 
@@ -71,12 +85,14 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::Proposal {
             chain_id,      // source chain id
             deposit_nonce, // deposit nonce from source chain
+            resource_id,
             recipient,
             amount,
         } => to_json_binary(&query_proposal(
             deps,
             chain_id,
             deposit_nonce,
+            resource_id,
             recipient,
             amount,
         )?),
@@ -93,12 +109,13 @@ pub fn query_proposal(
     deps: Deps,
     chain_id: u64,      // source chain id
     deposit_nonce: u64, // deposit nonce from source chain
+    resource_id: String,
     recipient: Addr,
     amount: Uint128,
 ) -> StdResult<Proposal> {
     let proposal = PROPOSALS.load(
         deps.storage,
-        get_proposal_id(chain_id, deposit_nonce, recipient, amount),
+        get_proposal_id(chain_id, deposit_nonce, &resource_id, recipient, amount),
     )?;
 
     Ok(proposal)
@@ -106,10 +123,10 @@ pub fn query_proposal(
 
 pub fn execute_vote_proposal(
     deps: DepsMut,
-    _env: Env,
     info: MessageInfo,
     chain_id: u64,      // source chain id
     deposit_nonce: u64, // deposit nonce from source chain
+    resource_id: String,
     recipient: Addr,
     amount: Uint128,
 ) -> Result<Response, ContractError> {
@@ -118,7 +135,13 @@ pub fn execute_vote_proposal(
     if !bridge_info.relayers.contains(&info.sender) {
         return Err(ContractError::Unauthorized {});
     }
-    let proposal_id = get_proposal_id(chain_id, deposit_nonce, recipient.clone(), amount);
+    let proposal_id = get_proposal_id(
+        chain_id,
+        deposit_nonce,
+        &resource_id,
+        recipient.clone(),
+        amount,
+    );
 
     let mut proposal = if PROPOSALS.has(deps.storage, proposal_id.clone()) {
         let proposal = PROPOSALS.load(deps.storage, proposal_id.clone())?;
@@ -127,6 +150,7 @@ pub fn execute_vote_proposal(
         Proposal {
             chain_id,
             deposit_nonce,
+            resource_id,
             recipient,
             amount,
             executed: false,
@@ -145,8 +169,11 @@ pub fn execute_vote_proposal(
 
     let mut res = Response::new();
     if proposal.voters.len() as u64 >= bridge_info.threshold {
+        let token_address =
+            RESOURCE_ID_TO_TOKEN.load(deps.storage, proposal.resource_id.clone())?;
+
         let msg = WasmMsg::Execute {
-            contract_addr: bridge_info.lsd_token.to_string(),
+            contract_addr: token_address.to_string(),
             msg: to_json_binary(
                 &(lsd_token::msg::ExecuteMsg::Mint {
                     recipient: proposal.recipient.clone().into_string(),
@@ -167,12 +194,13 @@ pub fn execute_vote_proposal(
         .add_attribute("executed", proposal.executed.to_string())
         .add_attribute("recipient", proposal.recipient)
         .add_attribute("chain_id", chain_id.to_string())
+        .add_attribute("deposit_nonce", proposal.deposit_nonce.to_string())
+        .add_attribute("resource_id", &proposal.resource_id)
         .add_attribute("amount", proposal.amount))
 }
 
 pub fn execute_add_relayer(
     deps: DepsMut,
-    _env: Env,
     info: MessageInfo,
     relayer: Addr,
 ) -> Result<Response, ContractError> {
@@ -191,7 +219,6 @@ pub fn execute_add_relayer(
 }
 pub fn execute_remove_relayer(
     deps: DepsMut,
-    _env: Env,
     info: MessageInfo,
     relayer: Addr,
 ) -> Result<Response, ContractError> {
@@ -213,9 +240,45 @@ pub fn execute_remove_relayer(
     Ok(Response::default().add_attribute("action", "remove_relayer"))
 }
 
+pub fn execute_add_resource_id_to_token(
+    deps: DepsMut,
+    info: MessageInfo,
+    resource_id: String,
+    token: Addr,
+) -> Result<Response, ContractError> {
+    let bridge_info = BRIDGE_INFO.load(deps.storage)?;
+    if bridge_info.admin != info.sender {
+        return Err(ContractError::Unauthorized {});
+    }
+    if RESOURCE_ID_TO_TOKEN.has(deps.storage, resource_id.clone()) {
+        return Err(ContractError::Duplicate {});
+    }
+
+    RESOURCE_ID_TO_TOKEN.save(deps.storage, resource_id, &token)?;
+
+    Ok(Response::default().add_attribute("action", "add_resource_id_to_token"))
+}
+
+pub fn execute_remove_resource_id(
+    deps: DepsMut,
+    info: MessageInfo,
+    resource_id: String,
+) -> Result<Response, ContractError> {
+    let bridge_info = BRIDGE_INFO.load(deps.storage)?;
+    if bridge_info.admin != info.sender {
+        return Err(ContractError::Unauthorized {});
+    }
+    if !RESOURCE_ID_TO_TOKEN.has(deps.storage, resource_id.clone()) {
+        return Err(ContractError::NotExist {});
+    }
+
+    RESOURCE_ID_TO_TOKEN.remove(deps.storage, resource_id);
+
+    Ok(Response::default().add_attribute("action", "remove_resource_id"))
+}
+
 pub fn execute_change_threshold(
     deps: DepsMut,
-    _env: Env,
     info: MessageInfo,
     threshold: u64,
 ) -> Result<Response, ContractError> {
@@ -236,7 +299,6 @@ pub fn execute_change_threshold(
 
 pub fn execute_transfer_admin(
     deps: DepsMut,
-    _env: Env,
     info: MessageInfo,
     new_admin: String,
 ) -> Result<Response, ContractError> {

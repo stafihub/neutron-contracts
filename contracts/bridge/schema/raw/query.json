@@ -27,7 +27,8 @@
             "amount",
             "chain_id",
             "deposit_nonce",
-            "recipient"
+            "recipient",
+            "resource_id"
           ],
           "properties": {
             "amount": {
@@ -45,6 +46,9 @@
             },
             "recipient": {
               "$ref": "#/definitions/Addr"
+            },
+            "resource_id": {
+              "type": "string"
             }
           },
           "additionalProperties": false

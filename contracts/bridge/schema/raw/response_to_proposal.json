@@ -8,6 +8,7 @@
     "deposit_nonce",
     "executed",
     "recipient",
+    "resource_id",
     "voters"
   ],
   "properties": {
@@ -29,6 +30,9 @@
     },
     "recipient": {
       "$ref": "#/definitions/Addr"
+    },
+    "resource_id": {
+      "type": "string"
     },
     "voters": {
       "type": "array",

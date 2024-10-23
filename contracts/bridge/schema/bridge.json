@@ -8,15 +8,11 @@
     "type": "object",
     "required": [
       "admin",
-      "lsd_token",
       "relayers",
       "threshold"
     ],
     "properties": {
       "admin": {
-        "$ref": "#/definitions/Addr"
-      },
-      "lsd_token": {
         "$ref": "#/definitions/Addr"
       },
       "relayers": {
@@ -55,7 +51,8 @@
               "amount",
               "chain_id",
               "deposit_nonce",
-              "recipient"
+              "recipient",
+              "resource_id"
             ],
             "properties": {
               "amount": {
@@ -73,6 +70,9 @@
               },
               "recipient": {
                 "$ref": "#/definitions/Addr"
+              },
+              "resource_id": {
+                "type": "string"
               }
             },
             "additionalProperties": false
@@ -115,6 +115,52 @@
             "properties": {
               "relayer": {
                 "$ref": "#/definitions/Addr"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
+          "add_resource_id_to_token"
+        ],
+        "properties": {
+          "add_resource_id_to_token": {
+            "type": "object",
+            "required": [
+              "resource_id",
+              "token"
+            ],
+            "properties": {
+              "resource_id": {
+                "type": "string"
+              },
+              "token": {
+                "$ref": "#/definitions/Addr"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
+          "remove_resource_id"
+        ],
+        "properties": {
+          "remove_resource_id": {
+            "type": "object",
+            "required": [
+              "resource_id"
+            ],
+            "properties": {
+              "resource_id": {
+                "type": "string"
               }
             },
             "additionalProperties": false
@@ -207,7 +253,8 @@
               "amount",
               "chain_id",
               "deposit_nonce",
-              "recipient"
+              "recipient",
+              "resource_id"
             ],
             "properties": {
               "amount": {
@@ -225,6 +272,9 @@
               },
               "recipient": {
                 "$ref": "#/definitions/Addr"
+              },
+              "resource_id": {
+                "type": "string"
               }
             },
             "additionalProperties": false
@@ -253,15 +303,11 @@
       "type": "object",
       "required": [
         "admin",
-        "lsd_token",
         "relayers",
         "threshold"
       ],
       "properties": {
         "admin": {
-          "$ref": "#/definitions/Addr"
-        },
-        "lsd_token": {
           "$ref": "#/definitions/Addr"
         },
         "relayers": {
@@ -294,6 +340,7 @@
         "deposit_nonce",
         "executed",
         "recipient",
+        "resource_id",
         "voters"
       ],
       "properties": {
@@ -315,6 +362,9 @@
         },
         "recipient": {
           "$ref": "#/definitions/Addr"
+        },
+        "resource_id": {
+          "type": "string"
         },
         "voters": {
           "type": "array",

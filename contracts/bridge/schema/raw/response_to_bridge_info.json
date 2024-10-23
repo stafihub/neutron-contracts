@@ -4,15 +4,11 @@
   "type": "object",
   "required": [
     "admin",
-    "lsd_token",
     "relayers",
     "threshold"
   ],
   "properties": {
     "admin": {
-      "$ref": "#/definitions/Addr"
-    },
-    "lsd_token": {
       "$ref": "#/definitions/Addr"
     },
     "relayers": {
