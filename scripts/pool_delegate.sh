@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
 pool_delegate() {
-  gaiad tx bank send "$ADDRESS_2" "$pool_address" 880000uatom \
+  gaiad tx bank send "$ADDRESS_2" "$pool_address" 880000$HOSTCHAINDENOM \
         --gas auto --gas-adjustment 1.4 \
-        --fees 1000uatom --from $ADDRESS_2 \
+        --fees 1000$HOSTCHAINDENOM --from $ADDRESS_2 \
         --keyring-backend=test --home="$HOME_2" \
         --chain-id="$CHAIN_ID_2" --node "$GAIA_NODE" \
         -y --output json | wait_tx_gaia
@@ -35,5 +35,5 @@ pool_delegate() {
     echo -n .
   done
 
-  gaiad query staking delegations "$pool_address" --node "$GAIA_NODE" --output json | jq
+  $BINARY query staking delegations "$pool_address" --node "$GAIA_NODE" --output json | jq
 }

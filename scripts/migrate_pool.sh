@@ -3,33 +3,38 @@
 migrate_pool() {
   echo "-------------------------- migrate pool -------------------------------------"
 
-  msg=$(printf '{
-    "migrate_pool": {
-      "interchain_account_id": "test1",
-      "unbond": "0",
-      "bond": "0",
-      "active": "0",
-      "ibc_denom": "ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2",
-      "channel_id_of_ibc_denom": "channel-0",
-      "remote_denom": "uatom",
-      "validator_addrs": ["cosmosvaloper18hl5c9xn5dze2g50uaw0l2mr02ew57zk0auktn"],
-      "era": 1,
-      "rate": "1000000",
-      "total_platform_fee": "0",
-      "total_lsd_token_amount": "0",
-      "platform_fee_receiver": "%s",
-      "share_tokens":[],
-      "lsd_token_name": "lsdTokenNameX",
-      "lsd_token_symbol": "symbolX",
-      "minimal_stake": "100",
-      "unbonding_period": 1,
-      "era_seconds": 20,
-      "offset": -1000,
-      "sdk_greater_or_equal_v047": true
+msg=$(jq -n \
+  --arg ibc_denom "$IBCDENOM" \
+  --arg remote_denom "$HOSTCHAINDENOM" \
+  --arg validator "$VALIDATOR" \
+  --arg fee_receiver "$ADDRESS_1" \
+  '{
+    migrate_pool: {
+      interchain_account_id: "test1",
+      unbond: "0",
+      bond: "0",
+      active: "0",
+      ibc_denom: $ibc_denom,
+      channel_id_of_ibc_denom: "channel-0",
+      remote_denom: $remote_denom,
+      validator_addrs: [$validator],
+      era: 1,
+      rate: "1000000",
+      total_platform_fee: "0",
+      total_lsd_token_amount: "0",
+      platform_fee_receiver: $fee_receiver,
+      share_tokens: [],
+      lsd_token_name: "lsdTokenNameX",
+      lsd_token_symbol: "symbolX",
+      minimal_stake: "100",
+      unbonding_period: 1,
+      era_seconds: 20,
+      offset: -1000,
+      sdk_greater_or_equal_v047: true
     }
-  }' "$ADDRESS_1")
+  }')
 
-  # echo "the msg is: $msg"
+  # echo "the migrate_pool msg is: $msg"
   tx_result="$(
     neutrond tx wasm execute "$contract_address" "$msg" \
       --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \

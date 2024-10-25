@@ -71,8 +71,8 @@ process_era() {
   done
   echo " done"
 
-  echo "query ica atom balance"
-  gaiad query bank balances "$pool_address" --node "$GAIA_NODE" --output json | jq
+  echo "query ica asset(like atom) balance"
+  $BINARY query bank balances "$pool_address" --node "$GAIA_NODE" --output json | jq
 
   query="$(printf '{"pool_info": {"pool_addr": "%s"}}' "$pool_address")"
   echo "pool_info is: "
@@ -113,9 +113,9 @@ process_era() {
   done
   echo " done"
 
-  gaiad query staking delegations "$pool_address" --node "$GAIA_NODE" --output json | jq
+  $BINARY query staking delegations "$pool_address" --node "$GAIA_NODE" --output json | jq
 
-  gaiad query bank balances "$pool_address" --node "$GAIA_NODE" --output json | jq
+  $BINARY query bank balances "$pool_address" --node "$GAIA_NODE" --output json | jq
 
   query="$(printf '{"pool_info": {"pool_addr": "%s"}}' "$pool_address")"
   echo "pool_info is: "
@@ -188,7 +188,7 @@ process_era() {
   done
   echo " done"
 
-  gaiad query bank balances "$pool_address" --node "$GAIA_NODE" --output json | jq
+  $BINARY query bank balances "$pool_address" --node "$GAIA_NODE" --output json | jq
 
   query="$(printf '{"pool_info": {"pool_addr": "%s"}}' "$pool_address")"
   echo "pool_info is: "

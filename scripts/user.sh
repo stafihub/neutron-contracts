@@ -18,11 +18,11 @@ user_stake() {
 EOF
     )
 
-    tx_result=$(gaiad tx ibc-transfer transfer transfer channel-0 \
-        "$contract_address" 405550000uatom \
+    tx_result=$($BINARY tx ibc-transfer transfer transfer channel-0 \
+        "$contract_address" 405550000$HOSTCHAINDENOM \
         --memo "$msg" \
         --gas auto --gas-adjustment 1.4 \
-        --fees 1000uatom --from $ADDRESS_2 \
+        --fees 1000$HOSTCHAINDENOM --from $ADDRESS_2 \
         --keyring-backend=test --home="$HOME_2" \
         --chain-id="$CHAIN_ID_2" --node "$GAIA_NODE" \
         -y --output json | wait_tx_gaia)
@@ -61,7 +61,7 @@ user_stake_on_neutron() {
 
     tx_result=$(
         neutrond tx wasm execute "$contract_address" "$stake_msg" \
-            --amount 1000ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2 \
+            --amount 1000$IBCDENOM \
             --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
             --broadcast-mode=sync --gas-prices 0.0025untrn --gas 1000000 \
             --keyring-backend=test --home "$HOME_1" --node "$NEUTRON_NODE" | wait_tx
@@ -144,11 +144,11 @@ user_withdraw() {
     echo "--------------------------user withdraw-------------------------------------"
 
     echo "---- user balance before withdrawal ----"
-    gaiad query bank balances "$ADDRESS_2" --node "$GAIA_NODE"
+    $BINARY query bank balances "$ADDRESS_2" --node "$GAIA_NODE"
 
     echo "---- pool balance before user withdrawal ----"
-    gaiad query bank balances "$pool_address" --node "$GAIA_NODE"
-    
+    $BINARY query bank balances "$pool_address" --node "$GAIA_NODE"
+
     withdraw_msg=$(printf '{
   "withdraw": {
     "pool_addr": "%s",
@@ -177,10 +177,10 @@ user_withdraw() {
     echo " done"
 
     echo "---- user balance after withdrawal ----"
-    gaiad query bank balances "$ADDRESS_2" --node "$GAIA_NODE"
+    $BINARY query bank balances "$ADDRESS_2" --node "$GAIA_NODE"
 
     echo "---- pool balance after user withdrawal ----"
-    gaiad query bank balances "$pool_address" --node "$GAIA_NODE"
+    $BINARY query bank balances "$pool_address" --node "$GAIA_NODE"
 
 }
 
@@ -189,9 +189,9 @@ user_stake_lsm() {
     query="$(printf '{"balance": {"address": "%s"}}' "$ADDRESS_1")"
     neutrond query wasm contract-state smart "$lsd_token_contract_address" "$query" --output json | jq
 
-    tx_result=$(gaiad tx staking delegate "$VALIDATOR" 10000uatom \
+    tx_result=$($BINARY tx staking delegate "$VALIDATOR" 10000$HOSTCHAINDENOM \
         --gas auto --gas-adjustment 1.4 \
-        --fees 10000uatom --from $ADDRESS_2 \
+        --fees 10000$HOSTCHAINDENOM --from $ADDRESS_2 \
         --keyring-backend=test --home="$HOME_2" \
         --chain-id="$CHAIN_ID_2" --node "$GAIA_NODE" \
         -y --output json | wait_tx_gaia)
@@ -211,9 +211,9 @@ user_stake_lsm() {
     done
     echo " done"
 
-    tx_result=$(gaiad tx staking tokenize-share "$VALIDATOR" 6000uatom "$ADDRESS_2" \
+    tx_result=$($BINARY tx staking tokenize-share "$VALIDATOR" 6000$HOSTCHAINDENOM "$ADDRESS_2" \
         --gas auto --gas-adjustment 1.4 \
-        --fees 10000uatom --from $ADDRESS_2 \
+        --fees 10000$HOSTCHAINDENOM --from $ADDRESS_2 \
         --keyring-backend=test --home="$HOME_2" \
         --chain-id="$CHAIN_ID_2" --node "$GAIA_NODE" \
         -y --output json | wait_tx_gaia)
@@ -232,8 +232,8 @@ user_stake_lsm() {
     done
     echo " done"
 
-    share_token_denom=$(gaiad q bank balances $ADDRESS_2 --node "$GAIA_NODE" --output json | jq ".balances[0].denom" | sed 's/\"//g')
-    share_token_amount=$(gaiad q bank balances $ADDRESS_2 --node "$GAIA_NODE" --output json | jq ".balances[0].amount" | sed 's/\"//g')
+    share_token_denom=$($BINARY q bank balances $ADDRESS_2 --node "$GAIA_NODE" --output json | jq ".balances[0].denom" | sed 's/\"//g')
+    share_token_amount=$($BINARY q bank balances $ADDRESS_2 --node "$GAIA_NODE" --output json | jq ".balances[0].amount" | sed 's/\"//g')
 
     msg=$(
         cat <<EOF
@@ -251,11 +251,11 @@ user_stake_lsm() {
 EOF
     )
 
-    tx_result=$(gaiad tx ibc-transfer transfer transfer channel-0 \
+    tx_result=$($BINARY tx ibc-transfer transfer transfer channel-0 \
         "$contract_address" $share_token_amount$share_token_denom \
         --memo "$msg" \
         --gas auto --gas-adjustment 1.4 \
-        --fees 1000uatom --from $ADDRESS_2 \
+        --fees 1000$HOSTCHAINDENOM --from $ADDRESS_2 \
         --keyring-backend=test --home="$HOME_2" \
         --chain-id="$CHAIN_ID_2" --node "$GAIA_NODE" \
         -y --output json | wait_tx_gaia)

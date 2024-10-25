@@ -37,12 +37,12 @@ register_pool() {
   echo "ICA(Pool) address: $pool_address"
   echo "withdraw_addr: $withdraw_addr"
 
-  echo "-------------------------- transfer uatom through ibc -------------------------------------"
+  echo "-------------------------- transfer $HOSTCHAINDENOM through ibc -------------------------------------"
 
-  tx_result=$(gaiad tx ibc-transfer transfer transfer channel-0 \
-    "$ADDRESS_1" 1000uatom \
+  tx_result=$($BINARY tx ibc-transfer transfer transfer channel-0 \
+    "$ADDRESS_1" 1000$HOSTCHAINDENOM \
     --gas auto --gas-adjustment 1.4 \
-    --fees 1000uatom --from $ADDRESS_2 \
+    --fees 1000$HOSTCHAINDENOM --from $ADDRESS_2 \
     --keyring-backend=test --home="$HOME_2" \
     --chain-id="$CHAIN_ID_2" --node "$GAIA_NODE" \
     -y --output json | wait_tx_gaia)

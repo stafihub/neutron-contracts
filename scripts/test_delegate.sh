@@ -25,13 +25,22 @@ fi
 
 CHAIN_ID_1="test-1"
 CHAIN_ID_2="test-2"
-#NEUTRON_DIR="${NEUTRON_DIR:-/var/lib/docker/volumes/neutron-testing-data/_data}"
-#HOME_1="${NEUTRON_DIR}/test-1/"
+
+BINARY=gaiad
+HOSTCHAINDENOM="uatom"
+IBCDENOM="ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2"
+
+
 NEUTRON_DIR="${NEUTRON_DIR:-/Users/$(whoami)/OrbStack/docker/volumes}"
+HOME_1="${HOME_1:-${NEUTRON_DIR}/neutron-testing-data/${CHAIN_ID_1}/}"
+HOME_2="${HOME_2:-${NEUTRON_DIR}/neutron-testing-data/${CHAIN_ID_2}/}"
+
+# NEUTRON_DIR="${NEUTRON_DIR:-/var/lib/docker/volumes/neutron-testing-data/_data}"
+# HOME_1="${NEUTRON_DIR}/${CHAIN_ID_1}/"
+# HOME_2="${NEUTRON_DIR}/${CHAIN_ID_2}/"
+
 echo "volumes path: $NEUTRON_DIR"
-HOME_1="${HOME_1:-${NEUTRON_DIR}/neutron-testing-data/test-1/}"
 echo "home 1 path: $HOME_1"
-HOME_2="${HOME_2:-${NEUTRON_DIR}/neutron-testing-data/test-2/}"
 echo "home 2 path: $HOME_2"
 NEUTRON_NODE="tcp://127.0.0.1:26657"
 GAIA_NODE="tcp://127.0.0.1:16657"

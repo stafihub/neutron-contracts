@@ -3,23 +3,27 @@
 init_pool() {
   echo "-------------------------- init pool -------------------------------------"
 
-  msg=$(printf '{
-    "init_pool": {
-      "interchain_account_id": "test1",
-      "ibc_denom": "ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2",
-      "channel_id_of_ibc_denom": "channel-0",
-      "remote_denom": "uatom",
-      "validator_addrs": ["cosmosvaloper18hl5c9xn5dze2g50uaw0l2mr02ew57zk0auktn"],
-      "platform_fee_receiver": "%s",
-      "lsd_token_name": "lsdTokenNameX",
-      "lsd_token_symbol": "symbolX",
-      "minimal_stake": "100",
-      "unbonding_period": 1,
-      "sdk_greater_or_equal_v047": true
+msg=$(jq -n \
+  --arg ibc_denom "$IBCDENOM" \
+  --arg remote_denom "$HOSTCHAINDENOM" \
+  --arg fee_receiver "$ADDRESS_1" \
+  '{
+    init_pool: {
+      interchain_account_id: "test1",
+      ibc_denom: $ibc_denom,
+      channel_id_of_ibc_denom: "channel-0",
+      remote_denom: $remote_denom,
+      validator_addrs: ["cosmosvaloper18hl5c9xn5dze2g50uaw0l2mr02ew57zk0auktn"],
+      platform_fee_receiver: $fee_receiver,
+      lsd_token_name: "lsdTokenNameX",
+      lsd_token_symbol: "symbolX",
+      minimal_stake: "100",
+      unbonding_period: 1,
+      sdk_greater_or_equal_v047: true
     }
-  }' "$ADDRESS_1")
+  }')
 
-  # echo "the msg is: $msg"
+  # echo "the init_pool msg is: $msg"
   tx_result="$(
     neutrond tx wasm execute "$contract_address" "$msg" \
       --from "$ADDRESS_1" -y --chain-id "$CHAIN_ID_1" --output json \
