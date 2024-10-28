@@ -123,8 +123,6 @@ pub fn execute_era_active(
 
     pool_info.rate = new_rate;
     pool_info.status = ActiveEnded;
-    pool_info.bond = Uint128::zero();
-    pool_info.unbond = Uint128::zero();
     pool_info.active = new_active;
 
     let mut resp = Response::new().add_attribute("new_rate", pool_info.rate);
