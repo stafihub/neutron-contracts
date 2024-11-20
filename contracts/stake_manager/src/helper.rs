@@ -55,6 +55,7 @@ pub const REPLY_ID_RANGE_END: u64 = REPLY_ID_RANGE_START + REPLY_ID_RANGE_SIZE;
 pub const QUERY_REPLY_ID_RANGE_START: u64 = 2_000_000_000;
 pub const QUERY_REPLY_ID_RANGE_SIZE: u64 = 1_000_000;
 pub const QUERY_REPLY_ID_RANGE_END: u64 = QUERY_REPLY_ID_RANGE_START + QUERY_REPLY_ID_RANGE_SIZE;
+pub const VALIDATER_LEN_LIMIT: usize = 10;
 
 pub fn min_ntrn_ibc_fee(fee: IbcFee) -> IbcFee {
     IbcFee {

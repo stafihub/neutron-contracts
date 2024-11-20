@@ -5,6 +5,7 @@ use crate::helper::query_icq_register_fee;
 use crate::helper::set_withdraw_sub_msg;
 use crate::helper::total_icq_register_fee;
 use crate::helper::CAL_BASE;
+use crate::helper::VALIDATER_LEN_LIMIT;
 use crate::msg::MigratePoolParams;
 use crate::state::ValidatorUpdateStatus;
 use crate::state::POOLS;
@@ -28,7 +29,7 @@ pub fn execute_migrate_pool(
     let (pool_ica_info, withdraw_ica_info, _) =
         INFO_OF_ICA_ID.load(deps.storage, param.interchain_account_id.clone())?;
 
-    if param.validator_addrs.is_empty() || param.validator_addrs.len() > 5 {
+    if param.validator_addrs.is_empty() || param.validator_addrs.len() > VALIDATER_LEN_LIMIT {
         return Err(ContractError::ValidatorAddressesListSize {}.into());
     }
 
