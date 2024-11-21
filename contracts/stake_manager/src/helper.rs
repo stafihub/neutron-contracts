@@ -18,7 +18,7 @@ use lsd_token::msg::InstantiateMinterData;
 use neutron_sdk::bindings::msg::{IbcFee, NeutronMsg};
 use neutron_sdk::bindings::query::NeutronQuery;
 use neutron_sdk::bindings::types::ProtobufAny;
-use neutron_sdk::interchain_queries::v045::new_register_delegator_delegations_query_msg;
+use neutron_sdk::interchain_queries::v045::new_register_delegator_delegations_query_msg as v045_new_register_delegator_delegations_query_msg;
 use neutron_sdk::interchain_queries::v045::{
     new_register_balance_query_msg, new_register_staking_validators_query_msg,
 };
@@ -327,7 +327,7 @@ pub fn register_delegator_delegations_query_msg(
             update_period,
         )
     } else {
-        new_register_delegator_delegations_query_msg(
+        v045_new_register_delegator_delegations_query_msg(
             connection_id,
             delegator,
             validators,

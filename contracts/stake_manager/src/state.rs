@@ -1,5 +1,5 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{from_json, to_json_vec, Addr, Binary, StdResult, Storage, Uint128};
+use cosmwasm_std::{from_json, to_json_vec, Addr, Binary, Coin, StdResult, Storage, Uint128};
 use cw_storage_plus::{Item, Map};
 
 use crate::helper::{
@@ -112,6 +112,17 @@ pub const UNSTAKES_OF_INDEX: Map<(String, u64), UnstakeInfo> = Map::new("unstake
 #[cw_serde]
 pub struct DelegatorDelegationsResponse {
     pub delegations: Vec<cosmwasm_std::Delegation>,
+    pub last_submitted_local_height: u64,
+}
+
+#[cw_serde]
+pub struct Balances {
+    pub coins: Vec<Coin>,
+}
+
+#[cw_serde]
+pub struct BalanceResponse {
+    pub balances: Balances,
     pub last_submitted_local_height: u64,
 }
 

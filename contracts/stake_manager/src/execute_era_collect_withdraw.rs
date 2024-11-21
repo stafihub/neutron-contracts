@@ -7,7 +7,7 @@ use crate::{error_conversion::ContractError, helper::DEFAULT_TIMEOUT_SECONDS};
 use cosmwasm_std::{DepsMut, Env, MessageInfo, Response, Uint128};
 use neutron_sdk::{
     bindings::{msg::NeutronMsg, query::NeutronQuery},
-    NeutronError, NeutronResult,
+    NeutronResult,
 };
 
 pub fn execute_era_collect_withdraw(
@@ -26,10 +26,11 @@ pub fn execute_era_collect_withdraw(
     let (_, withdraw_ica_info, _) = INFO_OF_ICA_ID.load(deps.storage, pool_info.ica_id.clone())?;
 
     // check withdraw address balance and send it to the pool
-    let withdraw_balances_result: Result<
-        neutron_sdk::interchain_queries::v045::queries::BalanceResponse,
-        NeutronError,
-    > = query_balance_by_addr(deps.as_ref(), withdraw_ica_info.ica_addr.clone());
+    let withdraw_balances_result = query_balance_by_addr(
+        deps.as_ref(),
+        withdraw_ica_info.ica_addr.clone(),
+        pool_info.sdk_greater_or_equal_v047,
+    );
 
     let mut withdraw_amount = Uint128::zero();
     if let Ok(balance_response) = withdraw_balances_result {
