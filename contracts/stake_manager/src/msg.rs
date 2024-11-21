@@ -196,6 +196,7 @@ pub enum ExecuteMsg {
     },
     EraBond {
         pool_addr: String,
+        select_vals: Vec<String>,
     },
     EraCollectWithdraw {
         pool_addr: String,

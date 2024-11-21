@@ -32,6 +32,7 @@ pub fn execute_era_bond(
     env: Env,
     info: MessageInfo,
     pool_addr: String,
+    select_vals: Vec<String>,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
 
@@ -144,12 +145,15 @@ pub fn execute_era_bond(
         }
     } else {
         let stake_amount = pool_info.era_snapshot.bond - pool_info.era_snapshot.unbond;
-        let validator_count = pool_info.validator_addrs.len() as u128;
+        let validator_count = select_vals.len() as u128;
         if validator_count == 0 {
             return Err(ContractError::ValidatorsEmpty {}.into());
         }
         if stake_amount < STAKE_SPLIT_THRESHOLD {
-            for (index, validator_addr) in pool_info.validator_addrs.iter().enumerate() {
+            for (index, validator_addr) in select_vals.iter().enumerate() {
+                if !pool_info.validator_addrs.contains(validator_addr) {
+                    return Err(ContractError::ValidatorNotSupport {}.into());
+                }
                 if index == 0 {
                     msgs.push(gen_delegation_txs(
                         pool_addr.clone(),
@@ -182,7 +186,11 @@ pub fn execute_era_bond(
             let remainder =
                 stake_amount.sub(amount_per_validator.mul(Uint128::new(validator_count)));
 
-            for (index, validator_addr) in pool_info.validator_addrs.iter().enumerate() {
+            for (index, validator_addr) in select_vals.iter().enumerate() {
+                if !pool_info.validator_addrs.contains(validator_addr) {
+                    return Err(ContractError::ValidatorNotSupport {}.into());
+                }
+
                 let mut amount_for_this_validator = amount_per_validator;
 
                 // Add the remainder to the first validator

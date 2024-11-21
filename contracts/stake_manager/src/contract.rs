@@ -193,7 +193,10 @@ pub fn execute(
             stake_amount,
         } => execute_pool_delegate(deps, info, pool_addr, stake_amount),
         ExecuteMsg::EraUpdate { pool_addr } => execute_era_update(deps, env, info, pool_addr),
-        ExecuteMsg::EraBond { pool_addr } => execute_era_bond(deps, env, info, pool_addr),
+        ExecuteMsg::EraBond {
+            pool_addr,
+            select_vals,
+        } => execute_era_bond(deps, env, info, pool_addr, select_vals),
         ExecuteMsg::EraCollectWithdraw { pool_addr } => {
             execute_era_collect_withdraw(deps, info, pool_addr)
         }
