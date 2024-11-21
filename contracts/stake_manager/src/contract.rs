@@ -197,7 +197,10 @@ pub fn execute(
         ExecuteMsg::EraCollectWithdraw { pool_addr } => {
             execute_era_collect_withdraw(deps, info, pool_addr)
         }
-        ExecuteMsg::EraRebond { pool_addr } => execute_era_rebond(deps, info, pool_addr),
+        ExecuteMsg::EraRebond {
+            pool_addr,
+            select_vals,
+        } => execute_era_rebond(deps, info, pool_addr, select_vals),
         ExecuteMsg::EraActive { pool_addr } => execute_era_active(deps, pool_addr),
         ExecuteMsg::StakeLsm {
             neutron_address,

@@ -202,6 +202,7 @@ pub enum ExecuteMsg {
     },
     EraRebond {
         pool_addr: String,
+        select_vals: Vec<String>,
     },
     EraActive {
         pool_addr: String,

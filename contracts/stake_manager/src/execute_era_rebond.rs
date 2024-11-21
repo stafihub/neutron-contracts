@@ -17,6 +17,7 @@ pub fn execute_era_rebond(
     mut deps: DepsMut<NeutronQuery>,
     info: MessageInfo,
     pool_addr: String,
+    select_vals: Vec<String>,
 ) -> NeutronResult<Response<NeutronMsg>> {
     let mut pool_info = POOLS.load(deps.storage, pool_addr.clone())?;
 
@@ -37,8 +38,7 @@ pub fn execute_era_rebond(
         return Ok(Response::default());
     }
 
-    let validator_count = pool_info.validator_addrs.len() as u128;
-
+    let validator_count = select_vals.len() as u128;
     let mut msgs = vec![];
     if validator_count == 0 {
         return Err(ContractError::ValidatorsEmpty {}.into());
@@ -47,9 +47,12 @@ pub fn execute_era_rebond(
     let amount_per_validator = restake_amount.div(Uint128::from(validator_count));
     let remainder = restake_amount.sub(amount_per_validator.mul(Uint128::new(validator_count)));
 
-    for (index, validator_addr) in pool_info.validator_addrs.iter().enumerate() {
-        let mut amount_for_this_validator = amount_per_validator;
+    for (index, validator_addr) in select_vals.iter().enumerate() {
+        if !pool_info.validator_addrs.contains(validator_addr) {
+            return Err(ContractError::ValidatorNotSupport {}.into());
+        }
 
+        let mut amount_for_this_validator = amount_per_validator;
         // Add the remainder to the first validator
         if index == 0 {
             amount_for_this_validator += remainder;

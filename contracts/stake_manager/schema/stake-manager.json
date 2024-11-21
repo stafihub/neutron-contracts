@@ -429,11 +429,18 @@
           "era_rebond": {
             "type": "object",
             "required": [
-              "pool_addr"
+              "pool_addr",
+              "select_vals"
             ],
             "properties": {
               "pool_addr": {
                 "type": "string"
+              },
+              "select_vals": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
               }
             },
             "additionalProperties": false
