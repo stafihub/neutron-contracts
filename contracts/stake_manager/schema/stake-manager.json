@@ -970,11 +970,15 @@
           "balance": {
             "type": "object",
             "required": [
-              "ica_addr"
+              "ica_addr",
+              "sdk_greater_or_equal_v047"
             ],
             "properties": {
               "ica_addr": {
                 "type": "string"
+              },
+              "sdk_greater_or_equal_v047": {
+                "type": "boolean"
               }
             },
             "additionalProperties": false
@@ -1286,9 +1290,9 @@
           "minimum": 0.0
         }
       },
+      "additionalProperties": false,
       "definitions": {
         "Balances": {
-          "description": "A structure that can be reconstructed from **StorageValues**'s for the **Balance Interchain Query**. Contains coins that are held by some account on remote chain.",
           "type": "object",
           "required": [
             "coins"
@@ -1300,7 +1304,8 @@
                 "$ref": "#/definitions/Coin"
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         "Coin": {
           "type": "object",

@@ -59,11 +59,15 @@
         "balance": {
           "type": "object",
           "required": [
-            "ica_addr"
+            "ica_addr",
+            "sdk_greater_or_equal_v047"
           ],
           "properties": {
             "ica_addr": {
               "type": "string"
+            },
+            "sdk_greater_or_equal_v047": {
+              "type": "boolean"
             }
           },
           "additionalProperties": false

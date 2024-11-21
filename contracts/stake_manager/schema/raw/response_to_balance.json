@@ -16,9 +16,9 @@
       "minimum": 0.0
     }
   },
+  "additionalProperties": false,
   "definitions": {
     "Balances": {
-      "description": "A structure that can be reconstructed from **StorageValues**'s for the **Balance Interchain Query**. Contains coins that are held by some account on remote chain.",
       "type": "object",
       "required": [
         "coins"
@@ -30,7 +30,8 @@
             "$ref": "#/definitions/Coin"
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     "Coin": {
       "type": "object",
